@@ -23,7 +23,7 @@ interface ImportResult {
 
 const TEMPLATE_HEADERS = [
   "name",
-  "sku",
+  "code",
   "category",
   "designer",
   "description",
@@ -118,7 +118,11 @@ export function ProductImportDialog() {
 
   return (
     <>
-      <Button variant="outline" onClick={() => setOpen(true)}>
+      <Button
+        variant="outline"
+        onClick={() => setOpen(true)}
+        title="Bulk import products from a CSV or Excel file"
+      >
         <Upload className="h-4 w-4" />
         Import
       </Button>

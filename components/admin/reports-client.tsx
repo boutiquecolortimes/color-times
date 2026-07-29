@@ -164,7 +164,7 @@ const DATE = (value: unknown) => formatDate(String(value));
 const TABLE_CONFIGS: Record<ReportType, ColumnConfig[]> = {
   products: [
     { key: "name", label: "Product" },
-    { key: "sku", label: "SKU" },
+    { key: "sku", label: "Code" },
     { key: "category", label: "Category" },
     { key: "rentalPricePerDay", label: "Price/Day", format: (r) => CURRENCY(r.rentalPricePerDay) },
     { key: "retailValue", label: "Retail Value", format: (r) => CURRENCY(r.retailValue) },

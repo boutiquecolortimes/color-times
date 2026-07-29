@@ -7,6 +7,7 @@ import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
+import { escapeRegex } from "@/lib/utils";
 
 const SORTABLE_FIELDS = new Set([
   "name",
@@ -48,7 +49,21 @@ export async function GET(request: NextRequest): Promise<Response> {
   }
 
   if (search) {
-    filter.$text = { $search: search };
+    // Partial, case-insensitive match across product code (SKU), name, and
+    // other descriptive fields — $text only did whole-word stemmed matches
+    // on name/description/tags and never covered SKU, so typing a code or
+    // half a dress name returned nothing.
+    const regex = new RegExp(escapeRegex(search), "i");
+    filter.$or = [
+      { name: regex },
+      { sku: regex },
+      { designer: regex },
+      { dressType: regex },
+      { color: regex },
+      { fabric: regex },
+      { work: regex },
+      { tags: regex },
+    ];
   }
   if (category) {
     filter.category = category;
@@ -87,10 +102,16 @@ export async function POST(request: NextRequest): Promise<Response> {
       $or: [{ slug: input.slug }, { sku: input.sku }],
     }).lean();
     if (existing) {
-      return apiError("A product with this slug or SKU already exists", 409);
+      return apiError("A product with this code or slug already exists", 409);
     }
 
-    const product = await Product.create(input);
+    // Retail value and security deposit aren't on the Pricing tab anymore —
+    // auto-derive them from the rental price (same formula Quick Add used to
+    // use) so booking deposits and invoices keep working unchanged.
+    const retailValue = input.retailValue ?? Math.round(input.rentalPricePerDay * 12);
+    const securityDeposit = input.securityDeposit ?? Math.round(input.rentalPricePerDay * 2);
+
+    const product = await Product.create({ ...input, retailValue, securityDeposit });
 
     await recordAuditLog({
       entityType: "Product",

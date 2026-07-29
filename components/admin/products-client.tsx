@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  Archive,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -46,7 +47,6 @@ import { ColumnVisibilityMenu } from "@/components/admin/column-visibility-menu"
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { ProductsBulkToolbar } from "@/components/admin/products-bulk-toolbar";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
-import { ProductQuickAddDialog } from "@/components/admin/product-quick-add-dialog";
 import { ProductImportDialog } from "@/components/admin/product-import-dialog";
 import { ProductDetailDrawer } from "@/components/admin/product-detail-drawer";
 import { ImagePreviewDialog } from "@/components/admin/image-preview-dialog";
@@ -412,7 +412,7 @@ export function ProductsClient({
     }
   }
 
-const exportHeaders = ["Name", "SKU", "Category", "Price/Day", "Stock", "Status"];
+const exportHeaders = ["Name", "Code", "Category", "Price/Day", "Stock", "Status"];
 
   async function fetchExportRows(): Promise<(string | number)[][]> {
     const full = await fetchProducts({ page: 1, search, category, status, sortBy, sortDir, all: true });
@@ -526,7 +526,7 @@ const exportHeaders = ["Name", "SKU", "Category", "Price/Day", "Stock", "Status"
           <div className="relative max-w-sm flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search by name, description, tags..."
+              placeholder="Search by name, code, designer..."
               value={search}
               onChange={(event) => {
                 setSearch(event.target.value);
@@ -589,7 +589,6 @@ const exportHeaders = ["Name", "SKU", "Category", "Price/Day", "Stock", "Status"
             </ButtonLink>
           )}
           <ProductImportDialog />
-          <ProductQuickAddDialog categories={categories} />
           <ButtonLink href="/admin/products/new" className="rounded-md">
             New Product
           </ButtonLink>
@@ -886,9 +885,10 @@ const exportHeaders = ["Name", "SKU", "Category", "Price/Day", "Stock", "Status"
                               variant="ghost"
                               size="icon-sm"
                               aria-label="Archive"
+                              title="Archive"
                               onClick={() => archiveMutation.mutate(product._id)}
                             >
-                              <RotateCcw className="h-3.5 w-3.5 rotate-180" />
+                              <Archive className="h-3.5 w-3.5" />
                             </Button>
                           )}
                           <Button

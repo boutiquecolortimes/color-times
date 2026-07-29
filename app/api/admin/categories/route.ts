@@ -38,7 +38,14 @@ export async function POST(request: NextRequest): Promise<Response> {
       return apiError("A category with this slug already exists", 409);
     }
 
-    const category = await Category.create(input);
+    const displayOrder = input.displayOrder ?? (await Category.countDocuments());
+
+    const category = await Category.create({
+      ...input,
+      heroImage: input.heroImage ?? "",
+      isFeatured: input.isFeatured ?? false,
+      displayOrder,
+    });
     return apiSuccess({ category }, 201);
   } catch (error) {
     return apiErrorFromUnknown(error);

@@ -1,16 +1,18 @@
 import { z } from "zod";
 
 export const categorySchema = z.object({
-  name: z.string().trim().min(2, "Name must be at least 2 characters").max(80),
+  name: z.string().trim().min(1, "Name is required").max(80),
   slug: z
     .string()
     .trim()
     .toLowerCase()
-    .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Use lowercase letters, numbers and hyphens only"),
-  description: z.string().trim().min(10, "Description must be at least 10 characters").max(500),
-  heroImage: z.string().trim().min(1, "Hero image is required"),
-  displayOrder: z.number().int().min(0),
-  isFeatured: z.boolean(),
+    .min(1, "Slug is required"),
+  description: z.string().trim().max(500).optional(),
+  // Not set from the admin form anymore — auto-derived on the storefront,
+  // kept optional so older callers (scripts, imports) can still pass one.
+  heroImage: z.string().trim().optional(),
+  displayOrder: z.number().int().min(0).optional(),
+  isFeatured: z.boolean().optional(),
 });
 
 export type CategoryInput = z.infer<typeof categorySchema>;

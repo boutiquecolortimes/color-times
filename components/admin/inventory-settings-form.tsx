@@ -56,7 +56,7 @@ export function InventorySettingsForm({
         className="space-y-8"
       >
         <section className="rounded-lg border border-border bg-card p-6">
-          <h2 className="font-heading text-lg">Stock &amp; SKU</h2>
+          <h2 className="font-heading text-lg">Stock &amp; Code</h2>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField
               control={form.control}
@@ -83,11 +83,11 @@ export function InventorySettingsForm({
               name="skuPrefix"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>SKU Prefix</FormLabel>
+                  <FormLabel>Code Prefix</FormLabel>
                   <FormControl>
                     <Input {...field} />
                   </FormControl>
-                  <FormDescription>Used when auto-generating new SKUs.</FormDescription>
+                  <FormDescription>Used when auto-generating new codes.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

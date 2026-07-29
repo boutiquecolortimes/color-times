@@ -25,7 +25,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { ImageUploadField } from "@/components/admin/image-upload-field";
 import { categorySchema, type CategoryInput } from "@/lib/validations/category";
 
 interface CategoryRow extends CategoryInput {
@@ -65,9 +64,6 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
       name: "",
       slug: "",
       description: "",
-      heroImage: "",
-      displayOrder: 0,
-      isFeatured: false,
     },
   });
 
@@ -77,9 +73,6 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
       name: "",
       slug: "",
       description: "",
-      heroImage: "",
-      displayOrder: categories.length,
-      isFeatured: false,
     });
     setDialogOpen(true);
   }
@@ -143,10 +136,6 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
           <div className="p-3">
             <p className="truncate text-sm font-medium">{category.name}</p>
             <p className="truncate text-xs text-muted-foreground">{category.slug}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Order {category.displayOrder}
-              {category.isFeatured && " · Featured"}
-            </p>
             <div className="mt-2 flex justify-end gap-1">
               <Button variant="ghost" size="icon-sm" onClick={() => openEditDialog(category)}>
                 <Pencil className="h-3.5 w-3.5" />
@@ -218,8 +207,6 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
               <th className="px-4 py-3">Image</th>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Slug</th>
-              <th className="px-4 py-3">Order</th>
-              <th className="px-4 py-3">Featured</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
@@ -235,8 +222,6 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
                 </td>
                 <td className="px-4 py-3 font-medium">{category.name}</td>
                 <td className="px-4 py-3 text-muted-foreground">{category.slug}</td>
-                <td className="px-4 py-3">{category.displayOrder}</td>
-                <td className="px-4 py-3">{category.isFeatured ? "Yes" : "—"}</td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-2">
                     <Button variant="ghost" size="icon-sm" onClick={() => openEditDialog(category)}>
@@ -261,7 +246,7 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
             ))}
             {categories.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
                   No categories yet. Create your first one.
                 </td>
               </tr>
@@ -329,63 +314,6 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="heroImage"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Hero Image</FormLabel>
-                    <FormControl>
-                      <ImageUploadField
-                        images={field.value ? [field.value] : []}
-                        onChange={(images) => field.onChange(images[0] ?? "")}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="displayOrder"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Display Order</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          value={field.value}
-                          onChange={(event) => field.onChange(Number(event.target.value))}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="isFeatured"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Featured</FormLabel>
-                      <FormControl>
-                        <label className="flex h-8 items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={field.value}
-                            onChange={(event) => field.onChange(event.target.checked)}
-                            className="h-4 w-4 rounded border-input"
-                          />
-                          Show on homepage
-                        </label>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
               <DialogFooter>
                 <Button type="submit" disabled={saveMutation.isPending}>
                   {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}

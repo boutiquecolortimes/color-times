@@ -42,6 +42,8 @@ export default async function EditProductPage({
           description: product.description,
           color: product.color,
           fabric: product.fabric,
+          dressType: product.dressType ?? "",
+          work: product.work ?? "",
           images: product.images,
           variants: product.variants,
           status: product.status,

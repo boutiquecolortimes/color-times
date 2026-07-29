@@ -10,7 +10,8 @@ import type { ProductSize } from "@/models/Product";
 
 interface ImportRow {
   name?: string;
-  sku?: string;
+  code?: string;
+  sku?: string; // legacy header name, still accepted
   category?: string;
   designer?: string;
   description?: string;
@@ -112,12 +113,12 @@ export async function POST(request: NextRequest): Promise<Response> {
         continue;
       }
 
-      const sku = (row.sku?.trim() || `IMP-${Date.now()}-${i}`).toUpperCase();
+      const sku = (row.code?.trim() || row.sku?.trim() || `IMP-${Date.now()}-${i}`).toUpperCase();
       const slug = slugify(name);
 
       const existing = await Product.findOne({ $or: [{ sku }, { slug }] }).lean();
       if (existing) {
-        results.push({ row: rowNumber, name, status: "skipped", reason: "SKU or slug already exists" });
+        results.push({ row: rowNumber, name, status: "skipped", reason: "Code or slug already exists" });
         continue;
       }
 

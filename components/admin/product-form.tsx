@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Form,
   FormControl,
@@ -25,7 +26,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { ImageUploadField } from "@/components/admin/image-upload-field";
+import { BookingStatusBadge } from "@/components/admin/booking-status-badge";
+import { ServiceOrderStatusBadge } from "@/components/admin/service-order-status-badge";
 import { productSchema, type ProductInput } from "@/lib/validations/product";
+import { formatDate } from "@/lib/utils";
+import type { BookingStatus } from "@/models/Booking";
+import type { ServiceOrderStatus } from "@/models/ServiceOrder";
 
 const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL", "Custom"] as const;
 
@@ -38,6 +44,37 @@ interface ProductFormProps {
   categories: CategoryOption[];
   productId?: string;
   defaultValues?: ProductInput;
+}
+
+interface ProductHistoryBooking {
+  _id: string;
+  bookingNumber: string;
+  customerName: string;
+  status: BookingStatus;
+  rentalStartDate: string;
+  rentalEndDate: string;
+  totalAmount: number;
+}
+
+interface ProductHistoryServiceOrder {
+  _id: string;
+  serviceType: "dry_clean" | "tailor";
+  status: ServiceOrderStatus;
+  sentDate: string;
+  expectedReturnDate: string;
+  totalAmount: number;
+}
+
+interface ProductHistory {
+  bookings: ProductHistoryBooking[];
+  serviceOrders: ProductHistoryServiceOrder[];
+}
+
+async function fetchProductHistory(id: string): Promise<ProductHistory> {
+  const res = await fetch(`/api/admin/products/${id}/history`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error);
+  return json.data;
 }
 
 function slugify(value: string): string {
@@ -68,11 +105,9 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
       images: [],
       variants: [{ size: "M", quantityInStock: 0 }],
       rentalPricePerDay: 0,
-      retailValue: 0,
       purchasePrice: 0,
       stitchingCost: 0,
       transportCost: 0,
-      securityDeposit: 0,
       isFeatured: false,
       isNewArrival: false,
       isActive: true,
@@ -83,6 +118,12 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "variants",
+  });
+
+  const { data: history } = useQuery({
+    queryKey: ["admin", "product-history", productId],
+    queryFn: () => fetchProductHistory(productId as string),
+    enabled: Boolean(productId),
   });
 
   const saveMutation = useMutation({
@@ -110,231 +151,190 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}
-        className="space-y-8"
+        className="space-y-6"
       >
-        <section className="rounded-lg border border-border bg-card p-6">
-          <h2 className="font-heading text-lg">Basic Information</h2>
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Product Name</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      onChange={(event) => {
-                        field.onChange(event);
-                        if (!isEditing) form.setValue("slug", slugify(event.target.value));
-                      }}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="slug"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Slug</FormLabel>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="sku"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>SKU</FormLabel>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="category"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Category</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select a category">
-                          {(value: string) =>
-                            categories.find((cat) => cat._id === value)?.name ??
-                            "Select a category"
-                          }
-                        </SelectValue>
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat._id} value={cat._id}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="designer"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Designer (optional)</FormLabel>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="color"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Color</FormLabel>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="fabric"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Fabric</FormLabel>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="dressType"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Dress Type</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. Unstitched, Semi-stitched, Ready-to-wear" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="work"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Work</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. Zari embroidery, Mirror work" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-          <div className="mt-4">
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea rows={4} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-        </section>
+        <Tabs defaultValue="basic">
+          <TabsList className="w-full sm:w-fit">
+            <TabsTrigger value="basic">Basic Info</TabsTrigger>
+            <TabsTrigger value="images">Images</TabsTrigger>
+            <TabsTrigger value="pricing">Pricing</TabsTrigger>
+            <TabsTrigger value="other">Other</TabsTrigger>
+          </TabsList>
 
-        <section className="rounded-lg border border-border bg-card p-6">
-          <h2 className="font-heading text-lg">Images</h2>
-          <div className="mt-4">
-            <FormField
-              control={form.control}
-              name="images"
-              render={({ field }) => (
-                <FormItem>
-                  <FormControl>
-                    <ImageUploadField images={field.value} onChange={field.onChange} multiple />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-        </section>
-
-        <section className="rounded-lg border border-border bg-card p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="font-heading text-lg">Sizes & Stock</h2>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => append({ size: "M", quantityInStock: 0 })}
-            >
-              <Plus className="h-4 w-4" />
-              Add Size
-            </Button>
-          </div>
-          <div className="mt-4 space-y-3">
-            {fields.map((fieldItem, index) => (
-              <div key={fieldItem.id} className="flex items-end gap-3">
+          <TabsContent value="basic">
+            <section className="rounded-lg border border-border bg-card p-6">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
-                  name={`variants.${index}.size`}
+                  name="name"
                   render={({ field }) => (
-                    <FormItem className="w-32">
-                      <FormLabel>Size</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {SIZE_OPTIONS.map((size) => (
-                            <SelectItem key={size} value={size}>
-                              {size}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <FormItem>
+                      <FormLabel>Product Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          onChange={(event) => {
+                            field.onChange(event);
+                            if (!isEditing) form.setValue("slug", slugify(event.target.value));
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
                 <FormField
                   control={form.control}
-                  name={`variants.${index}.quantityInStock`}
+                  name="slug"
                   render={({ field }) => (
-                    <FormItem className="w-32">
-                      <FormLabel>Quantity</FormLabel>
+                    <FormItem>
+                      <FormLabel>Slug</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="sku"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Code</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select a category">
+                              {(value: string) =>
+                                categories.find((cat) => cat._id === value)?.name ??
+                                "Select a category"
+                              }
+                            </SelectValue>
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat._id} value={cat._id}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="color"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Color</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="fabric"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Fabric</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="dressType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Dress Type</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. Unstitched, Semi-stitched, Ready-to-wear" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="work"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Work</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. Zari embroidery, Mirror work" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="mt-4">
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea rows={4} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </section>
+          </TabsContent>
+
+          <TabsContent value="images">
+            <section className="rounded-lg border border-border bg-card p-6">
+              <FormField
+                control={form.control}
+                name="images"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <ImageUploadField images={field.value} onChange={field.onChange} multiple />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </section>
+          </TabsContent>
+
+          <TabsContent value="pricing">
+            <section className="rounded-lg border border-border bg-card p-6">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="rentalPricePerDay"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Rent / Day (&#8377;)</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -342,199 +342,285 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
                           onChange={(event) => field.onChange(Number(event.target.value))}
                         />
                       </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="purchasePrice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Purchase Price (&#8377;)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          value={field.value ?? 0}
+                          onChange={(event) => field.onChange(Number(event.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="transportCost"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Transport Cost (&#8377;)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          value={field.value ?? 0}
+                          onChange={(event) => field.onChange(Number(event.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="stitchingCost"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Stitching Cost (&#8377;)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          value={field.value ?? 0}
+                          onChange={(event) => field.onChange(Number(event.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </section>
+          </TabsContent>
+
+          <TabsContent value="other" className="space-y-6">
+            <section className="rounded-lg border border-border bg-card p-6">
+              <div className="flex items-center justify-between">
+                <h2 className="font-heading text-lg">Size &amp; Quantity</h2>
                 <Button
                   type="button"
-                  variant="ghost"
-                  size="icon"
-                  disabled={fields.length === 1}
-                  onClick={() => remove(index)}
-                  className="text-destructive"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => append({ size: "M", quantityInStock: 0 })}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Plus className="h-4 w-4" />
+                  Add Size
                 </Button>
               </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-lg border border-border bg-card p-6">
-          <h2 className="font-heading text-lg">Pricing</h2>
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <FormField
-              control={form.control}
-              name="rentalPricePerDay"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Rental Price / Day (&#8377;)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      value={field.value}
-                      onChange={(event) => field.onChange(Number(event.target.value))}
+              <div className="mt-4 space-y-3">
+                {fields.map((fieldItem, index) => (
+                  <div key={fieldItem.id} className="flex items-end gap-3">
+                    <FormField
+                      control={form.control}
+                      name={`variants.${index}.size`}
+                      render={({ field }) => (
+                        <FormItem className="w-32">
+                          <FormLabel>Size</FormLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger className="w-full">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {SIZE_OPTIONS.map((size) => (
+                                <SelectItem key={size} value={size}>
+                                  {size}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
                     />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="securityDeposit"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Security Deposit (&#8377;)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      value={field.value}
-                      onChange={(event) => field.onChange(Number(event.target.value))}
+                    <FormField
+                      control={form.control}
+                      name={`variants.${index}.quantityInStock`}
+                      render={({ field }) => (
+                        <FormItem className="w-32">
+                          <FormLabel>Quantity</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              value={field.value}
+                              onChange={(event) => field.onChange(Number(event.target.value))}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
                     />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="retailValue"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Retail Value (&#8377;)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      value={field.value}
-                      onChange={(event) => field.onChange(Number(event.target.value))}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="purchasePrice"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Purchase Price (&#8377;)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      value={field.value ?? 0}
-                      onChange={(event) => field.onChange(Number(event.target.value))}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="stitchingCost"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Stitching Cost (&#8377;)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      value={field.value ?? 0}
-                      onChange={(event) => field.onChange(Number(event.target.value))}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="transportCost"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Transport Cost (&#8377;)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      value={field.value ?? 0}
-                      onChange={(event) => field.onChange(Number(event.target.value))}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-        </section>
-
-        {isEditing && (
-          <section className="rounded-lg border border-border bg-card p-6">
-            <h2 className="font-heading text-lg">Inventory Status</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Updates automatically when a booking is confirmed, returned, or sent for dry
-              cleaning/repair. Override manually if needed.
-            </p>
-            <div className="mt-4 max-w-xs">
-              <FormField
-                control={form.control}
-                name="status"
-                render={() => (
-                  <FormItem>
-                    <Select
-                      value={form.watch("status") ?? "available"}
-                      onValueChange={(value) => form.setValue("status", value as ProductInput["status"])}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      disabled={fields.length === 1}
+                      onClick={() => remove(index)}
+                      className="text-destructive"
                     >
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="available">Available</SelectItem>
-                        <SelectItem value="reserved">Reserved</SelectItem>
-                        <SelectItem value="picked_up">Picked Up</SelectItem>
-                        <SelectItem value="under_dry_cleaning">Dry Cleaning</SelectItem>
-                        <SelectItem value="under_repair">Repair</SelectItem>
-                        <SelectItem value="damaged">Damaged</SelectItem>
-                        <SelectItem value="returned">Returned</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </section>
-        )}
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </section>
 
-        <section className="rounded-lg border border-border bg-card p-6">
-          <h2 className="font-heading text-lg">Visibility</h2>
-          <div className="mt-4 flex flex-wrap gap-6">
-            {(["isActive", "isFeatured", "isNewArrival"] as const).map((key) => (
-              <FormField
-                key={key}
-                control={form.control}
-                name={key}
-                render={({ field }) => (
-                  <FormItem>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={field.value}
-                        onChange={(event) => field.onChange(event.target.checked)}
-                        className="h-4 w-4 rounded border-input"
-                      />
-                      {key === "isActive" && "Active (visible on site)"}
-                      {key === "isFeatured" && "Featured"}
-                      {key === "isNewArrival" && "New Arrival"}
-                    </label>
-                  </FormItem>
-                )}
-              />
-            ))}
-          </div>
-        </section>
+            <section className="rounded-lg border border-border bg-card p-6">
+              <h2 className="font-heading text-lg">Designer</h2>
+              <div className="mt-4 max-w-sm">
+                <FormField
+                  control={form.control}
+                  name="designer"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input placeholder="Designer name (optional)" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </section>
+
+            {isEditing && (
+              <section className="rounded-lg border border-border bg-card p-6">
+                <h2 className="font-heading text-lg">Status</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Updates automatically when a booking is confirmed, returned, or sent for dry
+                  cleaning/repair. Override manually if needed.
+                </p>
+                <div className="mt-4 max-w-xs">
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={() => (
+                      <FormItem>
+                        <Select
+                          value={form.watch("status") ?? "available"}
+                          onValueChange={(value) =>
+                            form.setValue("status", value as ProductInput["status"])
+                          }
+                        >
+                          <FormControl>
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="available">Available</SelectItem>
+                            <SelectItem value="reserved">Reserved</SelectItem>
+                            <SelectItem value="picked_up">Picked Up</SelectItem>
+                            <SelectItem value="under_dry_cleaning">Dry Cleaning</SelectItem>
+                            <SelectItem value="under_repair">Repair</SelectItem>
+                            <SelectItem value="damaged">Damaged</SelectItem>
+                            <SelectItem value="returned">Returned</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </section>
+            )}
+
+            <section className="rounded-lg border border-border bg-card p-6">
+              <h2 className="font-heading text-lg">Visibility</h2>
+              <div className="mt-4 flex flex-wrap gap-6">
+                {(["isFeatured", "isNewArrival"] as const).map((key) => (
+                  <FormField
+                    key={key}
+                    control={form.control}
+                    name={key}
+                    render={({ field }) => (
+                      <FormItem>
+                        <label className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={field.value}
+                            onChange={(event) => field.onChange(event.target.checked)}
+                            className="h-4 w-4 rounded border-input"
+                          />
+                          {key === "isFeatured" && "Featured"}
+                          {key === "isNewArrival" && "New Arrival"}
+                        </label>
+                      </FormItem>
+                    )}
+                  />
+                ))}
+              </div>
+            </section>
+
+            {isEditing && (
+              <section className="rounded-lg border border-border bg-card p-6">
+                <h2 className="font-heading text-lg">History</h2>
+                <div className="mt-4 space-y-5">
+                  <div>
+                    <p className="text-xs uppercase text-muted-foreground">
+                      Bookings ({history?.bookings.length ?? 0})
+                    </p>
+                    <div className="mt-2 space-y-2">
+                      {!history || history.bookings.length === 0 ? (
+                        <p className="py-3 text-sm text-muted-foreground">
+                          No bookings for this dress yet.
+                        </p>
+                      ) : (
+                        history.bookings.slice(0, 5).map((booking) => (
+                          <div key={booking._id} className="rounded-lg border border-border p-3 text-sm">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-medium">{booking.bookingNumber}</span>
+                              <BookingStatusBadge status={booking.status} />
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {booking.customerName} &middot; {formatDate(booking.rentalStartDate)} to{" "}
+                              {formatDate(booking.rentalEndDate)}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-xs uppercase text-muted-foreground">
+                      Dry Clean &amp; Repair ({history?.serviceOrders.length ?? 0})
+                    </p>
+                    <div className="mt-2 space-y-2">
+                      {!history || history.serviceOrders.length === 0 ? (
+                        <p className="py-3 text-sm text-muted-foreground">
+                          No dry-clean or repair orders for this dress yet.
+                        </p>
+                      ) : (
+                        history.serviceOrders.slice(0, 5).map((order) => (
+                          <div key={order._id} className="rounded-lg border border-border p-3 text-sm">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-medium">
+                                {order.serviceType === "dry_clean" ? "Dry Clean" : "Tailor / Alteration"}
+                              </span>
+                              <ServiceOrderStatusBadge status={order.status} />
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Sent {formatDate(order.sentDate)} &middot; Expected{" "}
+                              {formatDate(order.expectedReturnDate)}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+          </TabsContent>
+        </Tabs>
 
         <div className="flex justify-end gap-3">
           <Button type="button" variant="outline" onClick={() => router.push("/admin/products")}>

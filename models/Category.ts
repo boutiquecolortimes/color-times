@@ -16,8 +16,10 @@ const categorySchema = new Schema<ICategory>(
   {
     name: { type: String, required: true, trim: true },
     slug: { type: String, required: true, unique: true, lowercase: true, index: true },
-    description: { type: String, required: true },
-    heroImage: { type: String, required: true },
+    description: { type: String, trim: true, default: "" },
+    // Not editable in the admin form anymore — auto-fills from a product image
+    // on the storefront (see lib/catalog/queries.ts withRealHeroImages).
+    heroImage: { type: String, default: "" },
     displayOrder: { type: Number, default: 0 },
     isFeatured: { type: Boolean, default: false },
   },
