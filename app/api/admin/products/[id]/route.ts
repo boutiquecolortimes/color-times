@@ -40,6 +40,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
     const body = await request.json();
     const input = productSchema.partial().parse(body);
 
+    // If the form submitted an empty array (all images/sizes were cleared),
+    // don't let the save wipe the product down to nothing — keep the
+    // existing entries instead. A field the client never touched at all
+    // stays absent from `input` and is left alone below either way.
+    if (input.images && input.images.length === 0) delete input.images;
+    if (input.variants && input.variants.length === 0) delete input.variants;
+
     await connectToDatabase();
 
     const before = await Product.findById(id).lean();

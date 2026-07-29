@@ -16,8 +16,11 @@ export const productSchema = z.object({
   fabric: z.string().trim().optional().or(z.literal("")),
   dressType: z.string().trim().max(80).optional().or(z.literal("")),
   work: z.string().trim().max(120).optional().or(z.literal("")),
-  images: z.array(z.string()).min(1, "At least one image is required"),
-  variants: z.array(productVariantSchema).min(1, "At least one size is required"),
+  // No minimum here on purpose — leaving Images/Other untouched shouldn't
+  // silently block Save. The API fills in sensible defaults (a placeholder
+  // image, one M-size variant at 0 stock) when these come back empty.
+  images: z.array(z.string()),
+  variants: z.array(productVariantSchema),
   status: z
     .enum([
       "available",

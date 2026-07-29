@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -85,9 +86,32 @@ function slugify(value: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
+const FIELD_TABS: Record<string, string> = {
+  name: "basic",
+  slug: "basic",
+  sku: "basic",
+  category: "basic",
+  color: "basic",
+  fabric: "basic",
+  dressType: "basic",
+  work: "basic",
+  description: "basic",
+  images: "images",
+  rentalPricePerDay: "pricing",
+  purchasePrice: "pricing",
+  transportCost: "pricing",
+  stitchingCost: "pricing",
+  variants: "other",
+  designer: "other",
+  status: "other",
+  isFeatured: "other",
+  isNewArrival: "other",
+};
+
 export function ProductForm({ categories, productId, defaultValues }: ProductFormProps) {
   const router = useRouter();
   const isEditing = Boolean(productId);
+  const [activeTab, setActiveTab] = useState("basic");
 
   const form = useForm<ProductInput>({
     resolver: zodResolver(productSchema),
@@ -147,13 +171,23 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
     onError: (error: Error) => toast.error(error.message),
   });
 
+  function onInvalid(errors: Record<string, unknown>) {
+    // Zod validates every tab at once, but only the active tab's error text
+    // is visible — without this, a required field on another tab makes
+    // Submit look like it's doing nothing.
+    const firstField = Object.keys(errors)[0];
+    const tab = firstField ? FIELD_TABS[firstField] : undefined;
+    if (tab) setActiveTab(tab);
+    toast.error("Please fix the highlighted field before saving.");
+  }
+
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}
+        onSubmit={form.handleSubmit((values) => saveMutation.mutate(values), onInvalid)}
         className="space-y-6"
       >
-        <Tabs defaultValue="basic">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab((value as string) ?? "basic")}>
           <TabsList className="w-full sm:w-fit">
             <TabsTrigger value="basic">Basic Info</TabsTrigger>
             <TabsTrigger value="images">Images</TabsTrigger>
@@ -161,7 +195,7 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
             <TabsTrigger value="other">Other</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="basic">
+          <TabsContent value="basic" keepMounted>
             <section className="rounded-lg border border-border bg-card p-6">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField
@@ -309,7 +343,7 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
             </section>
           </TabsContent>
 
-          <TabsContent value="images">
+          <TabsContent value="images" keepMounted>
             <section className="rounded-lg border border-border bg-card p-6">
               <FormField
                 control={form.control}
@@ -326,7 +360,7 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
             </section>
           </TabsContent>
 
-          <TabsContent value="pricing">
+          <TabsContent value="pricing" keepMounted>
             <section className="rounded-lg border border-border bg-card p-6">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField
@@ -401,7 +435,7 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
             </section>
           </TabsContent>
 
-          <TabsContent value="other" className="space-y-6">
+          <TabsContent value="other" className="space-y-6" keepMounted>
             <section className="rounded-lg border border-border bg-card p-6">
               <div className="flex items-center justify-between">
                 <h2 className="font-heading text-lg">Size &amp; Quantity</h2>

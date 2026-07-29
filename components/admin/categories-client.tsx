@@ -25,6 +25,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { ImageUploadField } from "@/components/admin/image-upload-field";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { categorySchema, type CategoryInput } from "@/lib/validations/category";
 
 interface CategoryRow extends CategoryInput {
@@ -51,6 +53,7 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<CategoryRow | null>(null);
   const [view, setView] = useState<"table" | "card">("table");
+  const [deleteTarget, setDeleteTarget] = useState<CategoryRow | null>(null);
 
   const { data: categories = initialCategories } = useQuery({
     queryKey: ["admin", "categories"],
@@ -64,6 +67,7 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
       name: "",
       slug: "",
       description: "",
+      heroImage: "",
     },
   });
 
@@ -73,6 +77,7 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
       name: "",
       slug: "",
       description: "",
+      heroImage: "",
     });
     setDialogOpen(true);
   }
@@ -114,6 +119,7 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
     onSuccess: () => {
       toast.success("Category deleted");
       queryClient.invalidateQueries({ queryKey: ["admin", "categories"] });
+      setDeleteTarget(null);
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -145,11 +151,7 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
                 size="icon-sm"
                 className="text-destructive"
                 disabled={deleteMutation.isPending}
-                onClick={() => {
-                  if (window.confirm(`Delete "${category.name}"? This cannot be undone.`)) {
-                    deleteMutation.mutate(category._id);
-                  }
-                }}
+                onClick={() => setDeleteTarget(category)}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
@@ -232,11 +234,7 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
                       size="icon-sm"
                       className="text-destructive"
                       disabled={deleteMutation.isPending}
-                      onClick={() => {
-                        if (window.confirm(`Delete "${category.name}"? This cannot be undone.`)) {
-                          deleteMutation.mutate(category._id);
-                        }
-                      }}
+                      onClick={() => setDeleteTarget(category)}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
@@ -314,6 +312,22 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="heroImage"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Hero Image (optional)</FormLabel>
+                    <FormControl>
+                      <ImageUploadField
+                        images={field.value ? [field.value] : []}
+                        onChange={(images) => field.onChange(images[0] ?? "")}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <DialogFooter>
                 <Button type="submit" disabled={saveMutation.isPending}>
                   {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -324,6 +338,23 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
           </Form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete category?"
+        description={
+          deleteTarget
+            ? `Delete "${deleteTarget.name}"? This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        variant="destructive"
+        isLoading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate(deleteTarget._id);
+        }}
+      />
     </div>
   );
 }
