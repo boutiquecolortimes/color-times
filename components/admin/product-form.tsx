@@ -6,7 +6,7 @@ import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Check, Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -86,6 +86,14 @@ function slugify(value: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
+const TAB_ORDER = ["basic", "images", "pricing", "other"] as const;
+const TAB_LABELS: Record<(typeof TAB_ORDER)[number], string> = {
+  basic: "Basic Info",
+  images: "Images",
+  pricing: "Pricing",
+  other: "Other",
+};
+
 const FIELD_TABS: Record<string, string> = {
   name: "basic",
   slug: "basic",
@@ -111,7 +119,13 @@ const FIELD_TABS: Record<string, string> = {
 export function ProductForm({ categories, productId, defaultValues }: ProductFormProps) {
   const router = useRouter();
   const isEditing = Boolean(productId);
-  const [activeTab, setActiveTab] = useState("basic");
+  const [activeTab, setActiveTab] = useState<(typeof TAB_ORDER)[number]>("basic");
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(["basic"]));
+
+  function goToTab(tab: (typeof TAB_ORDER)[number]) {
+    setActiveTab(tab);
+    setVisitedTabs((prev) => new Set(prev).add(tab));
+  }
 
   const form = useForm<ProductInput>({
     resolver: zodResolver(productSchema),
@@ -176,10 +190,13 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
     // is visible — without this, a required field on another tab makes
     // Submit look like it's doing nothing.
     const firstField = Object.keys(errors)[0];
-    const tab = firstField ? FIELD_TABS[firstField] : undefined;
-    if (tab) setActiveTab(tab);
+    const tab = firstField ? (FIELD_TABS[firstField] as (typeof TAB_ORDER)[number] | undefined) : undefined;
+    if (tab) goToTab(tab);
     toast.error("Please fix the highlighted field before saving.");
   }
+
+  const currentIndex = TAB_ORDER.indexOf(activeTab);
+  const isLastTab = currentIndex === TAB_ORDER.length - 1;
 
   return (
     <Form {...form}>
@@ -187,12 +204,19 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
         onSubmit={form.handleSubmit((values) => saveMutation.mutate(values), onInvalid)}
         className="space-y-6"
       >
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab((value as string) ?? "basic")}>
+        <p className="text-sm text-muted-foreground">
+          Step {currentIndex + 1} of {TAB_ORDER.length} &middot; {TAB_LABELS[activeTab]}
+        </p>
+        <Tabs value={activeTab} onValueChange={(value) => goToTab((value as (typeof TAB_ORDER)[number]) ?? "basic")}>
           <TabsList className="w-full sm:w-fit">
-            <TabsTrigger value="basic">Basic Info</TabsTrigger>
-            <TabsTrigger value="images">Images</TabsTrigger>
-            <TabsTrigger value="pricing">Pricing</TabsTrigger>
-            <TabsTrigger value="other">Other</TabsTrigger>
+            {TAB_ORDER.map((tab) => (
+              <TabsTrigger key={tab} value={tab}>
+                {visitedTabs.has(tab) && tab !== activeTab && (
+                  <Check className="h-3 w-3 text-emerald-600" />
+                )}
+                {TAB_LABELS[tab]}
+              </TabsTrigger>
+            ))}
           </TabsList>
 
           <TabsContent value="basic" keepMounted>
@@ -656,14 +680,31 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
           </TabsContent>
         </Tabs>
 
-        <div className="flex justify-end gap-3">
+        <div className="flex items-center justify-between gap-3">
           <Button type="button" variant="outline" onClick={() => router.push("/admin/products")}>
             Cancel
           </Button>
-          <Button type="submit" disabled={saveMutation.isPending}>
-            {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isEditing ? "Save Changes" : "Create Product"}
-          </Button>
+          <div className="flex gap-3">
+            {currentIndex > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => goToTab(TAB_ORDER[currentIndex - 1])}
+              >
+                Back
+              </Button>
+            )}
+            {!isLastTab ? (
+              <Button type="button" onClick={() => goToTab(TAB_ORDER[currentIndex + 1])}>
+                Next
+              </Button>
+            ) : (
+              <Button type="submit" disabled={saveMutation.isPending}>
+                {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isEditing ? "Save Changes" : "Create Product"}
+              </Button>
+            )}
+          </div>
         </div>
       </form>
     </Form>
