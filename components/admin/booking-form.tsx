@@ -222,7 +222,7 @@ function BookingItemRow({
                 <Input
                   type="number"
                   min={0}
-                  value={field.value ?? 0}
+                  value={field.value === 0 ? "" : field.value}
                   onChange={(event) => field.onChange(Number(event.target.value) || 0)}
                 />
               </FormControl>
@@ -624,7 +624,7 @@ export function BookingForm({
                     <Input
                       type="number"
                       min={0}
-                      value={field.value ?? 0}
+                      value={field.value === 0 ? "" : field.value}
                       onChange={(event) => {
                         setSecurityTouched(true);
                         field.onChange(Number(event.target.value) || 0);
@@ -645,7 +645,7 @@ export function BookingForm({
                     <Input
                       type="number"
                       min={0}
-                      value={field.value ?? 0}
+                      value={field.value === 0 ? "" : field.value}
                       onChange={(event) => field.onChange(Number(event.target.value) || 0)}
                     />
                   </FormControl>

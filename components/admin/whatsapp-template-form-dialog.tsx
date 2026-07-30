@@ -179,8 +179,10 @@ export function WhatsAppTemplateFormDialog({
                   <FormControl>
                     <Input
                       type="number"
-                      value={field.value}
-                      onChange={(event) => field.onChange(Number(event.target.value))}
+                      value={field.value ? field.value : ""}
+                      onChange={(event) =>
+                        field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                      }
                     />
                   </FormControl>
                   <FormDescription>

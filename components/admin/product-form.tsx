@@ -394,8 +394,10 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
                       <FormControl>
                         <Input
                           type="number"
-                          value={field.value ?? 0}
-                          onChange={(event) => field.onChange(Number(event.target.value))}
+                          value={field.value ? field.value : ""}
+                          onChange={(event) =>
+                            field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                          }
                         />
                       </FormControl>
                       <FormMessage />
@@ -411,8 +413,10 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
                       <FormControl>
                         <Input
                           type="number"
-                          value={field.value ?? 0}
-                          onChange={(event) => field.onChange(Number(event.target.value))}
+                          value={field.value ? field.value : ""}
+                          onChange={(event) =>
+                            field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                          }
                         />
                       </FormControl>
                       <FormMessage />
@@ -428,8 +432,10 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
                       <FormControl>
                         <Input
                           type="number"
-                          value={field.value ?? 0}
-                          onChange={(event) => field.onChange(Number(event.target.value))}
+                          value={field.value ? field.value : ""}
+                          onChange={(event) =>
+                            field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                          }
                         />
                       </FormControl>
                       <FormMessage />
@@ -445,8 +451,10 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
                       <FormControl>
                         <Input
                           type="number"
-                          value={field.value}
-                          onChange={(event) => field.onChange(Number(event.target.value))}
+                          value={field.value ? field.value : ""}
+                          onChange={(event) =>
+                            field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                          }
                         />
                       </FormControl>
                       <FormMessage />
@@ -495,8 +503,10 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
                           <FormControl>
                             <Input
                               type="number"
-                              value={field.value}
-                              onChange={(event) => field.onChange(Number(event.target.value))}
+                              value={field.value ? field.value : ""}
+                              onChange={(event) =>
+                                field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                              }
                             />
                           </FormControl>
                         </FormItem>

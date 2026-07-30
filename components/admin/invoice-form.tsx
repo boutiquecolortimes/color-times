@@ -324,8 +324,10 @@ function ManualTab({
                             type="number"
                             placeholder="Qty"
                             step="1"
-                            value={field.value}
-                            onChange={(event) => field.onChange(Number(event.target.value))}
+                            value={field.value ? field.value : ""}
+                            onChange={(event) =>
+                              field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                            }
                           />
                         </FormControl>
                       </FormItem>
@@ -343,8 +345,10 @@ function ManualTab({
                             type="number"
                             placeholder="Unit Price"
                             step="0.01"
-                            value={field.value}
-                            onChange={(event) => field.onChange(Number(event.target.value))}
+                            value={field.value ? field.value : ""}
+                            onChange={(event) =>
+                              field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                            }
                           />
                         </FormControl>
                       </FormItem>
@@ -383,8 +387,10 @@ function ManualTab({
                   <Input
                     type="number"
                     step="0.01"
-                    value={field.value}
-                    onChange={(event) => field.onChange(Number(event.target.value))}
+                    value={field.value ? field.value : ""}
+                    onChange={(event) =>
+                      field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                    }
                   />
                 </FormControl>
                 <FormMessage />
@@ -401,8 +407,10 @@ function ManualTab({
                   <Input
                     type="number"
                     step="0.01"
-                    value={field.value}
-                    onChange={(event) => field.onChange(Number(event.target.value))}
+                    value={field.value ? field.value : ""}
+                    onChange={(event) =>
+                      field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                    }
                   />
                 </FormControl>
                 <FormMessage />
@@ -419,8 +427,10 @@ function ManualTab({
                   <Input
                     type="number"
                     step="0.01"
-                    value={field.value}
-                    onChange={(event) => field.onChange(Number(event.target.value))}
+                    value={field.value ? field.value : ""}
+                    onChange={(event) =>
+                      field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                    }
                   />
                 </FormControl>
                 <FormMessage />

@@ -185,8 +185,8 @@ export function ReturnBookingDialog({
                 className="mt-2"
                 type="number"
                 min={0}
-                value={damageCharges}
-                onChange={(event) => setDamageCharges(Math.max(0, Number(event.target.value)))}
+                value={damageCharges === 0 ? "" : damageCharges}
+                onChange={(event) => setDamageCharges(Math.max(0, Number(event.target.value) || 0))}
               />
             </div>
             <div>

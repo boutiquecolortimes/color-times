@@ -107,8 +107,10 @@ export function InvoicePaymentDialog({
                     <Input
                       type="number"
                       step="0.01"
-                      value={field.value}
-                      onChange={(event) => field.onChange(Number(event.target.value))}
+                      value={field.value ? field.value : ""}
+                      onChange={(event) =>
+                        field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                      }
                     />
                   </FormControl>
                   <FormMessage />

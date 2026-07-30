@@ -67,8 +67,10 @@ export function InventorySettingsForm({
                   <FormControl>
                     <Input
                       type="number"
-                      value={field.value}
-                      onChange={(event) => field.onChange(Number(event.target.value))}
+                      value={field.value ? field.value : ""}
+                      onChange={(event) =>
+                        field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                      }
                     />
                   </FormControl>
                   <FormDescription>
@@ -108,8 +110,10 @@ export function InventorySettingsForm({
                     <Input
                       type="number"
                       step="0.5"
-                      value={field.value}
-                      onChange={(event) => field.onChange(Number(event.target.value))}
+                      value={field.value ? field.value : ""}
+                      onChange={(event) =>
+                        field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                      }
                     />
                   </FormControl>
                   <FormDescription>
@@ -129,8 +133,10 @@ export function InventorySettingsForm({
                     <Input
                       type="number"
                       step="0.5"
-                      value={field.value}
-                      onChange={(event) => field.onChange(Number(event.target.value))}
+                      value={field.value ? field.value : ""}
+                      onChange={(event) =>
+                        field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                      }
                     />
                   </FormControl>
                   <FormDescription>
