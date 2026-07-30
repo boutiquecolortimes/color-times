@@ -29,9 +29,13 @@ export async function GET(request: NextRequest): Promise<Response> {
   if (status) {
     filter.status = status;
   }
-  if (from && to) {
-    filter.rentalStartDate = { $lte: new Date(to) };
+  // Supports a one-sided range too (just "from" or just "to"), not only both —
+  // matches any booking whose rental period overlaps the given window.
+  if (from) {
     filter.rentalEndDate = { $gte: new Date(from) };
+  }
+  if (to) {
+    filter.rentalStartDate = { $lte: new Date(to) };
   }
 
   const [bookings, total] = await Promise.all([

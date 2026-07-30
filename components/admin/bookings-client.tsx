@@ -18,6 +18,7 @@ import { BookingStatusBadge } from "@/components/admin/booking-status-badge";
 import { BookingCalendar } from "@/components/admin/booking-calendar";
 import { ReturnBookingDialog } from "@/components/admin/return-booking-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { DatePicker } from "@/components/ui/date-picker";
 import { cn, formatDate } from "@/lib/utils";
 import type { BookingStatus } from "@/models/Booking";
 
@@ -68,9 +69,13 @@ const STATUS_OPTIONS: BookingStatus[] = [
 async function fetchBookings(params: {
   page: number;
   status: string;
+  from: string;
+  to: string;
 }): Promise<{ bookings: BookingRow[]; pagination: Pagination }> {
   const searchParams = new URLSearchParams({ page: String(params.page) });
   if (params.status !== "all") searchParams.set("status", params.status);
+  if (params.from) searchParams.set("from", params.from);
+  if (params.to) searchParams.set("to", params.to);
 
   const res = await fetch(`/api/admin/bookings?${searchParams.toString()}`);
   const json = await res.json();
@@ -88,14 +93,16 @@ export function BookingsClient({
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("all");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [view, setView] = useState<"table" | "card" | "calendar">("table");
   const [returnDialogBookingId, setReturnDialogBookingId] = useState<string | null>(null);
 
-  const isDefaultQuery = page === 1 && status === "all";
+  const isDefaultQuery = page === 1 && status === "all" && from === "" && to === "";
 
   const { data } = useQuery({
-    queryKey: ["admin", "bookings", { page, status }],
-    queryFn: () => fetchBookings({ page, status }),
+    queryKey: ["admin", "bookings", { page, status, from, to }],
+    queryFn: () => fetchBookings({ page, status, from, to }),
     initialData: isDefaultQuery
       ? { bookings: initialBookings, pagination: initialPagination }
       : undefined,
@@ -209,6 +216,38 @@ export function BookingsClient({
               ))}
             </SelectContent>
           </Select>
+          <div className="flex items-center gap-2">
+            <DatePicker
+              value={from}
+              onChange={(value) => {
+                setFrom(value);
+                setPage(1);
+              }}
+              placeholder="From date"
+            />
+            <span className="text-sm text-muted-foreground">to</span>
+            <DatePicker
+              value={to}
+              onChange={(value) => {
+                setTo(value);
+                setPage(1);
+              }}
+              placeholder="To date"
+            />
+            {(from || to) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setFrom("");
+                  setTo("");
+                  setPage(1);
+                }}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
           <div className="flex shrink-0 rounded-md border border-border p-0.5 lg:hidden">
             <button
               type="button"
