@@ -41,11 +41,13 @@ export type BookingItemInput = z.infer<typeof bookingItemSchema>;
 export const bookingCreateSchema = z
   .object({
     customer: z.string().trim().min(1, "Customer is required"),
+    billNumber: z.string().trim().max(50).optional().or(z.literal("")),
+    bookingDate: z.string().trim().min(1, "Booking date is required"),
     items: z.array(bookingItemSchema).min(1, "Add at least one item"),
     rentalStartDate: z.string().trim().min(1, "Rental start date is required"),
     rentalEndDate: z.string().trim().min(1, "Rental end date is required"),
     eventDate: z.string().trim().min(1, "Event date is required"),
-    deliveryAddress: z.string().trim().min(1, "Delivery address is required"),
+    deliveryAddress: z.string().trim().optional().or(z.literal("")),
     advancePaid: z.number().min(0).optional(),
     measurements: measurementsZodSchema.optional(),
     notes: z.string().trim().optional().or(z.literal("")),

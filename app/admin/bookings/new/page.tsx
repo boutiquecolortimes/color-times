@@ -18,7 +18,7 @@ export default async function NewBookingPage() {
       .limit(200)
       .lean(),
     Product.find({ isActive: true, deletedAt: null, archivedAt: null })
-      .select("name sku rentalPricePerDay securityDeposit variants")
+      .select("name sku color rentalPricePerDay securityDeposit variants")
       .sort({ name: 1 })
       .limit(200)
       .lean(),
@@ -50,6 +50,7 @@ export default async function NewBookingPage() {
           _id: String(product._id),
           name: product.name,
           sku: product.sku,
+          color: product.color,
           rentalPricePerDay: product.rentalPricePerDay,
           securityDeposit: product.securityDeposit,
           variants: product.variants.map((variant) => ({

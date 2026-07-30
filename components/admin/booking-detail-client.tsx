@@ -53,6 +53,8 @@ interface BookingItemDetail {
 interface BookingDetail {
   _id: string;
   bookingNumber: string;
+  billNumber?: string;
+  bookingDate: string;
   status: BookingStatus;
   customer: { name: string; email: string; phone?: string } | null;
   items: BookingItemDetail[];
@@ -62,7 +64,7 @@ interface BookingDetail {
   securityDeposit: number;
   totalAmount: number;
   advancePaid?: number;
-  deliveryAddress: string;
+  deliveryAddress?: string;
   notes?: string;
   returnCondition?: ReturnCondition;
   returnNotes?: string;
@@ -140,6 +142,7 @@ export function BookingDetailClient({ initialBooking }: { initialBooking: Bookin
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             Created {formatDate(booking.createdAt)}
+            {booking.billNumber && ` · Bill #${booking.billNumber}`}
           </p>
         </div>
 
@@ -252,15 +255,19 @@ export function BookingDetailClient({ initialBooking }: { initialBooking: Bookin
               <h2 className="font-heading text-lg">Rental Period</h2>
               <div className="mt-2 space-y-1 text-sm">
                 <p className="flex justify-between">
+                  <span className="text-muted-foreground">Booking Date</span>
+                  <span>{formatDate(booking.bookingDate)}</span>
+                </p>
+                <p className="flex justify-between">
                   <span className="text-muted-foreground">Event Date</span>
                   <span>{formatDate(booking.eventDate)}</span>
                 </p>
                 <p className="flex justify-between">
-                  <span className="text-muted-foreground">Rental Start</span>
+                  <span className="text-muted-foreground">Pickup Date</span>
                   <span>{formatDate(booking.rentalStartDate)}</span>
                 </p>
                 <p className="flex justify-between">
-                  <span className="text-muted-foreground">Rental End</span>
+                  <span className="text-muted-foreground">Return Date</span>
                   <span>{formatDate(booking.rentalEndDate)}</span>
                 </p>
               </div>
@@ -295,10 +302,12 @@ export function BookingDetailClient({ initialBooking }: { initialBooking: Bookin
             </div>
           </div>
 
-          <div className="rounded-lg border border-border bg-card p-6">
-            <h2 className="font-heading text-lg">Delivery Address</h2>
-            <p className="mt-2 text-sm text-muted-foreground">{booking.deliveryAddress}</p>
-          </div>
+          {booking.deliveryAddress && (
+            <div className="rounded-lg border border-border bg-card p-6">
+              <h2 className="font-heading text-lg">Delivery Address</h2>
+              <p className="mt-2 text-sm text-muted-foreground">{booking.deliveryAddress}</p>
+            </div>
+          )}
 
           {booking.notes && (
             <div className="rounded-lg border border-border bg-card p-6">

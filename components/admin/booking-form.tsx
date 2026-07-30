@@ -4,13 +4,21 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useFieldArray, useWatch, type Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, Loader2, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Loader2, Plus, Trash2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -18,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   Form,
   FormControl,
@@ -27,8 +36,16 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { bookingCreateSchema, type BookingCreateInput } from "@/lib/validations/booking";
+import type { CustomerCreateInput } from "@/lib/validations/customer";
 import { daysBetween } from "@/lib/utils";
 import { MEASUREMENT_FIELD_DEFS } from "@/lib/config/measurement-fields";
+
+function todayIso(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
 
 interface CustomerOption {
   _id: string;
@@ -36,10 +53,27 @@ interface CustomerOption {
   email: string;
 }
 
+// Quick add from the booking form only asks for what a walk-in/phone booking
+// actually has on hand — name, mobile, S/O, and address. No email: the full
+// customer record still needs one (login identity), so we generate a unique
+// placeholder behind the scenes and it can be filled in properly later from
+// the customer's profile.
+const quickCustomerSchema = z.object({
+  name: z.string().trim().min(1, "Name is required"),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^[0-9+\-\s()]{7,20}$/, "Enter a valid mobile number"),
+  fatherName: z.string().trim().optional().or(z.literal("")),
+  addressLine1: z.string().trim().optional().or(z.literal("")),
+});
+type QuickCustomerInput = z.infer<typeof quickCustomerSchema>;
+
 interface ProductOption {
   _id: string;
   name: string;
   sku: string;
+  color: string;
   rentalPricePerDay: number;
   securityDeposit: number;
   variants: { size: string; quantityInStock: number }[];
@@ -113,31 +147,23 @@ function BookingItemRow({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Dress</FormLabel>
-              <Select
-                value={field.value}
-                onValueChange={(value) => {
-                  field.onChange(value ?? "");
-                  onProductChange(index);
-                }}
-              >
-                <FormControl>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select dress">
-                      {(value: string) => {
-                        const product = products.find((p) => p._id === value);
-                        return product ? `${product.name} (${product.sku})` : "Select dress";
-                      }}
-                    </SelectValue>
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {products.map((product) => (
-                    <SelectItem key={product._id} value={product._id}>
-                      {product.name} ({product.sku})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <SearchableSelect
+                  value={field.value}
+                  onChange={(value) => {
+                    field.onChange(value);
+                    onProductChange(index);
+                  }}
+                  placeholder="Select dress"
+                  searchPlaceholder="Search by name, code, or color..."
+                  emptyText="No dresses found."
+                  options={products.map((product) => ({
+                    value: product._id,
+                    label: `${product.name} (${product.sku})`,
+                    sublabel: `${product.color} · ${formatCurrency(product.rentalPricePerDay)}/day`,
+                  }))}
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -201,9 +227,15 @@ function BookingItemRow({
         </div>
       </div>
 
-      {selectedProduct && days > 0 && (
+      {selectedProduct && (
         <p className="mt-2 text-xs text-muted-foreground">
-          {formatCurrency(fee)} rental + {formatCurrency(deposit)} deposit
+          Color: {selectedProduct.color} &middot; Rent: {formatCurrency(selectedProduct.rentalPricePerDay)}/day
+          {days > 0 && (
+            <>
+              {" "}
+              &middot; {formatCurrency(fee)} rental + {formatCurrency(deposit)} deposit
+            </>
+          )}
         </p>
       )}
 
@@ -231,15 +263,19 @@ export function BookingForm({
   products: ProductOption[];
 }) {
   const router = useRouter();
+  const [customerList, setCustomerList] = useState<CustomerOption[]>(customers);
+  const [newCustomerOpen, setNewCustomerOpen] = useState(false);
+
   const form = useForm<BookingCreateInput>({
     resolver: zodResolver(bookingCreateSchema),
     defaultValues: {
       customer: "",
+      billNumber: "",
+      bookingDate: todayIso(),
       items: [{ product: "", size: "", quantity: 1 }],
       rentalStartDate: "",
       rentalEndDate: "",
       eventDate: "",
-      deliveryAddress: "",
       advancePaid: 0,
       notes: "",
     },
@@ -292,50 +328,116 @@ export function BookingForm({
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const quickCustomerForm = useForm<QuickCustomerInput>({
+    resolver: zodResolver(quickCustomerSchema),
+    defaultValues: { name: "", phone: "", fatherName: "", addressLine1: "" },
+  });
+
+  const createCustomerMutation = useMutation({
+    mutationFn: async (values: QuickCustomerInput) => {
+      const digits = values.phone.replace(/[^0-9]/g, "") || "customer";
+      const payload: CustomerCreateInput = {
+        name: values.name,
+        // Walk-in bookings usually don't come with an email — generate a
+        // unique placeholder so account creation isn't blocked on one.
+        email: `${digits}.${Date.now()}@walkin.vchuki.local`,
+        phone: values.phone,
+        fatherName: values.fatherName || "",
+        addressLine1: values.addressLine1 || "",
+        addressCity: "",
+        addressState: "",
+        addressPostalCode: "",
+      };
+      const res = await fetch("/api/admin/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data.customer as { _id: string; name: string; email: string };
+    },
+    onSuccess: (customer) => {
+      toast.success("Customer created");
+      setCustomerList((prev) => [...prev, { _id: customer._id, name: customer.name, email: customer.email }]);
+      form.setValue("customer", customer._id);
+      quickCustomerForm.reset();
+      setNewCustomerOpen(false);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   return (
+    <>
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
         className="space-y-6"
       >
         <section className="space-y-4 rounded-lg border border-border bg-card p-6">
+          <h2 className="font-heading text-lg">Booking Details</h2>
           <FormField
             control={form.control}
             name="customer"
             render={() => (
               <FormItem>
                 <FormLabel>Customer</FormLabel>
-                <Select
-                  value={customerValue}
-                  onValueChange={(value) => form.setValue("customer", value ?? "")}
-                >
-                  <FormControl>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select customer">
-                        {(value: string) => {
-                          const customer = customers.find((c) => c._id === value);
-                          return customer ? `${customer.name} (${customer.email})` : "Select customer";
-                        }}
-                      </SelectValue>
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {customers.length === 0 && (
-                      <div className="px-3 py-2 text-sm text-muted-foreground">
-                        No customers yet.
-                      </div>
-                    )}
-                    {customers.map((customer) => (
-                      <SelectItem key={customer._id} value={customer._id}>
-                        {customer.name} ({customer.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <SearchableSelect
+                    value={customerValue}
+                    onChange={(value) => form.setValue("customer", value)}
+                    placeholder="Select customer"
+                    searchPlaceholder="Search by name or email..."
+                    emptyText="No customers found."
+                    options={customerList.map((customer) => ({
+                      value: customer._id,
+                      label: customer.name,
+                      sublabel: customer.email,
+                    }))}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={() => setNewCustomerOpen(true)}
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    New
+                  </Button>
+                </div>
                 <FormMessage />
               </FormItem>
             )}
           />
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="billNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Bill Number (optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Manual bill/register no." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="bookingDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Booking Date</FormLabel>
+                  <FormControl>
+                    <DatePicker value={field.value} onChange={field.onChange} className="w-full" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <FormField
@@ -356,7 +458,7 @@ export function BookingForm({
               name="rentalStartDate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Rental Start Date</FormLabel>
+                  <FormLabel>Pickup Date</FormLabel>
                   <FormControl>
                     <DatePicker value={field.value} onChange={field.onChange} className="w-full" />
                   </FormControl>
@@ -369,7 +471,7 @@ export function BookingForm({
               name="rentalEndDate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Rental End Date</FormLabel>
+                  <FormLabel>Return Date</FormLabel>
                   <FormControl>
                     <DatePicker value={field.value} onChange={field.onChange} className="w-full" />
                   </FormControl>
@@ -410,8 +512,9 @@ export function BookingForm({
         </section>
 
         <section className="rounded-lg border border-border bg-secondary/40 p-6">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Total (rental + deposit)</span>
+          <h2 className="font-heading text-lg">Summary</h2>
+          <div className="mt-3 flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Total Amount (rental + deposit)</span>
             <span className="font-heading text-xl">{formatCurrency(total)}</span>
           </div>
           <div className="mt-4 max-w-xs">
@@ -437,8 +540,9 @@ export function BookingForm({
         </section>
 
         <section className="rounded-lg border border-border bg-card p-6">
-          <p className="text-sm font-medium">Measurements (inches, optional)</p>
-          <div className="mt-2 grid grid-cols-3 gap-3">
+          <h2 className="font-heading text-lg">Measurements</h2>
+          <p className="text-xs text-muted-foreground">In inches, all optional</p>
+          <div className="mt-2 grid grid-cols-2 gap-3">
             {MEASUREMENT_FIELD_DEFS.map(({ key, label }) => (
               <FormField
                 key={key}
@@ -464,22 +568,27 @@ export function BookingForm({
               />
             ))}
           </div>
-        </section>
-
-        <section className="rounded-lg border border-border bg-card p-6">
           <FormField
             control={form.control}
-            name="deliveryAddress"
+            name="measurements.other"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Delivery Address</FormLabel>
+              <FormItem className="mt-3">
+                <FormLabel className="text-xs">Others</FormLabel>
                 <FormControl>
-                  <Textarea rows={2} {...field} />
+                  <Textarea
+                    rows={2}
+                    placeholder="Any other measurement notes"
+                    value={(field.value as string | undefined) ?? ""}
+                    onChange={(event) => field.onChange(event.target.value)}
+                  />
                 </FormControl>
-                <FormMessage />
               </FormItem>
             )}
           />
+        </section>
+
+        <section className="rounded-lg border border-border bg-card p-6">
+          <h2 className="font-heading text-lg">Notes</h2>
           <FormField
             control={form.control}
             name="notes"
@@ -503,5 +612,81 @@ export function BookingForm({
         </div>
       </form>
     </Form>
+
+    <Dialog open={newCustomerOpen} onOpenChange={setNewCustomerOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>New Customer</DialogTitle>
+        </DialogHeader>
+        <Form {...quickCustomerForm}>
+          <form
+            onSubmit={quickCustomerForm.handleSubmit((values) =>
+              createCustomerMutation.mutate(values)
+            )}
+            className="space-y-4"
+          >
+            <FormField
+              control={quickCustomerForm.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Customer name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={quickCustomerForm.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Mobile</FormLabel>
+                  <FormControl>
+                    <Input placeholder="9876543210" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={quickCustomerForm.control}
+              name="fatherName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>S/O (Father&apos;s Name, optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Father's name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={quickCustomerForm.control}
+              name="addressLine1"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Address (optional)</FormLabel>
+                  <FormControl>
+                    <Textarea rows={2} placeholder="Address" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <DialogFooter>
+              <Button type="submit" disabled={createCustomerMutation.isPending}>
+                {createCustomerMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Create Customer
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

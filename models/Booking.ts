@@ -29,6 +29,8 @@ export interface BookingItem {
 export interface IBooking extends Document {
   _id: Types.ObjectId;
   bookingNumber: string;
+  billNumber?: string;
+  bookingDate: Date;
   customer: Types.ObjectId;
   items: BookingItem[];
   rentalStartDate: Date;
@@ -39,7 +41,7 @@ export interface IBooking extends Document {
   totalAmount: number;
   advancePaid: number;
   measurements?: MeasurementValues;
-  deliveryAddress: string;
+  deliveryAddress?: string;
   notes?: string;
   returnCondition?: ReturnCondition;
   returnNotes?: string;
@@ -70,6 +72,10 @@ const bookingItemSchema = new Schema<BookingItem>(
 const bookingSchema = new Schema<IBooking>(
   {
     bookingNumber: { type: String, required: true, unique: true, index: true },
+    // Manual/physical bill reference number, kept separate from the
+    // system-generated bookingNumber above.
+    billNumber: { type: String, trim: true },
+    bookingDate: { type: Date, required: true, default: Date.now, index: true },
     customer: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     items: {
       type: [bookingItemSchema],
@@ -92,7 +98,7 @@ const bookingSchema = new Schema<IBooking>(
     totalAmount: { type: Number, required: true, min: 0 },
     advancePaid: { type: Number, required: true, min: 0, default: 0 },
     measurements: { type: measurementsSchema, default: undefined },
-    deliveryAddress: { type: String, required: true },
+    deliveryAddress: { type: String, trim: true },
     notes: { type: String },
     returnCondition: { type: String, enum: RETURN_CONDITIONS },
     returnNotes: { type: String },

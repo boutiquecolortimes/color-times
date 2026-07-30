@@ -40,6 +40,8 @@ export default async function BookingDetailPage({
         initialBooking={{
           _id: String(booking._id),
           bookingNumber: booking.bookingNumber,
+          billNumber: booking.billNumber,
+          bookingDate: booking.bookingDate.toISOString(),
           status: booking.status,
           customer: booking.customer
             ? {

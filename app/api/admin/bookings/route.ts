@@ -105,6 +105,8 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     const booking = await Booking.create({
       bookingNumber,
+      billNumber: input.billNumber || undefined,
+      bookingDate: new Date(input.bookingDate),
       customer: input.customer,
       items,
       rentalStartDate,
