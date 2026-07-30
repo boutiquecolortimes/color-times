@@ -12,6 +12,29 @@ export interface BookingConflict {
   status: BookingStatus;
 }
 
+/**
+ * All product IDs with an active booking overlapping the given date range —
+ * used to pre-mark already-booked dresses in the item picker before the
+ * user selects one, instead of only warning after the fact.
+ */
+export async function findBookedProductIds(
+  rentalStartDate: Date,
+  rentalEndDate: Date,
+  excludeBookingId?: string
+): Promise<string[]> {
+  const filter: Record<string, unknown> = {
+    status: { $in: ACTIVE_BOOKING_STATUSES },
+    rentalStartDate: { $lte: rentalEndDate },
+    rentalEndDate: { $gte: rentalStartDate },
+  };
+  if (excludeBookingId) {
+    filter._id = { $ne: excludeBookingId };
+  }
+
+  const productIds = await Booking.find(filter).distinct("items.product");
+  return productIds.map((id) => String(id));
+}
+
 export async function findBookingConflicts(
   productId: string,
   rentalStartDate: Date,

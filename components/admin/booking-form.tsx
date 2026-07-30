@@ -107,10 +107,21 @@ async function fetchAvailability(
   return json.data;
 }
 
+// Bulk check so the dress dropdown can flag already-booked items upfront,
+// before the user picks one — not just warn after the fact.
+async function fetchBookedProductIds(from: string, to: string): Promise<string[]> {
+  const params = new URLSearchParams({ from, to });
+  const res = await fetch(`/api/admin/bookings/booked-products?${params.toString()}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error);
+  return json.data.productIds;
+}
+
 function BookingItemRow({
   index,
   control,
   products,
+  bookedProductIds,
   rentalStartDate,
   rentalEndDate,
   canRemove,
@@ -121,6 +132,7 @@ function BookingItemRow({
   index: number;
   control: Control<BookingCreateInput>;
   products: ProductOption[];
+  bookedProductIds: Set<string>;
   rentalStartDate: string;
   rentalEndDate: string;
   canRemove: boolean;
@@ -167,11 +179,18 @@ function BookingItemRow({
                   placeholder="Select dress"
                   searchPlaceholder="Search by name, code, or color..."
                   emptyText="No dresses found."
-                  options={products.map((product) => ({
-                    value: product._id,
-                    label: `${product.name} (${product.sku})`,
-                    sublabel: `${product.color} · ${formatCurrency(product.rentalPricePerDay)}/day`,
-                  }))}
+                  options={products.map((product) => {
+                    const isBooked =
+                      bookedProductIds.has(product._id) && product._id !== field.value;
+                    return {
+                      value: product._id,
+                      label: `${product.name} (${product.sku})`,
+                      sublabel: isBooked
+                        ? "Already booked for these dates"
+                        : `${product.color} · ${formatCurrency(product.rentalPricePerDay)}/day`,
+                      disabled: isBooked,
+                    };
+                  })}
                 />
               </FormControl>
               <FormMessage />
@@ -299,6 +318,15 @@ export function BookingForm({
     const product = products.find((p) => p._id === item.product);
     return product ? sum + product.securityDeposit : sum;
   }, 0);
+
+  // Flags dresses already held by another active booking for these dates so
+  // the picker can show that upfront, before the user selects one.
+  const bookedProductsQuery = useQuery({
+    queryKey: ["admin", "booked-products", rentalStartDate, rentalEndDate],
+    queryFn: () => fetchBookedProductIds(rentalStartDate, rentalEndDate),
+    enabled: Boolean(rentalStartDate && rentalEndDate),
+  });
+  const bookedProductIds = new Set(bookedProductsQuery.data ?? []);
 
   useEffect(() => {
     if (!securityTouched) {
@@ -502,6 +530,7 @@ export function BookingForm({
               index={index}
               control={form.control}
               products={products}
+              bookedProductIds={bookedProductIds}
               rentalStartDate={rentalStartDate}
               rentalEndDate={rentalEndDate}
               canRemove={fields.length > 1}

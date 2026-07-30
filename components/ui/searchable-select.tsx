@@ -9,6 +9,7 @@ interface SearchableSelectOption {
   value: string
   label: string
   sublabel?: string
+  disabled?: boolean
 }
 
 interface SearchableSelectProps {
@@ -90,19 +91,29 @@ function SearchableSelect({
                 <button
                   key={option.value}
                   type="button"
+                  disabled={option.disabled}
                   onClick={() => {
+                    if (option.disabled) return
                     onChange(option.value)
                     setOpen(false)
                   }}
                   className={cn(
                     "flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-secondary",
-                    option.value === value && "bg-secondary"
+                    option.value === value && "bg-secondary",
+                    option.disabled && "cursor-not-allowed opacity-50 hover:bg-transparent"
                   )}
                 >
                   <span className="truncate">
                     {option.label}
                     {option.sublabel && (
-                      <span className="ml-1.5 text-xs text-muted-foreground">{option.sublabel}</span>
+                      <span
+                        className={cn(
+                          "ml-1.5 text-xs",
+                          option.disabled ? "text-destructive" : "text-muted-foreground"
+                        )}
+                      >
+                        {option.sublabel}
+                      </span>
                     )}
                   </span>
                   {option.value === value && <Check className="h-3.5 w-3.5 shrink-0 text-accent" />}
