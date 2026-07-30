@@ -298,6 +298,12 @@ export function BookingDetailClient({ initialBooking }: { initialBooking: Bookin
                     <span>{formatCurrency(booking.advancePaid ?? 0)}</span>
                   </p>
                 )}
+                <p className="flex justify-between border-t border-border pt-2 font-medium">
+                  <span>Due Amount</span>
+                  <span className="text-accent">
+                    {formatCurrency(booking.totalAmount - (booking.advancePaid ?? 0))}
+                  </span>
+                </p>
               </div>
             </div>
           </div>

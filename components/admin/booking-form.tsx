@@ -285,6 +285,7 @@ export function BookingForm({
   const rentalEndDate = form.watch("rentalEndDate");
   const items = form.watch("items");
   const securityDepositValue = form.watch("securityDeposit") ?? 0;
+  const advancePaidValue = form.watch("advancePaid") ?? 0;
 
   const days = daysBetween(rentalStartDate, rentalEndDate);
   const rentTotal = items.reduce((sum, item) => {
@@ -292,6 +293,7 @@ export function BookingForm({
     return sum + (item.pricePerDay || 0) * days;
   }, 0);
   const grandTotal = rentTotal + securityDepositValue;
+  const dueAmount = grandTotal - advancePaidValue;
 
   const suggestedSecurityDeposit = items.reduce((sum, item) => {
     const product = products.find((p) => p._id === item.product);
@@ -627,6 +629,11 @@ export function BookingForm({
           <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
             <span className="text-sm text-muted-foreground">Total Amount (rent + security)</span>
             <span className="font-heading text-xl">{formatCurrency(grandTotal)}</span>
+          </div>
+
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Due Amount (total &minus; advance)</span>
+            <span className="font-heading text-xl text-accent">{formatCurrency(dueAmount)}</span>
           </div>
         </section>
 
