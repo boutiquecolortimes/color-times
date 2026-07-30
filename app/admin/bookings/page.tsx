@@ -36,7 +36,10 @@ export default async function AdminBookingsPage() {
     _id: String(booking._id),
     bookingNumber: booking.bookingNumber,
     billNumber: booking.billNumber,
-    bookingDate: booking.bookingDate.toISOString(),
+    // Older bookings (created before bookingDate existed on the schema) don't
+    // have this field stored on the document — .lean() reads don't backfill
+    // schema defaults, so fall back to when the booking record was created.
+    bookingDate: (booking.bookingDate ?? booking.createdAt ?? new Date()).toISOString(),
     status: booking.status,
     rentalStartDate: booking.rentalStartDate.toISOString(),
     rentalEndDate: booking.rentalEndDate.toISOString(),

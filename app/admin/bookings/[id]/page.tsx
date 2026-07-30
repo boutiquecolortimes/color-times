@@ -41,7 +41,9 @@ export default async function BookingDetailPage({
           _id: String(booking._id),
           bookingNumber: booking.bookingNumber,
           billNumber: booking.billNumber,
-          bookingDate: booking.bookingDate.toISOString(),
+          // Older bookings predate the bookingDate field — .lean() doesn't
+          // backfill schema defaults for fields missing on the stored doc.
+          bookingDate: (booking.bookingDate ?? booking.createdAt ?? new Date()).toISOString(),
           status: booking.status,
           customer: booking.customer
             ? {

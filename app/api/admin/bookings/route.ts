@@ -71,8 +71,17 @@ export async function GET(request: NextRequest): Promise<Response> {
     dueAmount: summaryRow.totalAmount - summaryRow.advancePaid,
   };
 
+  // Older bookings predate the bookingDate/advancePaid fields, so a plain
+  // .lean() read can leave them missing on the stored document — normalize
+  // here instead of letting every consumer guess.
+  const normalizedBookings = bookings.map((booking) => ({
+    ...booking,
+    bookingDate: booking.bookingDate ?? booking.createdAt ?? new Date(),
+    advancePaid: booking.advancePaid ?? 0,
+  }));
+
   return apiSuccess({
-    bookings,
+    bookings: normalizedBookings,
     pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
     summary,
   });
