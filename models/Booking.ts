@@ -20,6 +20,7 @@ export const RETURN_CONDITIONS: ReturnCondition[] = [
 
 export interface BookingItem {
   product: Types.ObjectId;
+  color: string;
   size: string;
   quantity: number;
   pricePerDay: number;
@@ -61,6 +62,7 @@ export interface IBooking extends Document {
 const bookingItemSchema = new Schema<BookingItem>(
   {
     product: { type: Schema.Types.ObjectId, ref: "Product", required: true, index: true },
+    color: { type: String, trim: true, default: "" },
     size: { type: String, required: true },
     quantity: { type: Number, required: true, min: 1, default: 1 },
     pricePerDay: { type: Number, required: true, min: 0 },

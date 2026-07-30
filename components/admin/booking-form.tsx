@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useFieldArray, useWatch, type Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -38,7 +38,6 @@ import {
 import { bookingCreateSchema, type BookingCreateInput } from "@/lib/validations/booking";
 import type { CustomerCreateInput } from "@/lib/validations/customer";
 import { daysBetween } from "@/lib/utils";
-import { MEASUREMENT_FIELD_DEFS } from "@/lib/config/measurement-fields";
 
 function todayIso(): string {
   const now = new Date();
@@ -47,24 +46,37 @@ function todayIso(): string {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
+// Just the fields this business actually measures for a booking — the full
+// 11-field set (bust, waist, hip, etc.) lives in lib/config/measurement-fields
+// and stays as-is for the Customisation flow, which still needs it.
+const BOOKING_MEASUREMENT_FIELDS = [
+  { key: "upperChest", label: "Upper Chest (UC)" },
+  { key: "lowerChest", label: "Lower Chest (LC)" },
+  { key: "sleeveLength", label: "Sleeve Length (SL)" },
+  { key: "armhole", label: "Armhole (AH)" },
+] as const;
+
 interface CustomerOption {
   _id: string;
   name: string;
   email: string;
 }
 
+const RELATION_OPTIONS = ["S/O", "W/O"] as const;
+
 // Quick add from the booking form only asks for what a walk-in/phone booking
-// actually has on hand — name, mobile, S/O, and address. No email: the full
-// customer record still needs one (login identity), so we generate a unique
-// placeholder behind the scenes and it can be filled in properly later from
-// the customer's profile.
+// actually has on hand — name, mobile, relation + name, and address. No
+// email: the full customer record still needs one (login identity), so we
+// generate a unique placeholder behind the scenes and it can be filled in
+// properly later from the customer's profile.
 const quickCustomerSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
   phone: z
     .string()
     .trim()
     .regex(/^[0-9+\-\s()]{7,20}$/, "Enter a valid mobile number"),
-  fatherName: z.string().trim().optional().or(z.literal("")),
+  relation: z.enum(RELATION_OPTIONS),
+  relationName: z.string().trim().optional().or(z.literal("")),
   addressLine1: z.string().trim().optional().or(z.literal("")),
 });
 type QuickCustomerInput = z.infer<typeof quickCustomerSchema>;
@@ -117,13 +129,11 @@ function BookingItemRow({
   onConflictChange: (index: number, hasConflict: boolean) => void;
 }) {
   const productValue = useWatch({ control, name: `items.${index}.product` });
-  const quantityValue = useWatch({ control, name: `items.${index}.quantity` }) || 1;
+  const pricePerDayValue = useWatch({ control, name: `items.${index}.pricePerDay` }) || 0;
 
   const selectedProduct = products.find((p) => p._id === productValue);
-  const sizeOptions = useMemo(() => selectedProduct?.variants ?? [], [selectedProduct]);
   const days = daysBetween(rentalStartDate, rentalEndDate);
-  const fee = selectedProduct ? selectedProduct.rentalPricePerDay * days * quantityValue : 0;
-  const deposit = selectedProduct ? selectedProduct.securityDeposit * quantityValue : 0;
+  const fee = days > 0 ? pricePerDayValue * days : 0;
 
   const availabilityQuery = useQuery({
     queryKey: ["admin", "product-availability", productValue, rentalStartDate, rentalEndDate],
@@ -171,24 +181,13 @@ function BookingItemRow({
 
         <FormField
           control={control}
-          name={`items.${index}.size`}
+          name={`items.${index}.color`}
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Size</FormLabel>
-              <Select value={field.value} onValueChange={(value) => field.onChange(value ?? "")}>
-                <FormControl>
-                  <SelectTrigger className="w-full" disabled={!selectedProduct}>
-                    <SelectValue placeholder="Size" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {sizeOptions.map((variant) => (
-                    <SelectItem key={variant.size} value={variant.size}>
-                      {variant.size} ({variant.quantityInStock} in stock)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormLabel>Color</FormLabel>
+              <FormControl>
+                <Input placeholder="Color" {...field} />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -196,16 +195,16 @@ function BookingItemRow({
 
         <FormField
           control={control}
-          name={`items.${index}.quantity`}
+          name={`items.${index}.pricePerDay`}
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Qty</FormLabel>
+              <FormLabel>Rent/Day (&#8377;)</FormLabel>
               <FormControl>
                 <Input
                   type="number"
-                  min={1}
-                  value={field.value}
-                  onChange={(event) => field.onChange(Number(event.target.value) || 1)}
+                  min={0}
+                  value={field.value ?? 0}
+                  onChange={(event) => field.onChange(Number(event.target.value) || 0)}
                 />
               </FormControl>
               <FormMessage />
@@ -227,15 +226,9 @@ function BookingItemRow({
         </div>
       </div>
 
-      {selectedProduct && (
+      {selectedProduct && days > 0 && (
         <p className="mt-2 text-xs text-muted-foreground">
-          Color: {selectedProduct.color} &middot; Rent: {formatCurrency(selectedProduct.rentalPricePerDay)}/day
-          {days > 0 && (
-            <>
-              {" "}
-              &middot; {formatCurrency(fee)} rental + {formatCurrency(deposit)} deposit
-            </>
-          )}
+          {formatCurrency(fee)} rental ({days} day{days === 1 ? "" : "s"})
         </p>
       )}
 
@@ -265,6 +258,7 @@ export function BookingForm({
   const router = useRouter();
   const [customerList, setCustomerList] = useState<CustomerOption[]>(customers);
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
+  const [securityTouched, setSecurityTouched] = useState(false);
 
   const form = useForm<BookingCreateInput>({
     resolver: zodResolver(bookingCreateSchema),
@@ -272,10 +266,10 @@ export function BookingForm({
       customer: "",
       billNumber: "",
       bookingDate: todayIso(),
-      items: [{ product: "", size: "", quantity: 1 }],
+      items: [{ product: "", color: "", pricePerDay: 0 }],
       rentalStartDate: "",
       rentalEndDate: "",
-      eventDate: "",
+      securityDeposit: 0,
       advancePaid: 0,
       notes: "",
     },
@@ -290,14 +284,26 @@ export function BookingForm({
   const rentalStartDate = form.watch("rentalStartDate");
   const rentalEndDate = form.watch("rentalEndDate");
   const items = form.watch("items");
+  const securityDepositValue = form.watch("securityDeposit") ?? 0;
 
   const days = daysBetween(rentalStartDate, rentalEndDate);
-  const total = items.reduce((sum, item) => {
-    const product = products.find((p) => p._id === item.product);
-    if (!product || !days) return sum;
-    const quantity = item.quantity || 1;
-    return sum + product.rentalPricePerDay * days * quantity + product.securityDeposit * quantity;
+  const rentTotal = items.reduce((sum, item) => {
+    if (!item.product || !days) return sum;
+    return sum + (item.pricePerDay || 0) * days;
   }, 0);
+  const grandTotal = rentTotal + securityDepositValue;
+
+  const suggestedSecurityDeposit = items.reduce((sum, item) => {
+    const product = products.find((p) => p._id === item.product);
+    return product ? sum + product.securityDeposit : sum;
+  }, 0);
+
+  useEffect(() => {
+    if (!securityTouched) {
+      form.setValue("securityDeposit", suggestedSecurityDeposit);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestedSecurityDeposit, securityTouched]);
 
   const [conflicts, setConflicts] = useState<Record<number, boolean>>({});
   const hasAnyConflict = Object.values(conflicts).some(Boolean);
@@ -307,7 +313,12 @@ export function BookingForm({
   }
 
   function handleProductChange(index: number) {
-    form.setValue(`items.${index}.size`, "");
+    const productId = form.getValues(`items.${index}.product`);
+    const product = products.find((p) => p._id === productId);
+    if (product) {
+      form.setValue(`items.${index}.color`, product.color);
+      form.setValue(`items.${index}.pricePerDay`, product.rentalPricePerDay);
+    }
   }
 
   const mutation = useMutation({
@@ -330,7 +341,7 @@ export function BookingForm({
 
   const quickCustomerForm = useForm<QuickCustomerInput>({
     resolver: zodResolver(quickCustomerSchema),
-    defaultValues: { name: "", phone: "", fatherName: "", addressLine1: "" },
+    defaultValues: { name: "", phone: "", relation: "S/O", relationName: "", addressLine1: "" },
   });
 
   const createCustomerMutation = useMutation({
@@ -342,7 +353,7 @@ export function BookingForm({
         // unique placeholder so account creation isn't blocked on one.
         email: `${digits}.${Date.now()}@walkin.vchuki.local`,
         phone: values.phone,
-        fatherName: values.fatherName || "",
+        fatherName: values.relationName ? `${values.relation} ${values.relationName}` : "",
         addressLine1: values.addressLine1 || "",
         addressCity: "",
         addressState: "",
@@ -376,6 +387,36 @@ export function BookingForm({
       >
         <section className="space-y-4 rounded-lg border border-border bg-card p-6">
           <h2 className="font-heading text-lg">Booking Details</h2>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="billNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Bill Number (optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Manual bill/register no." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="bookingDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Booking Date</FormLabel>
+                  <FormControl>
+                    <DatePicker value={field.value} onChange={field.onChange} className="w-full" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
           <FormField
             control={form.control}
             name="customer"
@@ -413,48 +454,6 @@ export function BookingForm({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField
               control={form.control}
-              name="billNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Bill Number (optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Manual bill/register no." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="bookingDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Booking Date</FormLabel>
-                  <FormControl>
-                    <DatePicker value={field.value} onChange={field.onChange} className="w-full" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <FormField
-              control={form.control}
-              name="eventDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Event Date</FormLabel>
-                  <FormControl>
-                    <DatePicker value={field.value} onChange={field.onChange} className="w-full" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
               name="rentalStartDate"
               render={({ field }) => (
                 <FormItem>
@@ -489,7 +488,7 @@ export function BookingForm({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => append({ product: "", size: "", quantity: 1 })}
+              onClick={() => append({ product: "", color: "", pricePerDay: 0 })}
             >
               <Plus className="h-4 w-4" /> Add Item
             </Button>
@@ -511,39 +510,11 @@ export function BookingForm({
           ))}
         </section>
 
-        <section className="rounded-lg border border-border bg-secondary/40 p-6">
-          <h2 className="font-heading text-lg">Summary</h2>
-          <div className="mt-3 flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Total Amount (rental + deposit)</span>
-            <span className="font-heading text-xl">{formatCurrency(total)}</span>
-          </div>
-          <div className="mt-4 max-w-xs">
-            <FormField
-              control={form.control}
-              name="advancePaid"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Advance Paid (&#8377;)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={field.value ?? 0}
-                      onChange={(event) => field.onChange(Number(event.target.value) || 0)}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-        </section>
-
         <section className="rounded-lg border border-border bg-card p-6">
           <h2 className="font-heading text-lg">Measurements</h2>
           <p className="text-xs text-muted-foreground">In inches, all optional</p>
           <div className="mt-2 grid grid-cols-2 gap-3">
-            {MEASUREMENT_FIELD_DEFS.map(({ key, label }) => (
+            {BOOKING_MEASUREMENT_FIELDS.map(({ key, label }) => (
               <FormField
                 key={key}
                 control={form.control}
@@ -604,6 +575,61 @@ export function BookingForm({
           />
         </section>
 
+        <section className="rounded-lg border border-border bg-secondary/40 p-6">
+          <h2 className="font-heading text-lg">Payment Details</h2>
+          <div className="mt-3 flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Rent Total ({days || 0} day{days === 1 ? "" : "s"})</span>
+            <span className="font-medium">{formatCurrency(rentTotal)}</span>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="securityDeposit"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Security Amount (&#8377;)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={field.value ?? 0}
+                      onChange={(event) => {
+                        setSecurityTouched(true);
+                        field.onChange(Number(event.target.value) || 0);
+                      }}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="advancePaid"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Advance Amount (&#8377;)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={field.value ?? 0}
+                      onChange={(event) => field.onChange(Number(event.target.value) || 0)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+            <span className="text-sm text-muted-foreground">Total Amount (rent + security)</span>
+            <span className="font-heading text-xl">{formatCurrency(grandTotal)}</span>
+          </div>
+        </section>
+
         <div className="flex justify-end">
           <Button type="submit" disabled={mutation.isPending || hasAnyConflict}>
             {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -651,19 +677,44 @@ export function BookingForm({
                 </FormItem>
               )}
             />
-            <FormField
-              control={quickCustomerForm.control}
-              name="fatherName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>S/O (Father&apos;s Name, optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Father's name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-[auto_1fr] gap-3">
+              <FormField
+                control={quickCustomerForm.control}
+                name="relation"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Relation</FormLabel>
+                    <Select value={field.value} onValueChange={(value) => field.onChange(value ?? "S/O")}>
+                      <FormControl>
+                        <SelectTrigger className="w-24">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {RELATION_OPTIONS.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={quickCustomerForm.control}
+                name="relationName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name (optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Husband's / Father's name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <FormField
               control={quickCustomerForm.control}
               name="addressLine1"

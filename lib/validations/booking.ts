@@ -32,8 +32,12 @@ export function computeBookingSettlement(input: {
 
 export const bookingItemSchema = z.object({
   product: z.string().trim().min(1, "Dress is required"),
-  size: z.string().trim().min(1, "Size is required"),
-  quantity: z.number().min(1, "Quantity must be at least 1"),
+  // Size/quantity aren't collected in the booking form anymore — the API
+  // fills them in (one unit, the product's first size) so older reporting
+  // code that expects them keeps working. Color and rent are shown and are
+  // editable per line, defaulting to the product's own values.
+  color: z.string().trim().optional().or(z.literal("")),
+  pricePerDay: z.number().min(0).optional(),
 });
 
 export type BookingItemInput = z.infer<typeof bookingItemSchema>;
@@ -46,8 +50,12 @@ export const bookingCreateSchema = z
     items: z.array(bookingItemSchema).min(1, "Add at least one item"),
     rentalStartDate: z.string().trim().min(1, "Rental start date is required"),
     rentalEndDate: z.string().trim().min(1, "Rental end date is required"),
-    eventDate: z.string().trim().min(1, "Event date is required"),
+    // No longer collected in the form — the API defaults it to the pickup date.
+    eventDate: z.string().trim().optional().or(z.literal("")),
     deliveryAddress: z.string().trim().optional().or(z.literal("")),
+    // Editable override; the API sums the selected dresses' deposits as the
+    // suggested default when this isn't sent.
+    securityDeposit: z.number().min(0).optional(),
     advancePaid: z.number().min(0).optional(),
     measurements: measurementsZodSchema.optional(),
     notes: z.string().trim().optional().or(z.literal("")),

@@ -70,7 +70,9 @@ export async function POST(request: NextRequest): Promise<Response> {
     const days = daysBetween(rentalStartDate, rentalEndDate);
 
     const items = [];
-    let securityDeposit = 0;
+    // Suggested deposit total from the selected dresses' own security
+    // deposit — used unless the form sent an explicit override.
+    let suggestedSecurityDeposit = 0;
 
     for (const inputItem of input.items) {
       const product = await Product.findById(inputItem.product).lean();
@@ -87,19 +89,27 @@ export async function POST(request: NextRequest): Promise<Response> {
         );
       }
 
-      const pricePerDay = product.rentalPricePerDay;
-      const rentalFee = pricePerDay * days * inputItem.quantity;
-      securityDeposit += product.securityDeposit * inputItem.quantity;
+      // Size/quantity aren't collected in the booking form — one unit of the
+      // product's first listed size. Color and rent are editable per line in
+      // the form and fall back to the product's own values when omitted.
+      const quantity = 1;
+      const size = product.variants[0]?.size ?? "Custom";
+      const color = inputItem.color || product.color;
+      const pricePerDay = inputItem.pricePerDay ?? product.rentalPricePerDay;
+      const rentalFee = pricePerDay * days * quantity;
+      suggestedSecurityDeposit += product.securityDeposit * quantity;
 
       items.push({
         product: inputItem.product,
-        size: inputItem.size,
-        quantity: inputItem.quantity,
+        color,
+        size,
+        quantity,
         pricePerDay,
         rentalFee,
       });
     }
 
+    const securityDeposit = input.securityDeposit ?? suggestedSecurityDeposit;
     const totalAmount = items.reduce((sum, item) => sum + item.rentalFee, 0) + securityDeposit;
     const bookingNumber = await generateBookingNumber();
 
@@ -111,7 +121,8 @@ export async function POST(request: NextRequest): Promise<Response> {
       items,
       rentalStartDate,
       rentalEndDate,
-      eventDate: new Date(input.eventDate),
+      // No longer collected in the form — defaults to the pickup date.
+      eventDate: input.eventDate ? new Date(input.eventDate) : rentalStartDate,
       status: "inquiry",
       securityDeposit,
       totalAmount,
