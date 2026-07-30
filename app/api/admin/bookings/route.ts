@@ -38,7 +38,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     filter.rentalStartDate = { $lte: new Date(to) };
   }
 
-  const [bookings, total] = await Promise.all([
+  const [bookings, total, summaryAgg] = await Promise.all([
     Booking.find(filter)
       .populate("customer", "name email")
       .populate("items.product", "name images")
@@ -47,11 +47,34 @@ export async function GET(request: NextRequest): Promise<Response> {
       .limit(pageSize)
       .lean(),
     Booking.countDocuments(filter),
+    // Earnings summary is computed over every booking matching the current
+    // filter (not just the current page) so it reflects the store's real
+    // totals, not just what's visible in the table.
+    Booking.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: null,
+          totalAmount: { $sum: "$totalAmount" },
+          securityDeposit: { $sum: "$securityDeposit" },
+          advancePaid: { $sum: "$advancePaid" },
+        },
+      },
+    ]),
   ]);
+
+  const summaryRow = summaryAgg[0] ?? { totalAmount: 0, securityDeposit: 0, advancePaid: 0 };
+  const summary = {
+    totalAmount: summaryRow.totalAmount,
+    securityDeposit: summaryRow.securityDeposit,
+    advancePaid: summaryRow.advancePaid,
+    dueAmount: summaryRow.totalAmount - summaryRow.advancePaid,
+  };
 
   return apiSuccess({
     bookings,
     pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    summary,
   });
 }
 

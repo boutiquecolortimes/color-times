@@ -12,7 +12,7 @@ const PAGE_SIZE = 20;
 export default async function AdminBookingsPage() {
   await connectToDatabase();
 
-  const [bookings, total] = await Promise.all([
+  const [bookings, total, summaryAgg] = await Promise.all([
     Booking.find()
       .populate("customer", "name email")
       .populate("items.product", "name images")
@@ -20,15 +20,29 @@ export default async function AdminBookingsPage() {
       .limit(PAGE_SIZE)
       .lean(),
     Booking.countDocuments(),
+    Booking.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalAmount: { $sum: "$totalAmount" },
+          securityDeposit: { $sum: "$securityDeposit" },
+          advancePaid: { $sum: "$advancePaid" },
+        },
+      },
+    ]),
   ]);
 
   const initialBookings = bookings.map((booking) => ({
     _id: String(booking._id),
     bookingNumber: booking.bookingNumber,
+    billNumber: booking.billNumber,
+    bookingDate: booking.bookingDate.toISOString(),
     status: booking.status,
     rentalStartDate: booking.rentalStartDate.toISOString(),
     rentalEndDate: booking.rentalEndDate.toISOString(),
     totalAmount: booking.totalAmount,
+    securityDeposit: booking.securityDeposit,
+    advancePaid: booking.advancePaid ?? 0,
     customer: booking.customer
       ? {
           name: (booking.customer as unknown as { name: string }).name,
@@ -42,6 +56,8 @@ export default async function AdminBookingsPage() {
     })),
   }));
 
+  const summaryRow = summaryAgg[0] ?? { totalAmount: 0, securityDeposit: 0, advancePaid: 0 };
+
   return (
     <BookingsClient
       initialBookings={initialBookings}
@@ -50,6 +66,12 @@ export default async function AdminBookingsPage() {
         pageSize: PAGE_SIZE,
         total,
         totalPages: Math.ceil(total / PAGE_SIZE),
+      }}
+      initialSummary={{
+        totalAmount: summaryRow.totalAmount,
+        securityDeposit: summaryRow.securityDeposit,
+        advancePaid: summaryRow.advancePaid,
+        dueAmount: summaryRow.totalAmount - summaryRow.advancePaid,
       }}
     />
   );

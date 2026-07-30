@@ -25,12 +25,27 @@ import type { BookingStatus } from "@/models/Booking";
 interface BookingRow {
   _id: string;
   bookingNumber: string;
+  billNumber?: string;
+  bookingDate: string;
   status: BookingStatus;
   rentalStartDate: string;
   rentalEndDate: string;
   totalAmount: number;
+  securityDeposit: number;
+  advancePaid: number;
   customer: { name: string; email: string } | null;
   items: { product: { name: string } | null }[];
+}
+
+interface BookingsSummary {
+  totalAmount: number;
+  securityDeposit: number;
+  advancePaid: number;
+  dueAmount: number;
+}
+
+function formatINR(value: number): string {
+  return `₹${Math.round(value).toLocaleString("en-IN")}`;
 }
 
 function productSummary(items: { product: { name: string } | null }[]): string {
@@ -71,7 +86,7 @@ async function fetchBookings(params: {
   status: string;
   from: string;
   to: string;
-}): Promise<{ bookings: BookingRow[]; pagination: Pagination }> {
+}): Promise<{ bookings: BookingRow[]; pagination: Pagination; summary: BookingsSummary }> {
   const searchParams = new URLSearchParams({ page: String(params.page) });
   if (params.status !== "all") searchParams.set("status", params.status);
   if (params.from) searchParams.set("from", params.from);
@@ -86,9 +101,11 @@ async function fetchBookings(params: {
 export function BookingsClient({
   initialBookings,
   initialPagination,
+  initialSummary,
 }: {
   initialBookings: BookingRow[];
   initialPagination: Pagination;
+  initialSummary: BookingsSummary;
 }) {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
@@ -104,12 +121,13 @@ export function BookingsClient({
     queryKey: ["admin", "bookings", { page, status, from, to }],
     queryFn: () => fetchBookings({ page, status, from, to }),
     initialData: isDefaultQuery
-      ? { bookings: initialBookings, pagination: initialPagination }
+      ? { bookings: initialBookings, pagination: initialPagination, summary: initialSummary }
       : undefined,
   });
 
   const bookings = data?.bookings ?? [];
   const pagination = data?.pagination ?? initialPagination;
+  const summary = data?.summary ?? initialSummary;
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({
@@ -148,15 +166,29 @@ export function BookingsClient({
             </Link>
             <BookingStatusBadge status={booking.status} />
           </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Bill #{booking.billNumber || "—"} · Booked {formatDate(booking.bookingDate)}
+          </p>
           <p className="mt-2 text-sm">{booking.customer?.name ?? "—"}</p>
           <p className="text-xs text-muted-foreground">{booking.customer?.email}</p>
           <p className="mt-2 text-sm text-muted-foreground">{productSummary(booking.items)}</p>
           <p className="mt-1 text-xs text-muted-foreground">
             {formatDate(booking.rentalStartDate)} &rarr; {formatDate(booking.rentalEndDate)}
           </p>
-          <p className="mt-2 text-sm font-medium">
-            &#8377;{booking.totalAmount.toLocaleString("en-IN")}
-          </p>
+          <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span>Total</span>
+            <span className="text-right font-medium text-foreground">
+              {formatINR(booking.totalAmount)}
+            </span>
+            <span>Security</span>
+            <span className="text-right">{formatINR(booking.securityDeposit)}</span>
+            <span>Advance</span>
+            <span className="text-right">{formatINR(booking.advancePaid)}</span>
+            <span>Due</span>
+            <span className="text-right font-medium text-accent">
+              {formatINR(booking.totalAmount - booking.advancePaid)}
+            </span>
+          </div>
           <Select
             value={booking.status}
             onValueChange={(value) => {
@@ -316,6 +348,27 @@ export function BookingsClient({
         </div>
       </div>
 
+      {view !== "calendar" && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-lg border border-border bg-card p-4">
+            <p className="text-xs text-muted-foreground">Total Earnings</p>
+            <p className="mt-1 font-heading text-lg">{formatINR(summary.totalAmount)}</p>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <p className="text-xs text-muted-foreground">Security Held</p>
+            <p className="mt-1 font-heading text-lg">{formatINR(summary.securityDeposit)}</p>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <p className="text-xs text-muted-foreground">Advance Collected</p>
+            <p className="mt-1 font-heading text-lg">{formatINR(summary.advancePaid)}</p>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <p className="text-xs text-muted-foreground">Due Amount</p>
+            <p className="mt-1 font-heading text-lg text-accent">{formatINR(summary.dueAmount)}</p>
+          </div>
+        </div>
+      )}
+
       {view === "calendar" ? (
         <BookingCalendar />
       ) : (
@@ -326,14 +379,19 @@ export function BookingsClient({
             <div className="hidden lg:block">{cardGrid}</div>
           ) : (
           <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
-            <table className="w-full min-w-[640px] text-sm whitespace-nowrap">
+            <table className="w-full min-w-[1180px] text-sm whitespace-nowrap">
               <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3">Booking #</th>
+                  <th className="px-4 py-3">Bill #</th>
+                  <th className="px-4 py-3">Booking Date</th>
                   <th className="px-4 py-3">Customer</th>
                   <th className="px-4 py-3">Product</th>
-                  <th className="px-4 py-3">Dates</th>
+                  <th className="px-4 py-3">Rental Dates</th>
                   <th className="px-4 py-3">Total</th>
+                  <th className="px-4 py-3">Security</th>
+                  <th className="px-4 py-3">Advance</th>
+                  <th className="px-4 py-3">Due</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3 text-right">Update</th>
                 </tr>
@@ -352,6 +410,12 @@ export function BookingsClient({
                         {booking.bookingNumber}
                       </Link>
                     </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {booking.billNumber || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                      {formatDate(booking.bookingDate)}
+                    </td>
                     <td className="px-4 py-3">
                       <p>{booking.customer?.name ?? "—"}</p>
                       <p className="text-xs text-muted-foreground">
@@ -365,8 +429,17 @@ export function BookingsClient({
                       {formatDate(booking.rentalStartDate)} &rarr;{" "}
                       {formatDate(booking.rentalEndDate)}
                     </td>
-                    <td className="px-4 py-3">
-                      &#8377;{booking.totalAmount.toLocaleString("en-IN")}
+                    <td className="px-4 py-3 font-medium">
+                      {formatINR(booking.totalAmount)}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {formatINR(booking.securityDeposit)}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {formatINR(booking.advancePaid)}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-accent">
+                      {formatINR(booking.totalAmount - booking.advancePaid)}
                     </td>
                     <td className="px-4 py-3">
                       <BookingStatusBadge status={booking.status} />
@@ -405,7 +478,7 @@ export function BookingsClient({
                 {bookings.length === 0 && (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={12}
                       className="px-4 py-10 text-center text-muted-foreground"
                     >
                       No bookings found.
