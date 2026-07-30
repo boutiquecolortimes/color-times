@@ -29,7 +29,7 @@ export function AdminSidebar({ role }: { role: UserRole }) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="no-scrollbar flex-1 overflow-y-auto">
         <AdminNavLinks role={role} />
       </div>
 

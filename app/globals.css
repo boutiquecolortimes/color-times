@@ -271,4 +271,11 @@
   .kicker {
     @apply text-xs uppercase tracking-[0.3em] text-accent font-medium;
   }
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
