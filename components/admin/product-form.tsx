@@ -389,23 +389,6 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
-                  name="rentalPricePerDay"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Rent / Day (&#8377;)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          value={field.value}
-                          onChange={(event) => field.onChange(Number(event.target.value))}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
                   name="purchasePrice"
                   render={({ field }) => (
                     <FormItem>
@@ -448,6 +431,23 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
                         <Input
                           type="number"
                           value={field.value ?? 0}
+                          onChange={(event) => field.onChange(Number(event.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="rentalPricePerDay"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Rent (&#8377;)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          value={field.value}
                           onChange={(event) => field.onChange(Number(event.target.value))}
                         />
                       </FormControl>
