@@ -62,7 +62,7 @@ export function TrendingDresses({ dresses }: { dresses: DressListing[] }) {
                     <h3 className="mt-1 font-heading text-lg">{dress.name}</h3>
                     <p className="mt-1 text-sm text-accent">
                       &#8377;{dress.pricePerDay.toLocaleString("en-IN")}{" "}
-                      <span className="text-muted-foreground">/ per day</span>
+                      <span className="text-muted-foreground">rent</span>
                     </p>
                   </div>
                 </Link>

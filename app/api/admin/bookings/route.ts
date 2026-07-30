@@ -10,7 +10,6 @@ import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
-import { daysBetween } from "@/lib/utils";
 
 export async function GET(request: NextRequest): Promise<Response> {
   const auth = await requireApiRole(ADMIN_ROLES);
@@ -99,7 +98,6 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     const rentalStartDate = new Date(input.rentalStartDate);
     const rentalEndDate = new Date(input.rentalEndDate);
-    const days = daysBetween(rentalStartDate, rentalEndDate);
 
     const items = [];
     // Suggested deposit total from the selected dresses' own security
@@ -128,7 +126,8 @@ export async function POST(request: NextRequest): Promise<Response> {
       const size = product.variants[0]?.size ?? "Custom";
       const color = inputItem.color || product.color;
       const pricePerDay = inputItem.pricePerDay ?? product.rentalPricePerDay;
-      const rentalFee = pricePerDay * days * quantity;
+      // Flat rent for the whole booking — not multiplied by rental days.
+      const rentalFee = pricePerDay * quantity;
       suggestedSecurityDeposit += product.securityDeposit * quantity;
 
       items.push({

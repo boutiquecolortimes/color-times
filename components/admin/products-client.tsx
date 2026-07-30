@@ -91,7 +91,7 @@ interface ProductsResponse {
 
 const COLUMN_DEFS = [
   { key: "category", label: "Category" },
-  { key: "price", label: "Price/Day" },
+  { key: "price", label: "Rent" },
   { key: "stock", label: "Stock" },
   { key: "status", label: "Status" },
 ];
@@ -412,7 +412,7 @@ export function ProductsClient({
     }
   }
 
-const exportHeaders = ["Name", "Code", "Category", "Price/Day", "Stock", "Status"];
+const exportHeaders = ["Name", "Code", "Category", "Rent", "Stock", "Status"];
 
   async function fetchExportRows(): Promise<(string | number)[][]> {
     const full = await fetchProducts({ page: 1, search, category, status, sortBy, sortDir, all: true });
@@ -491,7 +491,7 @@ const exportHeaders = ["Name", "Code", "Category", "Price/Day", "Stock", "Status
             <p className="text-xs text-muted-foreground">{product.sku}</p>
             <p className="mt-1 text-sm text-accent">
               &#8377;{product.rentalPricePerDay.toLocaleString("en-IN")}
-              <span className="text-muted-foreground">/day</span>
+              <span className="text-muted-foreground"> rent</span>
             </p>
             <div className="mt-2 flex gap-1">
               <ButtonLink
@@ -685,7 +685,7 @@ const exportHeaders = ["Name", "Code", "Category", "Price/Day", "Stock", "Status
                       className="flex items-center gap-1 hover:text-foreground"
                       onClick={() => toggleSort("rentalPricePerDay")}
                     >
-                      Price/Day <SortIcon field="rentalPricePerDay" sortBy={sortBy} sortDir={sortDir} />
+                      Rent <SortIcon field="rentalPricePerDay" sortBy={sortBy} sortDir={sortDir} />
                     </button>
                   </th>
                 )}

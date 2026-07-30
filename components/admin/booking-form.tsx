@@ -145,7 +145,8 @@ function BookingItemRow({
 
   const selectedProduct = products.find((p) => p._id === productValue);
   const days = daysBetween(rentalStartDate, rentalEndDate);
-  const fee = days > 0 ? pricePerDayValue * days : 0;
+  // Flat rent amount per item — not multiplied by the number of rental days.
+  const fee = pricePerDayValue;
 
   const availabilityQuery = useQuery({
     queryKey: ["admin", "product-availability", productValue, rentalStartDate, rentalEndDate],
@@ -187,7 +188,7 @@ function BookingItemRow({
                       label: `${product.name} (${product.sku})`,
                       sublabel: isBooked
                         ? "Already booked for these dates"
-                        : `${product.color} · ${formatCurrency(product.rentalPricePerDay)}/day`,
+                        : `${product.color} · ${formatCurrency(product.rentalPricePerDay)} rent`,
                       disabled: isBooked,
                     };
                   })}
@@ -217,7 +218,7 @@ function BookingItemRow({
           name={`items.${index}.pricePerDay`}
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Rent/Day (&#8377;)</FormLabel>
+              <FormLabel>Rent (&#8377;)</FormLabel>
               <FormControl>
                 <Input
                   type="number"
@@ -247,7 +248,7 @@ function BookingItemRow({
 
       {selectedProduct && days > 0 && (
         <p className="mt-2 text-xs text-muted-foreground">
-          {formatCurrency(fee)} rental ({days} day{days === 1 ? "" : "s"})
+          {formatCurrency(fee)} flat rent &middot; {days} day{days === 1 ? "" : "s"} rental period
         </p>
       )}
 
@@ -306,10 +307,10 @@ export function BookingForm({
   const securityDepositValue = form.watch("securityDeposit") ?? 0;
   const advancePaidValue = form.watch("advancePaid") ?? 0;
 
-  const days = daysBetween(rentalStartDate, rentalEndDate);
+  // Flat rent per item — the total isn't multiplied by the rental duration.
   const rentTotal = items.reduce((sum, item) => {
-    if (!item.product || !days) return sum;
-    return sum + (item.pricePerDay || 0) * days;
+    if (!item.product) return sum;
+    return sum + (item.pricePerDay || 0);
   }, 0);
   const grandTotal = rentTotal + securityDepositValue;
   const dueAmount = grandTotal - advancePaidValue;
@@ -609,7 +610,7 @@ export function BookingForm({
         <section className="rounded-lg border border-border bg-card p-6">
           <h2 className="font-heading text-lg">Payment Details</h2>
           <div className="mt-3 flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Rent Total ({days || 0} day{days === 1 ? "" : "s"})</span>
+            <span className="text-muted-foreground">Rent Total (flat, not per day)</span>
             <span className="font-medium">{formatCurrency(rentTotal)}</span>
           </div>
 

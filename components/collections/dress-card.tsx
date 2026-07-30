@@ -40,7 +40,7 @@ export function DressCard({ dress }: { dress: DressListing }) {
         <div className="mt-2 flex items-center justify-between">
           <p className="text-sm text-accent">
             &#8377;{dress.pricePerDay.toLocaleString("en-IN")}{" "}
-            <span className="text-muted-foreground">/ day</span>
+            <span className="text-muted-foreground">rent</span>
           </p>
           <p className="text-xs text-muted-foreground">Sizes {dress.sizes.join(", ")}</p>
         </div>

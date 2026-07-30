@@ -226,7 +226,7 @@ export function ProductDetailDrawer({
 
                   <div className="grid grid-cols-3 gap-3 rounded-lg border border-border p-3 text-sm">
                     <div>
-                      <p className="text-xs uppercase text-muted-foreground">Price/Day</p>
+                      <p className="text-xs uppercase text-muted-foreground">Rent</p>
                       <p className="mt-0.5 font-medium">
                         &#8377;{product.rentalPricePerDay.toLocaleString("en-IN")}
                       </p>
