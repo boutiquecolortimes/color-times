@@ -1,6 +1,8 @@
 import { Schema, model, models, type Document, type Model, type Types } from "mongoose";
 
-export type ProductSize = "XS" | "S" | "M" | "L" | "XL" | "XXL" | "Custom";
+// Free-text now — the admin form lets the user type any size (numeric,
+// letter, or free-form) instead of picking from a fixed dropdown.
+export type ProductSize = string;
 
 export type ProductStatus =
   | "available"
@@ -64,11 +66,7 @@ export interface IProduct extends Document {
 
 const variantSchema = new Schema<IProductVariant>(
   {
-    size: {
-      type: String,
-      enum: ["XS", "S", "M", "L", "XL", "XXL", "Custom"],
-      required: true,
-    },
+    size: { type: String, required: true, trim: true },
     quantityInStock: { type: Number, required: true, min: 0, default: 0 },
   },
   { _id: false }

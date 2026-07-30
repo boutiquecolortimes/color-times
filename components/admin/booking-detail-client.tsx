@@ -273,7 +273,7 @@ export function BookingDetailClient({ initialBooking }: { initialBooking: Bookin
               </div>
             </div>
 
-            <div className="rounded-lg border border-border bg-secondary/40 p-6">
+            <div className="rounded-lg border border-border bg-card p-6">
               <h2 className="font-heading text-lg">Billing</h2>
               <div className="mt-2 space-y-1 text-sm">
                 {booking.items.map((item, index) => (

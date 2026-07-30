@@ -161,7 +161,7 @@ function BookingItemRow({
   }, [hasConflict, index]);
 
   return (
-    <div className="rounded-lg border border-border p-4">
+    <div className="rounded-lg border border-border bg-secondary/40 p-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-[2fr_1fr_1fr_auto]">
         <FormField
           control={control}
@@ -511,7 +511,7 @@ export function BookingForm({
           </div>
         </section>
 
-        <section className="space-y-4">
+        <section className="space-y-4 rounded-lg border border-border bg-card p-6">
           <div className="flex items-center justify-between">
             <h2 className="font-heading text-lg">Items</h2>
             <Button
@@ -606,7 +606,7 @@ export function BookingForm({
           />
         </section>
 
-        <section className="rounded-lg border border-border bg-secondary/40 p-6">
+        <section className="rounded-lg border border-border bg-card p-6">
           <h2 className="font-heading text-lg">Payment Details</h2>
           <div className="mt-3 flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Rent Total ({days || 0} day{days === 1 ? "" : "s"})</span>

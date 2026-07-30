@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 export const productVariantSchema = z.object({
-  size: z.enum(["XS", "S", "M", "L", "XL", "XXL", "Custom"]),
+  // Free text — the form has a plain input instead of a fixed size dropdown.
+  size: z.string().trim().min(1, "Size is required"),
   quantityInStock: z.number().int().min(0),
 });
 

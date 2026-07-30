@@ -34,8 +34,6 @@ import { formatDate } from "@/lib/utils";
 import type { BookingStatus } from "@/models/Booking";
 import type { ServiceOrderStatus } from "@/models/ServiceOrder";
 
-const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL", "Custom"] as const;
-
 interface CategoryOption {
   _id: string;
   name: string;
@@ -482,20 +480,9 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
                       render={({ field }) => (
                         <FormItem className="w-32">
                           <FormLabel>Size</FormLabel>
-                          <Select value={field.value} onValueChange={field.onChange}>
-                            <FormControl>
-                              <SelectTrigger className="w-full">
-                                <SelectValue />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {SIZE_OPTIONS.map((size) => (
-                                <SelectItem key={size} value={size}>
-                                  {size}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <FormControl>
+                            <Input placeholder="e.g. M, 38, Free" {...field} />
+                          </FormControl>
                         </FormItem>
                       )}
                     />
