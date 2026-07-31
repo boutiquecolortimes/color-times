@@ -43,6 +43,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ColumnVisibilityMenu } from "@/components/admin/column-visibility-menu";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { ProductsBulkToolbar } from "@/components/admin/products-bulk-toolbar";
@@ -477,6 +478,8 @@ const exportHeaders = ["Name", "Code", "Category", "Rent", "Stock", "Status"];
             <button
               type="button"
               className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-background/80"
+              aria-label={product.isFavorited ? "Remove from favorites" : "Add to favorites"}
+              title={product.isFavorited ? "Remove from favorites" : "Add to favorites"}
               onClick={() =>
                 favoriteMutation.mutate({ id: product._id, isFavorited: !product.isFavorited })
               }
@@ -584,7 +587,13 @@ const exportHeaders = ["Name", "Code", "Category", "Rent", "Stock", "Status"];
         </div>
         <div className="flex flex-wrap gap-2">
           {canManageSettings && (
-            <ButtonLink variant="outline" size="icon" href="/admin/products/settings" aria-label="Inventory settings">
+            <ButtonLink
+              variant="outline"
+              size="icon"
+              href="/admin/products/settings"
+              aria-label="Inventory settings"
+              title="Inventory settings"
+            >
               <Settings2 className="h-4 w-4" />
             </ButtonLink>
           )}
@@ -597,22 +606,36 @@ const exportHeaders = ["Name", "Code", "Category", "Rent", "Stock", "Status"];
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1 rounded-md border border-border p-1">
-          <Button
-            variant={view === "table" ? "secondary" : "ghost"}
-            size="icon-sm"
-            onClick={() => setView("table")}
-            aria-label="Table view"
-          >
-            <List className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={view === "card" ? "secondary" : "ghost"}
-            size="icon-sm"
-            onClick={() => setView("card")}
-            aria-label="Card view"
-          >
-            <Grid3x3 className="h-4 w-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant={view === "table" ? "secondary" : "ghost"}
+                  size="icon-sm"
+                  onClick={() => setView("table")}
+                  aria-label="Table view"
+                />
+              }
+            >
+              <List className="h-4 w-4" />
+            </TooltipTrigger>
+            <TooltipContent>Table view</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant={view === "card" ? "secondary" : "ghost"}
+                  size="icon-sm"
+                  onClick={() => setView("card")}
+                  aria-label="Card view"
+                />
+              }
+            >
+              <Grid3x3 className="h-4 w-4" />
+            </TooltipTrigger>
+            <TooltipContent>Card view</TooltipContent>
+          </Tooltip>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -805,101 +828,159 @@ const exportHeaders = ["Name", "Code", "Category", "Rent", "Stock", "Status"];
                   )}
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="Favorite"
-                        onClick={() =>
-                          favoriteMutation.mutate({
-                            id: product._id,
-                            isFavorited: !product.isFavorited,
-                          })
-                        }
-                      >
-                        <Star
-                          className={cn(
-                            "h-3.5 w-3.5",
-                            product.isFavorited && "fill-accent text-accent"
-                          )}
-                        />
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label="Favorite"
+                              onClick={() =>
+                                favoriteMutation.mutate({
+                                  id: product._id,
+                                  isFavorited: !product.isFavorited,
+                                })
+                              }
+                            />
+                          }
+                        >
+                          <Star
+                            className={cn(
+                              "h-3.5 w-3.5",
+                              product.isFavorited && "fill-accent text-accent"
+                            )}
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {product.isFavorited ? "Remove from favorites" : "Add to favorites"}
+                        </TooltipContent>
+                      </Tooltip>
                       {status === "trash" ? (
                         <>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label="Restore"
-                            onClick={() => restoreMutation.mutate(product._id)}
-                          >
-                            <RotateCcw className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-destructive"
-                            aria-label="Delete permanently"
-                            onClick={() =>
-                              setConfirmState({ ids: [product._id], action: "permanent-delete" })
-                            }
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  aria-label="Restore"
+                                  onClick={() => restoreMutation.mutate(product._id)}
+                                />
+                              }
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                            </TooltipTrigger>
+                            <TooltipContent>Restore from trash</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  className="text-destructive"
+                                  aria-label="Delete permanently"
+                                  onClick={() =>
+                                    setConfirmState({ ids: [product._id], action: "permanent-delete" })
+                                  }
+                                />
+                              }
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </TooltipTrigger>
+                            <TooltipContent>Delete permanently</TooltipContent>
+                          </Tooltip>
                         </>
                       ) : (
                         <>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label="View"
-                            onClick={() => setViewingId(product._id)}
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  aria-label="View"
+                                  onClick={() => setViewingId(product._id)}
+                                />
+                              }
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </TooltipTrigger>
+                            <TooltipContent>View details</TooltipContent>
+                          </Tooltip>
                           <ButtonLink
                             variant="ghost"
                             size="icon-sm"
                             href={`/admin/products/${product._id}`}
                             aria-label="Edit"
+                            title="Edit product"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </ButtonLink>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label="Duplicate"
-                            onClick={() => duplicateMutation.mutate(product._id)}
-                          >
-                            <Copy className="h-3.5 w-3.5" />
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  aria-label="Duplicate"
+                                  onClick={() => duplicateMutation.mutate(product._id)}
+                                />
+                              }
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </TooltipTrigger>
+                            <TooltipContent>Duplicate product</TooltipContent>
+                          </Tooltip>
                           {product.archivedAt ? (
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label="Restore"
-                              onClick={() => restoreMutation.mutate(product._id)}
-                            >
-                              <RotateCcw className="h-3.5 w-3.5" />
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger
+                                render={
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    aria-label="Restore"
+                                    onClick={() => restoreMutation.mutate(product._id)}
+                                  />
+                                }
+                              >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                              </TooltipTrigger>
+                              <TooltipContent>Unarchive product</TooltipContent>
+                            </Tooltip>
                           ) : (
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label="Archive"
-                              title="Archive"
-                              onClick={() => archiveMutation.mutate(product._id)}
-                            >
-                              <Archive className="h-3.5 w-3.5" />
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger
+                                render={
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    aria-label="Archive"
+                                    onClick={() => archiveMutation.mutate(product._id)}
+                                  />
+                                }
+                              >
+                                <Archive className="h-3.5 w-3.5" />
+                              </TooltipTrigger>
+                              <TooltipContent>Archive product</TooltipContent>
+                            </Tooltip>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-destructive"
-                            aria-label="Delete"
-                            onClick={() => trashMutation.mutate(product._id)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  className="text-destructive"
+                                  aria-label="Delete"
+                                  onClick={() => trashMutation.mutate(product._id)}
+                                />
+                              }
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </TooltipTrigger>
+                            <TooltipContent>Move to trash</TooltipContent>
+                          </Tooltip>
                         </>
                       )}
                     </div>

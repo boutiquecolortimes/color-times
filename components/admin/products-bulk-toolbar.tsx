@@ -48,7 +48,7 @@ export function ProductsBulkToolbar({ count, status, onAction, onClear }: Produc
             </Button>
           </>
         )}
-        <Button size="sm" variant="ghost" onClick={onClear}>
+        <Button size="sm" variant="ghost" onClick={onClear} aria-label="Clear selection" title="Clear selection">
           <X className="h-3.5 w-3.5" />
         </Button>
       </div>
