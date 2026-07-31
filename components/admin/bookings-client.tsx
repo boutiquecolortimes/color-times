@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CalendarDays, Grid3x3, List } from "lucide-react";
+import { CalendarDays, Grid3x3, List, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import {
@@ -17,6 +17,7 @@ import {
 import { BookingStatusBadge } from "@/components/admin/booking-status-badge";
 import { BookingCalendar } from "@/components/admin/booking-calendar";
 import { ReturnBookingDialog } from "@/components/admin/return-booking-dialog";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { DatePicker } from "@/components/ui/date-picker";
 import { cn, formatDate } from "@/lib/utils";
@@ -114,6 +115,7 @@ export function BookingsClient({
   const [to, setTo] = useState("");
   const [view, setView] = useState<"table" | "card" | "calendar">("table");
   const [returnDialogBookingId, setReturnDialogBookingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<BookingRow | null>(null);
 
   const isDefaultQuery = page === 1 && status === "all" && from === "" && to === "";
 
@@ -149,6 +151,21 @@ export function BookingsClient({
     onSuccess: () => {
       toast.success("Booking status updated");
       queryClient.invalidateQueries({ queryKey: ["admin", "bookings"] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/bookings/${id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data;
+    },
+    onSuccess: () => {
+      toast.success("Booking deleted");
+      queryClient.invalidateQueries({ queryKey: ["admin", "bookings"] });
+      setDeleteTarget(null);
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -189,31 +206,43 @@ export function BookingsClient({
               {formatINR(booking.totalAmount - booking.advancePaid)}
             </span>
           </div>
-          <Select
-            value={booking.status}
-            onValueChange={(value) => {
-              if (!value || value === booking.status) return;
-              if (value === "returned") {
-                setReturnDialogBookingId(booking._id);
-                return;
-              }
-              updateStatusMutation.mutate({
-                id: booking._id,
-                status: value as BookingStatus,
-              });
-            }}
-          >
-            <SelectTrigger className="mt-3 w-full" size="sm">
-              <SelectValue>{(value: string) => value.replace("_", " ")}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {STATUS_OPTIONS.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {option.replace("_", " ")}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="mt-3 flex items-center gap-2">
+            <Select
+              value={booking.status}
+              onValueChange={(value) => {
+                if (!value || value === booking.status) return;
+                if (value === "returned") {
+                  setReturnDialogBookingId(booking._id);
+                  return;
+                }
+                updateStatusMutation.mutate({
+                  id: booking._id,
+                  status: value as BookingStatus,
+                });
+              }}
+            >
+              <SelectTrigger className="w-full" size="sm">
+                <SelectValue>{(value: string) => value.replace("_", " ")}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option.replace("_", " ")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="shrink-0 text-destructive hover:text-destructive"
+              aria-label="Delete booking"
+              onClick={() => setDeleteTarget(booking)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       ))}
       {bookings.length === 0 && (
@@ -379,7 +408,7 @@ export function BookingsClient({
             <div className="hidden lg:block">{cardGrid}</div>
           ) : (
           <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
-            <table className="w-full min-w-[1180px] text-sm whitespace-nowrap">
+            <table className="w-full min-w-[1240px] text-sm whitespace-nowrap">
               <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3">Booking #</th>
@@ -394,6 +423,9 @@ export function BookingsClient({
                   <th className="px-4 py-3">Due</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3 text-right">Update</th>
+                  <th className="px-4 py-3 text-right">
+                    <span className="sr-only">Delete</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -473,12 +505,24 @@ export function BookingsClient({
                         </SelectContent>
                       </Select>
                     </td>
+                    <td className="px-4 py-3 text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        aria-label="Delete booking"
+                        onClick={() => setDeleteTarget(booking)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </td>
                   </tr>
                 ))}
                 {bookings.length === 0 && (
                   <tr>
                     <td
-                      colSpan={12}
+                      colSpan={13}
                       className="px-4 py-10 text-center text-muted-foreground"
                     >
                       No bookings found.
@@ -504,6 +548,23 @@ export function BookingsClient({
         bookingId={returnDialogBookingId}
         open={returnDialogBookingId !== null}
         onOpenChange={(open) => !open && setReturnDialogBookingId(null)}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete booking?"
+        description={
+          deleteTarget
+            ? `Delete booking ${deleteTarget.bookingNumber}${deleteTarget.customer ? ` for ${deleteTarget.customer.name}` : ""}? This removes it permanently, including its billing history. This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        variant="destructive"
+        isLoading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate(deleteTarget._id);
+        }}
       />
     </div>
   );

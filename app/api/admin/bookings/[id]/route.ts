@@ -7,7 +7,7 @@ import "@/models/User";
 import { bookingStatusSchema, computeBookingSettlement } from "@/lib/validations/booking";
 import { ACTIVE_BOOKING_STATUSES } from "@/lib/admin/booking-availability";
 import { requireApiRole } from "@/lib/api/require-role";
-import { ADMIN_ROLES } from "@/lib/auth/roles";
+import { ADMIN_ROLES, MANAGER_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 import {
@@ -214,4 +214,46 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
   } catch (error) {
     return apiErrorFromUnknown(error);
   }
+}
+
+// Restricted to managers+ — deleting a booking removes it from all revenue
+// and history reporting, so it's gated tighter than a normal status change.
+export async function DELETE(request: NextRequest, { params }: RouteParams): Promise<Response> {
+  const auth = await requireApiRole(MANAGER_ROLES);
+  if ("error" in auth) return auth.error;
+
+  const { id } = await params;
+  await connectToDatabase();
+
+  const booking = await Booking.findById(id).lean();
+  if (!booking) {
+    return apiError("Booking not found", 404);
+  }
+
+  await Booking.findByIdAndDelete(id);
+
+  await recordAuditLog({
+    entityType: "Booking",
+    entityId: id,
+    action: "delete",
+    actor: auth.user,
+    snapshot: booking as unknown as Record<string, unknown>,
+  });
+
+  // Release any dress this booking was holding, unless another active
+  // booking still has it out.
+  const productIds = booking.items.map((item) => item.product);
+  if (ACTIVE_BOOKING_STATUSES.includes(booking.status)) {
+    for (const productId of productIds) {
+      const stillActive = await Booking.exists({
+        "items.product": productId,
+        status: { $in: ACTIVE_BOOKING_STATUSES },
+      });
+      if (!stillActive) {
+        await Product.findByIdAndUpdate(productId, { status: "available" });
+      }
+    }
+  }
+
+  return apiSuccess({ deleted: true });
 }
