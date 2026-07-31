@@ -4,7 +4,18 @@ import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CalendarDays, Grid3x3, List, Search, Trash2 } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronDown,
+  Download,
+  FileDown,
+  Grid3x3,
+  List,
+  Printer,
+  Search,
+  Table2,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Input } from "@/components/ui/input";
@@ -15,12 +26,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { BookingStatusBadge } from "@/components/admin/booking-status-badge";
 import { BookingCalendar } from "@/components/admin/booking-calendar";
 import { ReturnBookingDialog } from "@/components/admin/return-booking-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { DatePicker } from "@/components/ui/date-picker";
+import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 import { cn, formatDate } from "@/lib/utils";
 import type { BookingStatus } from "@/models/Booking";
 
@@ -89,12 +107,14 @@ async function fetchBookings(params: {
   from: string;
   to: string;
   search: string;
+  all?: boolean;
 }): Promise<{ bookings: BookingRow[]; pagination: Pagination; summary: BookingsSummary }> {
   const searchParams = new URLSearchParams({ page: String(params.page) });
   if (params.status !== "all") searchParams.set("status", params.status);
   if (params.from) searchParams.set("from", params.from);
   if (params.to) searchParams.set("to", params.to);
   if (params.search) searchParams.set("search", params.search);
+  if (params.all) searchParams.set("all", "true");
 
   const res = await fetch(`/api/admin/bookings?${searchParams.toString()}`);
   const json = await res.json();
@@ -120,6 +140,7 @@ export function BookingsClient({
   const [view, setView] = useState<"table" | "card" | "calendar">("table");
   const [returnDialogBookingId, setReturnDialogBookingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BookingRow | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const isDefaultQuery =
     page === 1 && status === "all" && from === "" && to === "" && search === "";
@@ -174,6 +195,74 @@ export function BookingsClient({
     },
     onError: (error: Error) => toast.error(error.message),
   });
+
+  const exportHeaders = [
+    "Booking #",
+    "Bill #",
+    "Booking Date",
+    "Customer",
+    "Email",
+    "Product",
+    "Rental Start",
+    "Rental End",
+    "Total",
+    "Security",
+    "Advance",
+    "Due",
+    "Status",
+  ];
+
+  function bookingsToRows(rows: BookingRow[]): (string | number)[][] {
+    return rows.map((booking) => [
+      booking.bookingNumber,
+      booking.billNumber || "—",
+      formatDate(booking.bookingDate),
+      booking.customer?.name ?? "—",
+      booking.customer?.email ?? "—",
+      productSummary(booking.items),
+      formatDate(booking.rentalStartDate),
+      formatDate(booking.rentalEndDate),
+      booking.totalAmount,
+      booking.securityDeposit,
+      booking.advancePaid,
+      booking.totalAmount - booking.advancePaid,
+      booking.status.replace("_", " "),
+    ]);
+  }
+
+  async function fetchAllBookingsForExport(): Promise<BookingRow[]> {
+    const result = await fetchBookings({ page: 1, status, from, to, search, all: true });
+    return result.bookings;
+  }
+
+  async function withExportGuard(action: () => Promise<void>): Promise<void> {
+    setIsExporting(true);
+    try {
+      await action();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Export failed");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  function handleExportExcel() {
+    void withExportGuard(async () => {
+      const rows = bookingsToRows(await fetchAllBookingsForExport());
+      await downloadExcel("bookings", "Bookings", exportHeaders, rows);
+    });
+  }
+
+  function handleExportPdf() {
+    void withExportGuard(async () => {
+      const rows = bookingsToRows(await fetchAllBookingsForExport());
+      await downloadPdf("bookings", "Bookings", exportHeaders, rows);
+    });
+  }
+
+  function handlePrint() {
+    window.print();
+  }
 
   const cardGrid = (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -388,6 +477,27 @@ export function BookingsClient({
               {pagination.total} bookings
             </p>
           )}
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" size="sm" disabled={isExporting} />}>
+              <Download className="h-4 w-4" />
+              Export
+              <ChevronDown className="h-3.5 w-3.5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportExcel}>
+                <Table2 className="h-4 w-4" />
+                Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportPdf}>
+                <FileDown className="h-4 w-4" />
+                PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handlePrint}>
+                <Printer className="h-4 w-4" />
+                Print
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <ButtonLink href="/admin/bookings/new" size="sm">
             New Booking
           </ButtonLink>

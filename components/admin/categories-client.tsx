@@ -5,7 +5,19 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Grid3x3, List, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  Download,
+  FileDown,
+  Grid3x3,
+  List,
+  Loader2,
+  Pencil,
+  Plus,
+  Printer,
+  Table2,
+  Trash2,
+} from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +30,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Form,
   FormControl,
   FormField,
@@ -28,6 +46,7 @@ import {
 import { ImageUploadField } from "@/components/admin/image-upload-field";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { categorySchema, type CategoryInput } from "@/lib/validations/category";
+import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 
 interface CategoryRow extends CategoryInput {
   _id: string;
@@ -54,6 +73,7 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
   const [editing, setEditing] = useState<CategoryRow | null>(null);
   const [view, setView] = useState<"table" | "card">("table");
   const [deleteTarget, setDeleteTarget] = useState<CategoryRow | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const { data: categories = initialCategories } = useQuery({
     queryKey: ["admin", "categories"],
@@ -124,6 +144,37 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const exportHeaders = ["Name", "Slug", "Description"];
+
+  function exportRows(): (string | number)[][] {
+    return categories.map((category) => [
+      category.name,
+      category.slug,
+      category.description ?? "",
+    ]);
+  }
+
+  async function withExportGuard(action: () => Promise<void>): Promise<void> {
+    setIsExporting(true);
+    try {
+      await action();
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  function handleExportExcel() {
+    void withExportGuard(() => downloadExcel("categories", "Categories", exportHeaders, exportRows()));
+  }
+
+  function handleExportPdf() {
+    void withExportGuard(() => downloadPdf("categories", "Categories", exportHeaders, exportRows()));
+  }
+
+  function handlePrint() {
+    window.print();
+  }
+
   const cardGrid = (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
       {categories.map((category) => (
@@ -191,10 +242,33 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
             </Button>
           </div>
         </div>
-        <Button onClick={openCreateDialog} className="rounded-md">
-          <Plus className="h-4 w-4" />
-          New Category
-        </Button>
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" size="sm" disabled={isExporting} />}>
+              <Download className="h-4 w-4" />
+              Export
+              <ChevronDown className="h-3.5 w-3.5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportExcel}>
+                <Table2 className="h-4 w-4" />
+                Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportPdf}>
+                <FileDown className="h-4 w-4" />
+                PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handlePrint}>
+                <Printer className="h-4 w-4" />
+                Print
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button onClick={openCreateDialog} className="rounded-md">
+            <Plus className="h-4 w-4" />
+            New Category
+          </Button>
+        </div>
       </div>
 
       <div className="lg:hidden">{cardGrid}</div>

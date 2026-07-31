@@ -19,6 +19,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   await connectToDatabase();
 
   const searchParams = request.nextUrl.searchParams;
+  const all = searchParams.get("all") === "true";
   const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
   const pageSize = Math.min(200, Math.max(1, Number(searchParams.get("pageSize") ?? "20")));
   const status = searchParams.get("status");
@@ -58,14 +59,13 @@ export async function GET(request: NextRequest): Promise<Response> {
     ];
   }
 
+  const baseQuery = Booking.find(filter)
+    .populate("customer", "name email")
+    .populate("items.product", "name images")
+    .sort({ createdAt: -1 });
+
   const [bookings, total, summaryAgg] = await Promise.all([
-    Booking.find(filter)
-      .populate("customer", "name email")
-      .populate("items.product", "name images")
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * pageSize)
-      .limit(pageSize)
-      .lean(),
+    all ? baseQuery.lean() : baseQuery.skip((page - 1) * pageSize).limit(pageSize).lean(),
     Booking.countDocuments(filter),
     // Earnings summary is computed over every booking matching the current
     // filter (not just the current page) so it reflects the store's real
@@ -102,7 +102,9 @@ export async function GET(request: NextRequest): Promise<Response> {
 
   return apiSuccess({
     bookings: normalizedBookings,
-    pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    pagination: all
+      ? { page: 1, pageSize: total || 1, total, totalPages: 1 }
+      : { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
     summary,
   });
 }
