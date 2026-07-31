@@ -32,10 +32,15 @@ interface ProductDetail {
   designer?: string;
   color: string;
   fabric: string;
+  dressType?: string;
+  work?: string;
   images: string[];
   category: { name: string } | null;
   variants: { size: string; quantityInStock: number }[];
   rentalPricePerDay: number;
+  purchasePrice?: number;
+  transportCost?: number;
+  stitchingCost?: number;
   retailValue: number;
   securityDeposit: number;
   isActive: boolean;
@@ -234,6 +239,14 @@ export function ProductDetailDrawer({
                       <p className="text-xs uppercase text-muted-foreground">Fabric</p>
                       <p className="mt-0.5">{product.fabric}</p>
                     </div>
+                    <div>
+                      <p className="text-xs uppercase text-muted-foreground">Dress Type</p>
+                      <p className="mt-0.5">{product.dressType || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-muted-foreground">Work</p>
+                      <p className="mt-0.5">{product.work || "—"}</p>
+                    </div>
                   </div>
 
                   <div>
@@ -258,6 +271,27 @@ export function ProductDetailDrawer({
                       <p className="text-xs uppercase text-muted-foreground">Retail Value</p>
                       <p className="mt-0.5 font-medium">
                         &#8377;{product.retailValue.toLocaleString("en-IN")}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3 rounded-lg border border-border p-3 text-sm">
+                    <div>
+                      <p className="text-xs uppercase text-muted-foreground">Purchase Price</p>
+                      <p className="mt-0.5 font-medium">
+                        &#8377;{(product.purchasePrice ?? 0).toLocaleString("en-IN")}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-muted-foreground">Stitching Cost</p>
+                      <p className="mt-0.5 font-medium">
+                        &#8377;{(product.stitchingCost ?? 0).toLocaleString("en-IN")}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-muted-foreground">Transport Cost</p>
+                      <p className="mt-0.5 font-medium">
+                        &#8377;{(product.transportCost ?? 0).toLocaleString("en-IN")}
                       </p>
                     </div>
                   </div>
