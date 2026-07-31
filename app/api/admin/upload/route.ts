@@ -68,7 +68,15 @@ export async function POST(request: NextRequest): Promise<Response> {
     const inputBuffer = Buffer.from(await file.arrayBuffer());
     const optimizedBuffer = await optimizeImage(inputBuffer, file.type);
 
-    const blob = await put(`products/${Date.now()}-${file.name}`, optimizedBuffer, {
+    // sharp's output buffers are small enough to come out of Node's shared
+    // internal buffer pool, which backs them with a SharedArrayBuffer under
+    // the hood. Vercel Blob's put() sends this as a fetch request body, and
+    // undici (Node/Next's fetch implementation) refuses to send a body
+    // backed by SharedArrayBuffer — it throws "ArrayBuffer: SharedArrayBuffer
+    // is not allowed." Copying into a fresh, non-pooled buffer avoids it.
+    const uploadBuffer = Buffer.from(optimizedBuffer);
+
+    const blob = await put(`products/${Date.now()}-${file.name}`, uploadBuffer, {
       access: "public",
       addRandomSuffix: true,
       contentType: file.type,
