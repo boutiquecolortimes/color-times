@@ -4,9 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CalendarDays, Grid3x3, List, Trash2 } from "lucide-react";
+import { CalendarDays, Grid3x3, List, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -87,11 +88,13 @@ async function fetchBookings(params: {
   status: string;
   from: string;
   to: string;
+  search: string;
 }): Promise<{ bookings: BookingRow[]; pagination: Pagination; summary: BookingsSummary }> {
   const searchParams = new URLSearchParams({ page: String(params.page) });
   if (params.status !== "all") searchParams.set("status", params.status);
   if (params.from) searchParams.set("from", params.from);
   if (params.to) searchParams.set("to", params.to);
+  if (params.search) searchParams.set("search", params.search);
 
   const res = await fetch(`/api/admin/bookings?${searchParams.toString()}`);
   const json = await res.json();
@@ -113,15 +116,17 @@ export function BookingsClient({
   const [status, setStatus] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [search, setSearch] = useState("");
   const [view, setView] = useState<"table" | "card" | "calendar">("table");
   const [returnDialogBookingId, setReturnDialogBookingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BookingRow | null>(null);
 
-  const isDefaultQuery = page === 1 && status === "all" && from === "" && to === "";
+  const isDefaultQuery =
+    page === 1 && status === "all" && from === "" && to === "" && search === "";
 
   const { data } = useQuery({
-    queryKey: ["admin", "bookings", { page, status, from, to }],
-    queryFn: () => fetchBookings({ page, status, from, to }),
+    queryKey: ["admin", "bookings", { page, status, from, to, search }],
+    queryFn: () => fetchBookings({ page, status, from, to, search }),
     initialData: isDefaultQuery
       ? { bookings: initialBookings, pagination: initialPagination, summary: initialSummary }
       : undefined,
@@ -255,6 +260,18 @@ export function BookingsClient({
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-3">
+          <div className="relative w-full max-w-xs">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search booking #, code, dress, or customer..."
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+              className="pl-9"
+            />
+          </div>
           <Select
             value={status}
             onValueChange={(value) => {

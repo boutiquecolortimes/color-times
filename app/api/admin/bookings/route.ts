@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Booking } from "@/models/Booking";
 import { Product } from "@/models/Product";
-import "@/models/User";
+import { User } from "@/models/User";
 import { bookingCreateSchema } from "@/lib/validations/booking";
 import { generateBookingNumber } from "@/lib/admin/booking-number";
 import { findBookingConflicts } from "@/lib/admin/booking-availability";
@@ -10,6 +10,7 @@ import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
+import { escapeRegex } from "@/lib/utils";
 
 export async function GET(request: NextRequest): Promise<Response> {
   const auth = await requireApiRole(ADMIN_ROLES);
@@ -23,6 +24,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   const status = searchParams.get("status");
   const from = searchParams.get("from");
   const to = searchParams.get("to");
+  const search = searchParams.get("search")?.trim();
 
   const filter: Record<string, unknown> = {};
   if (status) {
@@ -35,6 +37,25 @@ export async function GET(request: NextRequest): Promise<Response> {
   }
   if (to) {
     filter.rentalStartDate = { $lte: new Date(to) };
+  }
+  if (search) {
+    // Matches booking/bill number directly, plus customer name/email/phone
+    // and dress name/code via id lookups — one box searches everything.
+    const regex = new RegExp(escapeRegex(search), "i");
+    const [matchingCustomers, matchingProducts] = await Promise.all([
+      User.find({ $or: [{ name: regex }, { email: regex }, { phone: regex }] })
+        .select("_id")
+        .lean(),
+      Product.find({ $or: [{ name: regex }, { sku: regex }] })
+        .select("_id")
+        .lean(),
+    ]);
+    filter.$or = [
+      { bookingNumber: regex },
+      { billNumber: regex },
+      { customer: { $in: matchingCustomers.map((c) => c._id) } },
+      { "items.product": { $in: matchingProducts.map((p) => p._id) } },
+    ];
   }
 
   const [bookings, total, summaryAgg] = await Promise.all([
