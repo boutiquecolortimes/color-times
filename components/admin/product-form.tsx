@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -119,11 +119,28 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
   const isEditing = Boolean(productId);
   const [activeTab, setActiveTab] = useState<(typeof TAB_ORDER)[number]>("basic");
   const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(["basic"]));
+  // The bottom-right button is "Next" on every tab except the last, where it
+  // becomes the real Submit button in that exact same screen spot. Arriving
+  // there mid-click (e.g. a habitual second click after using "Next" a few
+  // times) could land squarely on Submit and create the product by accident.
+  // Briefly disabling it right after the last tab becomes active closes that
+  // window without adding any friction for someone deliberately reviewing it.
+  const [submitArmed, setSubmitArmed] = useState(false);
 
   function goToTab(tab: (typeof TAB_ORDER)[number]) {
     setActiveTab(tab);
     setVisitedTabs((prev) => new Set(prev).add(tab));
   }
+
+  useEffect(() => {
+    if (activeTab !== TAB_ORDER[TAB_ORDER.length - 1]) {
+      setSubmitArmed(false);
+      return;
+    }
+    setSubmitArmed(false);
+    const timer = setTimeout(() => setSubmitArmed(true), 600);
+    return () => clearTimeout(timer);
+  }, [activeTab]);
 
   const form = useForm<ProductInput>({
     resolver: zodResolver(productSchema),
@@ -696,9 +713,9 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
                 Next
               </Button>
             ) : (
-              <Button type="submit" disabled={saveMutation.isPending}>
+              <Button type="submit" disabled={saveMutation.isPending || !submitArmed}>
                 {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                {isEditing ? "Save Changes" : "Create Product"}
+                {submitArmed ? (isEditing ? "Save Changes" : "Create Product") : "Reviewing…"}
               </Button>
             )}
           </div>
