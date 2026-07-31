@@ -50,6 +50,7 @@ interface ProductHistoryBooking {
   rentalStartDate: string;
   rentalEndDate: string;
   totalAmount: number;
+  productRevenue: number;
 }
 
 interface ProductHistoryServiceOrder {
@@ -61,10 +62,26 @@ interface ProductHistoryServiceOrder {
   totalAmount: number;
 }
 
+interface ProductHistorySummary {
+  totalBookings: number;
+  totalServiceOrders: number;
+  timesRented: number;
+  totalEarned: number;
+  acquisitionCost: number;
+  totalServiceExpense: number;
+  totalExpense: number;
+  netAmount: number;
+}
+
 interface ProductHistory {
   bookings: ProductHistoryBooking[];
   serviceOrders: ProductHistoryServiceOrder[];
   activeRanges: { bookingNumber: string; rentalStartDate: string; rentalEndDate: string }[];
+  summary: ProductHistorySummary;
+}
+
+function formatINR(value: number): string {
+  return `₹${Math.round(value).toLocaleString("en-IN")}`;
 }
 
 async function fetchProduct(id: string): Promise<ProductDetail> {
@@ -275,6 +292,40 @@ export function ProductDetailDrawer({
                 </TabsContent>
 
                 <TabsContent value="history" className="space-y-5">
+                  {history && (
+                    <div className="rounded-lg border border-border bg-secondary/40 p-3">
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <p className="text-xs uppercase text-muted-foreground">Times Rented</p>
+                          <p className="mt-0.5 font-medium">{history.summary.timesRented}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase text-muted-foreground">Earned</p>
+                          <p className="mt-0.5 font-medium">{formatINR(history.summary.totalEarned)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase text-muted-foreground">Expenses</p>
+                          <p className="mt-0.5 font-medium">{formatINR(history.summary.totalExpense)}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {formatINR(history.summary.acquisitionCost)} acquisition +{" "}
+                            {formatINR(history.summary.totalServiceExpense)} dry-clean/repair
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase text-muted-foreground">Total (Net)</p>
+                          <p
+                            className={cn(
+                              "mt-0.5 font-medium",
+                              history.summary.netAmount >= 0 ? "text-accent" : "text-destructive"
+                            )}
+                          >
+                            {formatINR(history.summary.netAmount)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <p className="text-xs uppercase text-muted-foreground">
                       Bookings ({history?.bookings.length ?? 0})
@@ -299,7 +350,13 @@ export function ProductDetailDrawer({
                               {formatDate(booking.rentalEndDate)}
                             </p>
                             <p className="mt-1 text-xs">
-                              &#8377;{booking.totalAmount.toLocaleString("en-IN")}
+                              {formatINR(booking.productRevenue)} from this dress
+                              {booking.totalAmount !== booking.productRevenue && (
+                                <span className="text-muted-foreground">
+                                  {" "}
+                                  (booking total {formatINR(booking.totalAmount)})
+                                </span>
+                              )}
                             </p>
                           </div>
                         ))
