@@ -158,6 +158,8 @@ export async function POST(request: NextRequest): Promise<Response> {
         quantity,
         pricePerDay,
         rentalFee,
+        wearerName: inputItem.wearerName || undefined,
+        measurements: inputItem.measurements,
       });
     }
 

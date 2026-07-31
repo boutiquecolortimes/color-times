@@ -38,6 +38,10 @@ export const bookingItemSchema = z.object({
   // editable per line, defaulting to the product's own values.
   color: z.string().trim().optional().or(z.literal("")),
   pricePerDay: z.number().min(0).optional(),
+  // Per-item wearer + measurements — one booking can cover several people
+  // (e.g. 5 girls, 5 dresses), each with their own figure against their own dress.
+  wearerName: z.string().trim().max(120).optional().or(z.literal("")),
+  measurements: measurementsZodSchema.optional(),
 });
 
 export type BookingItemInput = z.infer<typeof bookingItemSchema>;

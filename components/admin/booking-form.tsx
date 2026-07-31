@@ -264,6 +264,72 @@ function BookingItemRow({
           </p>
         </div>
       )}
+
+      <div className="mt-3 border-t border-border pt-3">
+        <FormField
+          control={control}
+          name={`items.${index}.wearerName`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs">Wearer Name (optional)</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="Who's wearing this dress? e.g. Priya, Guest 2"
+                  value={(field.value as string | undefined) ?? ""}
+                  onChange={(event) => field.onChange(event.target.value)}
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+
+        <p className="mt-3 text-xs font-medium text-muted-foreground">
+          Measurements for this dress (in inches, optional)
+        </p>
+        <div className="mt-2 grid grid-cols-2 gap-3">
+          {BOOKING_MEASUREMENT_FIELDS.map(({ key, label }) => (
+            <FormField
+              key={key}
+              control={control}
+              name={`items.${index}.measurements.${key}` as const}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs">{label}</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      value={(field.value as number | undefined) ?? ""}
+                      onChange={(event) =>
+                        field.onChange(
+                          event.target.value === "" ? undefined : Number(event.target.value)
+                        )
+                      }
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          ))}
+        </div>
+        <FormField
+          control={control}
+          name={`items.${index}.measurements.other`}
+          render={({ field }) => (
+            <FormItem className="mt-3">
+              <FormLabel className="text-xs">Others</FormLabel>
+              <FormControl>
+                <Textarea
+                  rows={2}
+                  placeholder="Any other measurement notes for this dress"
+                  value={(field.value as string | undefined) ?? ""}
+                  onChange={(event) => field.onChange(event.target.value)}
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+      </div>
     </div>
   );
 }
@@ -286,7 +352,7 @@ export function BookingForm({
       customer: "",
       billNumber: "",
       bookingDate: todayIso(),
-      items: [{ product: "", color: "", pricePerDay: 0 }],
+      items: [{ product: "", color: "", pricePerDay: 0, wearerName: "" }],
       rentalStartDate: "",
       rentalEndDate: "",
       securityDeposit: 0,
@@ -519,7 +585,7 @@ export function BookingForm({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => append({ product: "", color: "", pricePerDay: 0 })}
+              onClick={() => append({ product: "", color: "", pricePerDay: 0, wearerName: "" })}
             >
               <Plus className="h-4 w-4" /> Add Item
             </Button>
@@ -540,54 +606,6 @@ export function BookingForm({
               onConflictChange={handleConflictChange}
             />
           ))}
-        </section>
-
-        <section className="rounded-lg border border-border bg-card p-6">
-          <h2 className="font-heading text-lg">Measurements</h2>
-          <p className="text-xs text-muted-foreground">In inches, all optional</p>
-          <div className="mt-2 grid grid-cols-2 gap-3">
-            {BOOKING_MEASUREMENT_FIELDS.map(({ key, label }) => (
-              <FormField
-                key={key}
-                control={form.control}
-                name={`measurements.${key}` as const}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">{label}</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        value={(field.value as number | undefined) ?? ""}
-                        onChange={(event) =>
-                          field.onChange(
-                            event.target.value === "" ? undefined : Number(event.target.value)
-                          )
-                        }
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            ))}
-          </div>
-          <FormField
-            control={form.control}
-            name="measurements.other"
-            render={({ field }) => (
-              <FormItem className="mt-3">
-                <FormLabel className="text-xs">Others</FormLabel>
-                <FormControl>
-                  <Textarea
-                    rows={2}
-                    placeholder="Any other measurement notes"
-                    value={(field.value as string | undefined) ?? ""}
-                    onChange={(event) => field.onChange(event.target.value)}
-                  />
-                </FormControl>
-              </FormItem>
-            )}
-          />
         </section>
 
         <section className="rounded-lg border border-border bg-card p-6">

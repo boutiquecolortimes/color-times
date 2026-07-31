@@ -25,6 +25,11 @@ export interface BookingItem {
   quantity: number;
   pricePerDay: number;
   rentalFee: number;
+  // Who's actually wearing this specific dress, and their measurements —
+  // lets one booking cover multiple people (e.g. 5 girls, 5 dresses), each
+  // tracked against their own item instead of one shared measurement set.
+  wearerName?: string;
+  measurements?: MeasurementValues;
 }
 
 export interface IBooking extends Document {
@@ -67,6 +72,8 @@ const bookingItemSchema = new Schema<BookingItem>(
     quantity: { type: Number, required: true, min: 1, default: 1 },
     pricePerDay: { type: Number, required: true, min: 0 },
     rentalFee: { type: Number, required: true, min: 0 },
+    wearerName: { type: String, trim: true },
+    measurements: { type: measurementsSchema, default: undefined },
   },
   { _id: false }
 );

@@ -65,6 +65,8 @@ export default async function BookingDetailPage({
             quantity: item.quantity,
             pricePerDay: item.pricePerDay,
             rentalFee: item.rentalFee,
+            wearerName: item.wearerName,
+            measurements: item.measurements,
           })),
           rentalStartDate: booking.rentalStartDate.toISOString(),
           rentalEndDate: booking.rentalEndDate.toISOString(),

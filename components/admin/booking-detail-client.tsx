@@ -48,6 +48,14 @@ interface BookingItemDetail {
   quantity: number;
   pricePerDay: number;
   rentalFee: number;
+  wearerName?: string;
+  measurements?: {
+    upperChest?: number;
+    lowerChest?: number;
+    sleeveLength?: number;
+    armhole?: number;
+    other?: string;
+  };
 }
 
 interface BookingDetail {
@@ -209,45 +217,71 @@ export function BookingDetailClient({ initialBooking }: { initialBooking: Bookin
                 {booking.items.length > 1 ? `Dresses (${booking.items.length})` : "Dress"}
               </h2>
               <div className="mt-2 space-y-3">
-                {booking.items.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      {item.product?.images?.[0] && (
-                        <Image
-                          src={item.product.images[0]}
-                          alt={item.product.name}
-                          width={48}
-                          height={48}
-                          className="h-12 w-12 rounded-md object-cover"
-                        />
-                      )}
-                      <div>
-                        <p className="text-sm font-medium">{item.product?.name ?? "—"}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {item.product?.sku} &middot; Size {item.size}
-                          {item.quantity > 1 && ` ×${item.quantity}`}
-                        </p>
+                {booking.items.map((item, index) => {
+                  const m = item.measurements;
+                  const measurementEntries = m
+                    ? ([
+                        ["UC", m.upperChest],
+                        ["LC", m.lowerChest],
+                        ["SL", m.sleeveLength],
+                        ["AH", m.armhole],
+                      ] as const).filter(([, value]) => value !== undefined && value !== null)
+                    : [];
+                  const hasMeasurements = measurementEntries.length > 0 || Boolean(m?.other);
+
+                  return (
+                    <div key={index} className="rounded-lg border border-border/60 p-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          {item.product?.images?.[0] && (
+                            <Image
+                              src={item.product.images[0]}
+                              alt={item.product.name}
+                              width={48}
+                              height={48}
+                              className="h-12 w-12 rounded-md object-cover"
+                            />
+                          )}
+                          <div>
+                            <p className="text-sm font-medium">{item.product?.name ?? "—"}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {item.product?.sku} &middot; Size {item.size}
+                              {item.quantity > 1 && ` ×${item.quantity}`}
+                            </p>
+                            {item.wearerName && (
+                              <p className="text-xs text-muted-foreground">
+                                For {item.wearerName}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        {booking.status === "returned" && item.product && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setDryCleanValues({
+                                product: item.product!._id,
+                                booking: booking._id,
+                                description: `Post-return dry clean for booking ${booking.bookingNumber}`,
+                              });
+                              setDryCleanDialogOpen(true);
+                            }}
+                          >
+                            <Sparkles className="h-3.5 w-3.5" />
+                            Send to Dry Clean
+                          </Button>
+                        )}
                       </div>
+                      {hasMeasurements && (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          {measurementEntries.map(([label, value]) => `${label} ${value}"`).join(" · ")}
+                          {m?.other ? `${measurementEntries.length > 0 ? " · " : ""}${m.other}` : ""}
+                        </p>
+                      )}
                     </div>
-                    {booking.status === "returned" && item.product && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setDryCleanValues({
-                            product: item.product!._id,
-                            booking: booking._id,
-                            description: `Post-return dry clean for booking ${booking.bookingNumber}`,
-                          });
-                          setDryCleanDialogOpen(true);
-                        }}
-                      >
-                        <Sparkles className="h-3.5 w-3.5" />
-                        Send to Dry Clean
-                      </Button>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
