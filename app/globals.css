@@ -227,6 +227,18 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html,
+  body {
+    /* Belt-and-suspenders guard against any single element (a portalled
+       dropdown/dialog rendered straight onto <body>, a wide table, a
+       mis-sized image, etc.) pushing the whole page wider than the
+       viewport and creating a page-level left/right scrollbar. Anything
+       that needs to scroll horizontally on purpose (tables, carousels)
+       already opts in with its own overflow-x-auto container, so this
+       only clips accidental overflow — it never blocks intentional
+       horizontal scrolling inside those containers. */
+    @apply overflow-x-hidden;
+  }
   body {
     @apply bg-background text-foreground;
   }
@@ -238,6 +250,12 @@
   h3,
   h4 {
     @apply font-heading;
+  }
+  img,
+  svg,
+  video,
+  canvas {
+    max-width: 100%;
   }
 }
 
