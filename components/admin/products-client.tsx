@@ -367,8 +367,26 @@ export function ProductsClient({
       if (!res.ok) throw new Error(json.error);
       return json.data;
     },
-    onSuccess: (_data, variables) => {
-      toast.success(`${variables.ids.length} product(s) updated`);
+    onSuccess: (data, variables) => {
+      if (variables.action === "permanent-delete") {
+        const { deleted, blocked } = data as {
+          deleted: number;
+          blocked: { name: string; sku: string }[];
+        };
+        if (deleted > 0) {
+          toast.success(`Permanently deleted ${deleted} product(s)`);
+        }
+        if (blocked.length > 0) {
+          toast.warning(
+            `Skipped ${blocked.length} product(s) with booking or service history: ${blocked
+              .map((b) => `${b.name} (${b.sku})`)
+              .join(", ")}`,
+            { duration: 8000 }
+          );
+        }
+      } else {
+        toast.success(`${variables.ids.length} product(s) updated`);
+      }
       invalidate();
       setSelectedIds(new Set());
       setConfirmState(null);

@@ -5,6 +5,7 @@ import { Product } from "@/models/Product";
 import { categorySchema } from "@/lib/validations/category";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
+import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 import { escapeRegex } from "@/lib/utils";
 
@@ -71,6 +72,14 @@ export async function DELETE(request: NextRequest, { params }: RouteParams): Pro
   if (!category) {
     return apiError("Category not found", 404);
   }
+
+  await recordAuditLog({
+    entityType: "Category",
+    entityId: id,
+    action: "delete",
+    actor: auth.user,
+    snapshot: category.toObject() as unknown as Record<string, unknown>,
+  });
 
   return apiSuccess({ deleted: true });
 }

@@ -43,6 +43,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ImageUploadField } from "@/components/admin/image-upload-field";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { categorySchema, type CategoryInput } from "@/lib/validations/category";
@@ -74,6 +75,8 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
   const [view, setView] = useState<"table" | "card">("table");
   const [deleteTarget, setDeleteTarget] = useState<CategoryRow | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   const { data: categories = initialCategories } = useQuery({
     queryKey: ["admin", "categories"],
@@ -144,6 +147,51 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await fetch("/api/admin/categories/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data as { deleted: number; blocked: { name: string; productCount: number }[] };
+    },
+    onSuccess: ({ deleted, blocked }) => {
+      if (deleted > 0) {
+        toast.success(`Deleted ${deleted} categor${deleted === 1 ? "y" : "ies"}`);
+      }
+      if (blocked.length > 0) {
+        toast.warning(
+          `Skipped ${blocked.length} categor${blocked.length === 1 ? "y" : "ies"} still in use: ${blocked
+            .map((b) => `${b.name} (${b.productCount} product${b.productCount === 1 ? "" : "s"})`)
+            .join(", ")}`,
+          { duration: 8000 }
+        );
+      }
+      queryClient.invalidateQueries({ queryKey: ["admin", "categories"] });
+      setSelectedIds(new Set());
+      setBulkDeleteOpen(false);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  function toggleSelectOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) =>
+      prev.size === categories.length ? new Set() : new Set(categories.map((c) => c._id))
+    );
+  }
+
   const exportHeaders = ["Name", "Slug", "Description"];
 
   function exportRows(): (string | number)[][] {
@@ -189,6 +237,13 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
                 className="object-cover"
               />
             )}
+            <div className="absolute left-2 top-2 rounded bg-background/80 p-0.5">
+              <Checkbox
+                checked={selectedIds.has(category._id)}
+                onCheckedChange={() => toggleSelectOne(category._id)}
+                aria-label={`Select ${category.name}`}
+              />
+            </div>
           </div>
           <div className="p-3">
             <p className="truncate text-sm font-medium">{category.name}</p>
@@ -271,6 +326,26 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
         </div>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2.5">
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <div className="ml-auto flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={bulkDeleteMutation.isPending}
+              onClick={() => setBulkDeleteOpen(true)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete Selected
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="lg:hidden">{cardGrid}</div>
 
       {view === "card" ? (
@@ -280,6 +355,13 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
         <table className="w-full min-w-[640px] text-sm whitespace-nowrap">
           <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
+              <th className="px-4 py-3">
+                <Checkbox
+                  checked={categories.length > 0 && selectedIds.size === categories.length}
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Select all"
+                />
+              </th>
               <th className="px-4 py-3">Image</th>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Slug</th>
@@ -289,6 +371,13 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
           <tbody>
             {categories.map((category) => (
               <tr key={category._id} className="border-b border-border last:border-0">
+                <td className="px-4 py-3">
+                  <Checkbox
+                    checked={selectedIds.has(category._id)}
+                    onCheckedChange={() => toggleSelectOne(category._id)}
+                    aria-label={`Select ${category.name}`}
+                  />
+                </td>
                 <td className="px-4 py-3">
                   <div className="relative h-10 w-10 overflow-hidden rounded-md bg-secondary">
                     {category.heroImage && (
@@ -318,7 +407,7 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
             ))}
             {categories.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
                   No categories yet. Create your first one.
                 </td>
               </tr>
@@ -428,6 +517,17 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
         onConfirm={() => {
           if (deleteTarget) deleteMutation.mutate(deleteTarget._id);
         }}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        title={`Delete ${selectedIds.size} categor${selectedIds.size === 1 ? "y" : "ies"}?`}
+        description="Any selected category that still has products in it will be skipped automatically and reported back — this cannot be undone for the rest."
+        confirmLabel="Delete"
+        variant="destructive"
+        isLoading={bulkDeleteMutation.isPending}
+        onConfirm={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
       />
     </div>
   );
