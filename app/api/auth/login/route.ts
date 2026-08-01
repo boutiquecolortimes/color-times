@@ -59,11 +59,14 @@ export async function POST(request: NextRequest): Promise<Response> {
       return apiError("This account has been deactivated. Contact an administrator.", 403);
     }
 
-    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
-      user.failedLoginAttempts = 0;
-      user.lockedUntil = undefined;
-      await user.save();
-    }
+    // One active session per account: bumping tokenVersion on every login
+    // invalidates whatever refresh token an earlier session on another
+    // device/browser was holding, so it gets signed out on its next silent
+    // refresh (at most ~15 min later, when its access token runs out).
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+    user.failedLoginAttempts = 0;
+    user.lockedUntil = undefined;
+    await user.save();
 
     const accessToken = await signAccessToken({
       sub: user._id.toString(),
@@ -73,7 +76,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     });
     const refreshToken = await signRefreshToken({
       sub: user._id.toString(),
-      tokenVersion: user.tokenVersion ?? 0,
+      tokenVersion: user.tokenVersion,
     });
 
     const response = apiSuccess({

@@ -39,7 +39,7 @@ export default async function LoginPage({
           />
         </span>
         <p className="font-heading text-[17px] font-semibold tracking-wide text-white">
-          {siteConfig.shortName}
+          {siteConfig.name}
         </p>
         <p className="mb-5 mt-1 text-[9.5px] font-semibold uppercase tracking-[0.24em] text-[#C9A6B4]">
           {isAdminLogin ? "Admin Panel" : "Customer Account"}

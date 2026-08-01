@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,6 +29,16 @@ export function LoginForm() {
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   });
+
+  useEffect(() => {
+    const reason = searchParams.get("reason");
+    if (reason === "idle") {
+      toast.info("You were signed out after 30 minutes of inactivity.");
+    } else if (reason === "session-ended") {
+      toast.info("You were signed out — your account may have signed in elsewhere, or your session ended.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function onSubmit(values: LoginInput) {
     try {
