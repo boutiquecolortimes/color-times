@@ -15,6 +15,7 @@ import {
   Pencil,
   Plus,
   Printer,
+  RotateCcw,
   Table2,
   Trash2,
 } from "lucide-react";
@@ -36,6 +37,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Form,
   FormControl,
   FormField,
@@ -53,8 +61,8 @@ interface CategoryRow extends CategoryInput {
   _id: string;
 }
 
-async function fetchCategories(): Promise<CategoryRow[]> {
-  const res = await fetch("/api/admin/categories");
+async function fetchCategories(status: string): Promise<CategoryRow[]> {
+  const res = await fetch(`/api/admin/categories?status=${status}`);
   const json = await res.json();
   if (!res.ok) throw new Error(json.error);
   return json.data.categories;
@@ -73,16 +81,24 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<CategoryRow | null>(null);
   const [view, setView] = useState<"table" | "card">("table");
+  const [status, setStatus] = useState<"active" | "trash">("active");
   const [deleteTarget, setDeleteTarget] = useState<CategoryRow | null>(null);
+  const [permanentDeleteTarget, setPermanentDeleteTarget] = useState<CategoryRow | null>(null);
+  const [bulkConfirmAction, setBulkConfirmAction] = useState<"delete" | "permanent-delete" | null>(
+    null
+  );
   const [isExporting, setIsExporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
-  const { data: categories = initialCategories } = useQuery({
-    queryKey: ["admin", "categories"],
-    queryFn: fetchCategories,
-    initialData: initialCategories,
+  const { data: categories = [] } = useQuery({
+    queryKey: ["admin", "categories", status],
+    queryFn: () => fetchCategories(status),
+    initialData: status === "active" ? initialCategories : undefined,
   });
+
+  function invalidate() {
+    queryClient.invalidateQueries({ queryKey: ["admin", "categories"] });
+  }
 
   const form = useForm<CategoryInput>({
     resolver: zodResolver(categorySchema),
@@ -126,7 +142,7 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
     },
     onSuccess: () => {
       toast.success(editing ? "Category updated" : "Category created");
-      queryClient.invalidateQueries({ queryKey: ["admin", "categories"] });
+      invalidate();
       setDialogOpen(false);
     },
     onError: (error: Error) => toast.error(error.message),
@@ -140,39 +156,84 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
       return json.data;
     },
     onSuccess: () => {
-      toast.success("Category deleted");
-      queryClient.invalidateQueries({ queryKey: ["admin", "categories"] });
+      toast.success("Category moved to trash");
+      invalidate();
       setDeleteTarget(null);
     },
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const bulkDeleteMutation = useMutation({
-    mutationFn: async (ids: string[]) => {
+  const restoreMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/categories/${id}/restore`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data;
+    },
+    onSuccess: () => {
+      toast.success("Category restored");
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const permanentDeleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/categories/${id}/permanent`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data;
+    },
+    onSuccess: () => {
+      toast.success("Category permanently deleted");
+      invalidate();
+      setPermanentDeleteTarget(null);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const bulkActionMutation = useMutation({
+    mutationFn: async ({
+      ids,
+      action,
+    }: {
+      ids: string[];
+      action: "delete" | "restore" | "permanent-delete";
+    }) => {
       const res = await fetch("/api/admin/categories/bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
+        body: JSON.stringify({ ids, action }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
-      return json.data as { deleted: number; blocked: { name: string; productCount: number }[] };
+      return json.data;
     },
-    onSuccess: ({ deleted, blocked }) => {
-      if (deleted > 0) {
-        toast.success(`Deleted ${deleted} categor${deleted === 1 ? "y" : "ies"}`);
+    onSuccess: (data, variables) => {
+      if (variables.action === "permanent-delete") {
+        const { deleted, blocked } = data as {
+          deleted: number;
+          blocked: { name: string; productCount: number }[];
+        };
+        if (deleted > 0) {
+          toast.success(`Permanently deleted ${deleted} categor${deleted === 1 ? "y" : "ies"}`);
+        }
+        if (blocked.length > 0) {
+          toast.warning(
+            `Skipped ${blocked.length} categor${blocked.length === 1 ? "y" : "ies"} still in use: ${blocked
+              .map((b) => `${b.name} (${b.productCount} product${b.productCount === 1 ? "" : "s"})`)
+              .join(", ")}`,
+            { duration: 8000 }
+          );
+        }
+      } else if (variables.action === "restore") {
+        toast.success(`Restored ${variables.ids.length} categor${variables.ids.length === 1 ? "y" : "ies"}`);
+      } else {
+        toast.success(`Moved ${variables.ids.length} categor${variables.ids.length === 1 ? "y" : "ies"} to trash`);
       }
-      if (blocked.length > 0) {
-        toast.warning(
-          `Skipped ${blocked.length} categor${blocked.length === 1 ? "y" : "ies"} still in use: ${blocked
-            .map((b) => `${b.name} (${b.productCount} product${b.productCount === 1 ? "" : "s"})`)
-            .join(", ")}`,
-          { duration: 8000 }
-        );
-      }
-      queryClient.invalidateQueries({ queryKey: ["admin", "categories"] });
+      invalidate();
       setSelectedIds(new Set());
-      setBulkDeleteOpen(false);
+      setBulkConfirmAction(null);
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -190,6 +251,11 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
     setSelectedIds((prev) =>
       prev.size === categories.length ? new Set() : new Set(categories.map((c) => c._id))
     );
+  }
+
+  function changeStatus(next: "active" | "trash") {
+    setStatus(next);
+    setSelectedIds(new Set());
   }
 
   const exportHeaders = ["Name", "Slug", "Description"];
@@ -249,25 +315,49 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
             <p className="truncate text-sm font-medium">{category.name}</p>
             <p className="truncate text-xs text-muted-foreground">{category.slug}</p>
             <div className="mt-2 flex justify-end gap-1">
-              <Button variant="ghost" size="icon-sm" onClick={() => openEditDialog(category)}>
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="text-destructive"
-                disabled={deleteMutation.isPending}
-                onClick={() => setDeleteTarget(category)}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+              {status === "trash" ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={restoreMutation.isPending}
+                    onClick={() => restoreMutation.mutate(category._id)}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-destructive"
+                    disabled={permanentDeleteMutation.isPending}
+                    onClick={() => setPermanentDeleteTarget(category)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="ghost" size="icon-sm" onClick={() => openEditDialog(category)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-destructive"
+                    disabled={deleteMutation.isPending}
+                    onClick={() => setDeleteTarget(category)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
       ))}
       {categories.length === 0 && (
         <p className="col-span-full py-10 text-center text-muted-foreground">
-          No categories yet. Create your first one.
+          {status === "trash" ? "Trash is empty." : "No categories yet. Create your first one."}
         </p>
       )}
     </div>
@@ -275,9 +365,18 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <p className="text-sm text-muted-foreground">{categories.length} categories</p>
+          <Select value={status} onValueChange={(value) => changeStatus((value ?? "active") as "active" | "trash")}>
+            <SelectTrigger className="w-32">
+              <SelectValue>{(value: string) => (value === "trash" ? "Trash" : "Active")}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="trash">Trash</SelectItem>
+            </SelectContent>
+          </Select>
           <div className="hidden items-center gap-1 rounded-md border border-border p-1 lg:flex">
             <Button
               variant={view === "table" ? "secondary" : "ghost"}
@@ -319,10 +418,12 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button onClick={openCreateDialog} className="rounded-md">
-            <Plus className="h-4 w-4" />
-            New Category
-          </Button>
+          {status === "active" && (
+            <Button onClick={openCreateDialog} className="rounded-md">
+              <Plus className="h-4 w-4" />
+              New Category
+            </Button>
+          )}
         </div>
       </div>
 
@@ -330,15 +431,40 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2.5">
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <div className="ml-auto flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant="destructive"
-              disabled={bulkDeleteMutation.isPending}
-              onClick={() => setBulkDeleteOpen(true)}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Delete Selected
-            </Button>
+            {status === "trash" ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={bulkActionMutation.isPending}
+                  onClick={() =>
+                    bulkActionMutation.mutate({ ids: Array.from(selectedIds), action: "restore" })
+                  }
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Restore
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={bulkActionMutation.isPending}
+                  onClick={() => setBulkConfirmAction("permanent-delete")}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete Permanently
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={bulkActionMutation.isPending}
+                onClick={() => setBulkConfirmAction("delete")}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Move to Trash
+              </Button>
+            )}
             <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
               Clear
             </Button>
@@ -389,18 +515,42 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
                 <td className="px-4 py-3 text-muted-foreground">{category.slug}</td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-2">
-                    <Button variant="ghost" size="icon-sm" onClick={() => openEditDialog(category)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="text-destructive"
-                      disabled={deleteMutation.isPending}
-                      onClick={() => setDeleteTarget(category)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    {status === "trash" ? (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={restoreMutation.isPending}
+                          onClick={() => restoreMutation.mutate(category._id)}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-destructive"
+                          disabled={permanentDeleteMutation.isPending}
+                          onClick={() => setPermanentDeleteTarget(category)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button variant="ghost" size="icon-sm" onClick={() => openEditDialog(category)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-destructive"
+                          disabled={deleteMutation.isPending}
+                          onClick={() => setDeleteTarget(category)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -408,7 +558,7 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
             {categories.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
-                  No categories yet. Create your first one.
+                  {status === "trash" ? "Trash is empty." : "No categories yet. Create your first one."}
                 </td>
               </tr>
             )}
@@ -505,13 +655,13 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Delete category?"
+        title="Move category to trash?"
         description={
           deleteTarget
-            ? `Delete "${deleteTarget.name}"? This cannot be undone.`
+            ? `Move "${deleteTarget.name}" to trash? You can restore it later from the Trash view.`
             : ""
         }
-        confirmLabel="Delete"
+        confirmLabel="Move to Trash"
         variant="destructive"
         isLoading={deleteMutation.isPending}
         onConfirm={() => {
@@ -520,14 +670,43 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
       />
 
       <ConfirmDialog
-        open={bulkDeleteOpen}
-        onOpenChange={setBulkDeleteOpen}
-        title={`Delete ${selectedIds.size} categor${selectedIds.size === 1 ? "y" : "ies"}?`}
-        description="Any selected category that still has products in it will be skipped automatically and reported back — this cannot be undone for the rest."
-        confirmLabel="Delete"
+        open={permanentDeleteTarget !== null}
+        onOpenChange={(open) => !open && setPermanentDeleteTarget(null)}
+        title="Permanently delete category?"
+        description={
+          permanentDeleteTarget
+            ? `Permanently delete "${permanentDeleteTarget.name}"? This cannot be undone. Blocked automatically if any product still uses it.`
+            : ""
+        }
+        confirmLabel="Delete Permanently"
         variant="destructive"
-        isLoading={bulkDeleteMutation.isPending}
-        onConfirm={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
+        isLoading={permanentDeleteMutation.isPending}
+        onConfirm={() => {
+          if (permanentDeleteTarget) permanentDeleteMutation.mutate(permanentDeleteTarget._id);
+        }}
+      />
+
+      <ConfirmDialog
+        open={bulkConfirmAction !== null}
+        onOpenChange={(open) => !open && setBulkConfirmAction(null)}
+        title={
+          bulkConfirmAction === "permanent-delete"
+            ? `Permanently delete ${selectedIds.size} categor${selectedIds.size === 1 ? "y" : "ies"}?`
+            : `Move ${selectedIds.size} categor${selectedIds.size === 1 ? "y" : "ies"} to trash?`
+        }
+        description={
+          bulkConfirmAction === "permanent-delete"
+            ? "This cannot be undone. Any selected category that still has products in it will be skipped automatically and reported back."
+            : "You can restore these from the Trash view at any time."
+        }
+        confirmLabel={bulkConfirmAction === "permanent-delete" ? "Delete Permanently" : "Move to Trash"}
+        variant="destructive"
+        isLoading={bulkActionMutation.isPending}
+        onConfirm={() => {
+          if (bulkConfirmAction) {
+            bulkActionMutation.mutate({ ids: Array.from(selectedIds), action: bulkConfirmAction });
+          }
+        }}
       />
     </div>
   );

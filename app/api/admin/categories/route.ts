@@ -7,12 +7,16 @@ import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 import { escapeRegex } from "@/lib/utils";
 
-export async function GET(): Promise<Response> {
+export async function GET(request: NextRequest): Promise<Response> {
   const auth = await requireApiRole(ADMIN_ROLES);
   if ("error" in auth) return auth.error;
 
   await connectToDatabase();
-  const categories = await Category.find().sort({ displayOrder: 1, name: 1 }).lean();
+
+  const status = request.nextUrl.searchParams.get("status") ?? "active";
+  const filter = status === "trash" ? { deletedAt: { $ne: null } } : { deletedAt: null };
+
+  const categories = await Category.find(filter).sort({ displayOrder: 1, name: 1 }).lean();
   return apiSuccess({ categories });
 }
 

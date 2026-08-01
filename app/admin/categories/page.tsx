@@ -7,7 +7,9 @@ export const metadata: Metadata = { title: "Categories" };
 
 export default async function AdminCategoriesPage() {
   await connectToDatabase();
-  const categories = await Category.find().sort({ displayOrder: 1, name: 1 }).lean();
+  const categories = await Category.find({ deletedAt: null })
+    .sort({ displayOrder: 1, name: 1 })
+    .lean();
 
   const initialCategories = categories.map((category) => ({
     _id: String(category._id),

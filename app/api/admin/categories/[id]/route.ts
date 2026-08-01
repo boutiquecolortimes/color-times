@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Category } from "@/models/Category";
-import { Product } from "@/models/Product";
 import { categorySchema } from "@/lib/validations/category";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
@@ -53,6 +52,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
   }
 }
 
+// Soft delete — moves the category to Trash. Doesn't require the category
+// to be unused: like Products, trashing just hides it from the active list;
+// only the permanent-delete route (which actually erases the document)
+// needs the "no products reference it" check.
 export async function DELETE(request: NextRequest, { params }: RouteParams): Promise<Response> {
   const auth = await requireApiRole(ADMIN_ROLES);
   if ("error" in auth) return auth.error;
@@ -60,15 +63,11 @@ export async function DELETE(request: NextRequest, { params }: RouteParams): Pro
   const { id } = await params;
   await connectToDatabase();
 
-  const productCount = await Product.countDocuments({ category: id });
-  if (productCount > 0) {
-    return apiError(
-      `Cannot delete this category — ${productCount} product(s) still reference it`,
-      409
-    );
-  }
-
-  const category = await Category.findByIdAndDelete(id);
+  const category = await Category.findByIdAndUpdate(
+    id,
+    { deletedAt: new Date() },
+    { returnDocument: "after" }
+  );
   if (!category) {
     return apiError("Category not found", 404);
   }

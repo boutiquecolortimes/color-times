@@ -8,6 +8,7 @@ export interface ICategory extends Document {
   heroImage: string;
   displayOrder: number;
   isFeatured: boolean;
+  deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -22,6 +23,7 @@ const categorySchema = new Schema<ICategory>(
     heroImage: { type: String, default: "" },
     displayOrder: { type: Number, default: 0 },
     isFeatured: { type: Boolean, default: false },
+    deletedAt: { type: Date, default: null, index: true },
   },
   { timestamps: true }
 );
