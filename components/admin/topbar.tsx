@@ -81,7 +81,7 @@ export function AdminTopbar({ user }: { user: SessionUser }) {
               </span>
               <div className="leading-tight">
                 <p className="font-heading text-lg font-semibold tracking-wide text-sidebar-foreground">
-                  {siteConfig.shortName}
+                  {siteConfig.name}
                 </p>
                 <p className="text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/60">
                   Admin Panel

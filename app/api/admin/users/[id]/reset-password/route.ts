@@ -21,13 +21,18 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
     const { id } = await params;
     await connectToDatabase();
 
-    const user = await User.findOne({ _id: id, role: { $in: STAFF_ROLES } });
+    const user = await User.findOne({ _id: id, role: { $in: STAFF_ROLES } }).select(
+      "+tokenVersion"
+    );
     if (!user) {
       return apiError("Staff account not found", 404);
     }
 
     const temporaryPassword = generateTemporaryPassword();
     user.passwordHash = await hashPassword(temporaryPassword);
+    // Forces that staff member's existing sessions (any device, any
+    // browser) to re-login with the new password on their next refresh.
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     await user.save();
 
     await recordAuditLog({

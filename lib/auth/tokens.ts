@@ -10,7 +10,10 @@ export interface AccessTokenPayload extends JWTPayload {
 
 export interface RefreshTokenPayload extends JWTPayload {
   sub: string;
-  tokenVersion: string;
+  // Must match the user's current tokenVersion in the DB. Bumped on every
+  // password change so older, still-unexpired refresh tokens stop working
+  // immediately instead of staying valid for up to 30 more days.
+  tokenVersion: number;
 }
 
 function getSecret(name: "access" | "refresh"): Uint8Array {

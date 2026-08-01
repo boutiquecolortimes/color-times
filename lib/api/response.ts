@@ -25,8 +25,13 @@ export function apiErrorFromUnknown(error: unknown): NextResponse {
     if (error.message.includes("E11000")) {
       return apiError("An account with this email already exists", 409);
     }
-    return apiError(error.message, 500);
+    // Anything else is unexpected — log the real error server-side for
+    // debugging, but never hand raw error internals (stack traces, DB
+    // details, file paths) back to the client.
+    console.error("Unhandled API error:", error);
+    return apiError("Something went wrong. Please try again.", 500);
   }
 
+  console.error("Unhandled API error (non-Error thrown):", error);
   return apiError("Something went wrong. Please try again.", 500);
 }

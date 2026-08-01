@@ -44,7 +44,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     });
     const refreshToken = await signRefreshToken({
       sub: user._id.toString(),
-      tokenVersion: user._id.toString(),
+      tokenVersion: user.tokenVersion,
     });
 
     const response = apiSuccess(

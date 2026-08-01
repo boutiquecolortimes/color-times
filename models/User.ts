@@ -14,6 +14,15 @@ export interface IUser extends Document {
   emailVerificationToken?: string;
   emailVerificationExpires?: Date;
   isActive: boolean;
+  // Bumped on every password change (self-service or admin reset). Refresh
+  // tokens carry the version they were issued with, so bumping this
+  // instantly invalidates every other outstanding session for this user
+  // without needing to track/blocklist individual tokens.
+  tokenVersion: number;
+  // DB-backed login lockout (not in-memory) so it holds up correctly across
+  // serverless instances, which don't share memory.
+  failedLoginAttempts: number;
+  lockedUntil?: Date;
   wishlist: Types.ObjectId[];
   addresses: {
     label: string;
@@ -65,6 +74,9 @@ const userSchema = new Schema<IUser>(
     emailVerificationToken: { type: String, select: false },
     emailVerificationExpires: { type: Date, select: false },
     isActive: { type: Boolean, default: true },
+    tokenVersion: { type: Number, default: 0, select: false },
+    failedLoginAttempts: { type: Number, default: 0, select: false },
+    lockedUntil: { type: Date, select: false },
     wishlist: [{ type: Schema.Types.ObjectId, ref: "Product" }],
     addresses: { type: [addressSchema], default: [] },
   },

@@ -25,13 +25,20 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
 
     await connectToDatabase();
-    const user = await User.findById(payload.sub);
+    const user = await User.findById(payload.sub).select("+tokenVersion");
     if (!user) {
       return apiError("Session expired, please log in again", 401);
     }
 
     if (!user.isActive) {
       return apiError("This account has been deactivated. Contact an administrator.", 403);
+    }
+
+    // A password change (self-service or admin reset) bumps tokenVersion,
+    // which immediately invalidates every refresh token issued before that
+    // change — even ones that haven't hit their 30-day expiry yet.
+    if (payload.tokenVersion !== (user.tokenVersion ?? 0)) {
+      return apiError("Session expired, please log in again", 401);
     }
 
     const accessToken = await signAccessToken({
@@ -42,7 +49,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     });
     const newRefreshToken = await signRefreshToken({
       sub: user._id.toString(),
-      tokenVersion: user._id.toString(),
+      tokenVersion: user.tokenVersion ?? 0,
     });
 
     const response = apiSuccess({ refreshed: true });
