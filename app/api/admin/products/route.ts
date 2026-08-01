@@ -102,7 +102,13 @@ export async function POST(request: NextRequest): Promise<Response> {
       $or: [{ slug: input.slug }, { sku: input.sku }],
     }).lean();
     if (existing) {
-      return apiError("A product with this code or slug already exists", 409);
+      // Trashed (soft-deleted) products still hold their code/slug, since
+      // the uniqueness check isn't scoped to deletedAt — surface that so an
+      // admin isn't stuck wondering why a "deleted" product blocks re-use.
+      const message = existing.deletedAt
+        ? "A product with this code or slug already exists in Trash — open Products, filter by Trash, and permanently delete it to reuse this code"
+        : "A product with this code or slug already exists";
+      return apiError(message, 409);
     }
 
     // Retail value and security deposit aren't on the Pricing tab anymore —

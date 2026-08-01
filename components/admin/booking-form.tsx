@@ -62,7 +62,7 @@ interface CustomerOption {
   email: string;
 }
 
-const RELATION_OPTIONS = ["S/O", "W/O"] as const;
+const RELATION_OPTIONS = ["S/O", "D/O", "W/O"] as const;
 
 // Quick add from the booking form only asks for what a walk-in/phone booking
 // actually has on hand — name, mobile, relation + name, and address. No
@@ -381,10 +381,10 @@ export function BookingForm({
   const grandTotal = rentTotal + securityDepositValue;
   const dueAmount = grandTotal - advancePaidValue;
 
-  const suggestedSecurityDeposit = items.reduce((sum, item) => {
-    const product = products.find((p) => p._id === item.product);
-    return product ? sum + product.securityDeposit : sum;
-  }, 0);
+  // Suggested deposit is 10% of the total rent across all items — not a sum
+  // of each dress's own deposit (that overcharged multi-item bookings, e.g.
+  // 5 dresses meant 5x the deposit). Still editable below.
+  const suggestedSecurityDeposit = Math.round(rentTotal * 0.1);
 
   // Flags dresses already held by another active booking for these dates so
   // the picker can show that upfront, before the user selects one.
@@ -650,6 +650,9 @@ export function BookingForm({
                       }}
                     />
                   </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    Suggested: 10% of rent total ({formatCurrency(suggestedSecurityDeposit)}) — editable
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}

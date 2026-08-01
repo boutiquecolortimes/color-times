@@ -123,9 +123,6 @@ export async function POST(request: NextRequest): Promise<Response> {
     const rentalEndDate = new Date(input.rentalEndDate);
 
     const items = [];
-    // Suggested deposit total from the selected dresses' own security
-    // deposit — used unless the form sent an explicit override.
-    let suggestedSecurityDeposit = 0;
 
     for (const inputItem of input.items) {
       const product = await Product.findById(inputItem.product).lean();
@@ -151,7 +148,6 @@ export async function POST(request: NextRequest): Promise<Response> {
       const pricePerDay = inputItem.pricePerDay ?? product.rentalPricePerDay;
       // Flat rent for the whole booking — not multiplied by rental days.
       const rentalFee = pricePerDay * quantity;
-      suggestedSecurityDeposit += product.securityDeposit * quantity;
 
       items.push({
         product: inputItem.product,
@@ -165,6 +161,12 @@ export async function POST(request: NextRequest): Promise<Response> {
       });
     }
 
+    // Suggested deposit is 10% of the total rent across all items — not a sum
+    // of each dress's own deposit, which overcharged multi-item bookings
+    // (e.g. 5 dresses previously meant 5x the deposit). Still overridable
+    // from the form.
+    const totalRent = items.reduce((sum, item) => sum + item.rentalFee, 0);
+    const suggestedSecurityDeposit = Math.round(totalRent * 0.1);
     const securityDeposit = input.securityDeposit ?? suggestedSecurityDeposit;
     const totalAmount = items.reduce((sum, item) => sum + item.rentalFee, 0) + securityDeposit;
     const bookingNumber = await generateBookingNumber();
