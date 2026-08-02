@@ -127,25 +127,54 @@ export function DashboardSkeleton() {
           <ChartPanelSkeleton tall />
         </div>
       </div>
-      <div className="rounded-lg border border-border bg-card p-5">
-        <Skeleton className="h-4 w-32" />
-        <Skeleton className="mt-2 h-3 w-48" />
-        <div className="mt-4 space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
-              <div className="min-w-0 flex-1 space-y-1.5">
-                <Skeleton className="h-3.5 w-32" />
-                <Skeleton className="h-3 w-44" />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+        <div className="rounded-lg border border-border bg-card p-5 lg:col-span-3">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="mt-2 h-3 w-48" />
+          <div className="mt-4 space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Skeleton className="h-3.5 w-32" />
+                  <Skeleton className="h-3 w-44" />
+                </div>
+                <Skeleton className="h-5 w-16 rounded-full" />
               </div>
-              <Skeleton className="h-5 w-16 rounded-full" />
-            </div>
-          ))}
+            ))}
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-5 lg:col-span-2">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="mt-2 h-3 w-40" />
+          <div className="mt-4 space-y-3.5">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Skeleton className="h-7 w-7 shrink-0 rounded-md" />
+                    <Skeleton className="h-3.5 w-24" />
+                  </div>
+                  <Skeleton className="h-3.5 w-10" />
+                </div>
+                <Skeleton className="h-1.5 w-full rounded-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="space-y-4">
+        <Skeleton className="h-5 w-48" />
+        <Skeleton className="h-3.5 w-72" />
+        <ChartPanelSkeleton tall />
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <ChartPanelSkeleton />
+          <ChartPanelSkeleton />
         </div>
       </div>
       <div className="space-y-4">
         <Skeleton className="h-5 w-56" />
-        <StatCardsSkeleton count={5} />
+        <StatCardsSkeleton count={4} />
       </div>
     </div>
   );

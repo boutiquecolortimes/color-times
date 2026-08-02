@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
   Select,
@@ -12,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DashboardAnalytics } from "@/components/admin/dashboard-analytics";
+import { ChartPanelSkeleton } from "@/components/admin/page-skeletons";
 import { DATE_RANGE_PRESETS, DATE_RANGE_LABELS, type DateRangePreset } from "@/lib/admin/date-ranges";
 import type { DashboardAnalytics as DashboardAnalyticsData } from "@/lib/admin/dashboard-stats";
 
@@ -26,8 +28,8 @@ async function fetchAnalytics(params: {
     if (params.to) searchParams.set("to", params.to);
   }
   const res = await fetch(`/api/admin/dashboard/analytics?${searchParams.toString()}`);
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error);
+  const json = await res.json().catch(() => ({ error: "Unexpected response from server" }));
+  if (!res.ok) throw new Error(json.error ?? "Failed to load analytics");
   return json.data;
 }
 
@@ -36,10 +38,11 @@ export function DashboardAnalyticsPanel() {
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: ["admin", "dashboard-analytics", { preset, customFrom, customTo }],
     queryFn: () => fetchAnalytics({ preset, from: customFrom, to: customTo }),
     enabled: preset !== "custom" || Boolean(customFrom && customTo),
+    retry: 1,
   });
 
   const analytics = data?.analytics;
@@ -69,11 +72,38 @@ export function DashboardAnalyticsPanel() {
         )}
 
         {data?.rangeLabel && (
-          <p className="text-sm text-muted-foreground">Showing {data.rangeLabel}</p>
+          <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            Showing {data.rangeLabel}
+            {isFetching && !isLoading && <Loader2 className="h-3 w-3 animate-spin" />}
+          </p>
         )}
       </div>
 
-      {analytics ? (
+      {isError ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-border bg-card px-6 py-16 text-center">
+          <div className="grid h-12 w-12 place-items-center rounded-full bg-destructive/10">
+            <AlertTriangle className="h-6 w-6 text-destructive" strokeWidth={1.5} />
+          </div>
+          <div>
+            <p className="text-sm font-medium">Couldn&apos;t load analytics</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {error instanceof Error ? error.message : "Something went wrong. Please try again."}
+            </p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => void refetch()}>
+            <RefreshCw className="h-3.5 w-3.5" />
+            Retry
+          </Button>
+        </div>
+      ) : isLoading || !analytics ? (
+        <div className="space-y-6">
+          <ChartPanelSkeleton tall />
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <ChartPanelSkeleton />
+            <ChartPanelSkeleton />
+          </div>
+        </div>
+      ) : (
         <DashboardAnalytics
           bookingStatusBreakdown={analytics.bookingStatusBreakdown}
           invoiceStatusBreakdown={analytics.invoiceStatusBreakdown}
@@ -81,11 +111,6 @@ export function DashboardAnalyticsPanel() {
           topProducts={analytics.topProducts}
           monthlyTrend={analytics.monthlyTrend}
         />
-      ) : (
-        <div className="flex items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
-          {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-          {isLoading ? "Loading analytics..." : "Select a date range to load analytics."}
-        </div>
       )}
     </div>
   );

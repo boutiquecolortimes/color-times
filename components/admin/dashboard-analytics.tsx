@@ -1,18 +1,8 @@
 "use client";
 
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { CalendarCheck, IndianRupee, Receipt, Shirt } from "lucide-react";
+import { TabularCard, type TabularCardRow } from "@/components/admin/tabular-card";
+import { RevenueChart } from "@/components/admin/revenue-chart";
 import type { BookingStatus } from "@/models/Booking";
 import type { InvoiceStatus } from "@/models/Invoice";
 
@@ -64,15 +54,6 @@ function formatCurrency(value: number): string {
   return `₹${value.toLocaleString("en-IN")}`;
 }
 
-const tooltipStyle = {
-  borderRadius: 8,
-  border: "1px solid var(--border)",
-  background: "var(--popover)",
-  fontSize: 13,
-};
-
-const axisTick = { fontSize: 12, fill: "var(--muted-foreground)" };
-
 export function DashboardAnalytics({
   bookingStatusBreakdown,
   invoiceStatusBreakdown,
@@ -80,167 +61,105 @@ export function DashboardAnalytics({
   topProducts,
   monthlyTrend,
 }: DashboardAnalyticsProps) {
-  const bookingPieData = bookingStatusBreakdown
+  const bookingTotal = bookingStatusBreakdown.reduce((sum, entry) => sum + entry.count, 0);
+  const bookingRows: TabularCardRow[] = bookingStatusBreakdown
     .filter((entry) => entry.count > 0)
-    .map((entry) => ({ name: BOOKING_STATUS_LABELS[entry.status], value: entry.count, status: entry.status }));
+    .map((entry) => ({
+      key: entry.status,
+      label: BOOKING_STATUS_LABELS[entry.status],
+      value: entry.count.toLocaleString("en-IN"),
+      secondaryValue: bookingTotal > 0 ? `${Math.round((entry.count / bookingTotal) * 100)}%` : undefined,
+      percent: bookingTotal > 0 ? (entry.count / bookingTotal) * 100 : 0,
+      color: BOOKING_STATUS_COLORS[entry.status],
+    }));
+
+  const invoiceMax = Math.max(1, ...invoiceStatusBreakdown.map((entry) => entry.count));
+  const invoiceRows: TabularCardRow[] = invoiceStatusBreakdown
+    .filter((entry) => entry.count > 0)
+    .map((entry) => ({
+      key: entry.status,
+      label: INVOICE_STATUS_LABELS[entry.status],
+      value: formatCurrency(entry.total),
+      secondaryValue: `${entry.count} invoice${entry.count === 1 ? "" : "s"}`,
+      percent: (entry.count / invoiceMax) * 100,
+      color: INVOICE_STATUS_COLORS[entry.status],
+    }));
+
+  const categoryMax = Math.max(1, ...categoryRevenue.map((entry) => entry.revenue));
+  const categoryRows: TabularCardRow[] = categoryRevenue.map((entry) => ({
+    key: entry.category,
+    label: entry.category,
+    value: formatCurrency(entry.revenue),
+    secondaryValue: `${entry.bookings} booking${entry.bookings === 1 ? "" : "s"}`,
+    percent: (entry.revenue / categoryMax) * 100,
+  }));
+
+  const productMax = Math.max(1, ...topProducts.map((entry) => entry.bookings));
+  const productRows: TabularCardRow[] = topProducts.map((entry) => ({
+    key: entry.name,
+    label: entry.name,
+    value: `${entry.bookings} booking${entry.bookings === 1 ? "" : "s"}`,
+    secondaryValue: formatCurrency(entry.revenue),
+    percent: (entry.bookings / productMax) * 100,
+  }));
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-lg border border-border bg-card p-5">
-          <h2 className="font-heading text-lg">Booking Status Distribution</h2>
-          <p className="mt-1 text-sm text-muted-foreground">All bookings, all-time</p>
-          <div className="mt-4">
-            {bookingPieData.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-                No bookings yet.
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={260}>
-                <PieChart>
-                  <Pie
-                    data={bookingPieData}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius={55}
-                    outerRadius={90}
-                    paddingAngle={2}
-                  >
-                    {bookingPieData.map((entry) => (
-                      <Cell key={entry.status} fill={BOOKING_STATUS_COLORS[entry.status]} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={tooltipStyle} formatter={(value) => [String(value), "Bookings"]} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
+      <div className="rounded-lg border border-border bg-card p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-heading text-base">Revenue &amp; Bookings Trend</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">Last 12 months</p>
+          </div>
+          <div className="hidden items-center gap-4 text-xs text-muted-foreground sm:flex">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full" style={{ background: "var(--gold)" }} />
+              Revenue
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full" style={{ background: "var(--chart-3)" }} />
+              Bookings
+            </span>
           </div>
         </div>
-
-        <div className="rounded-lg border border-border bg-card p-5">
-          <h2 className="font-heading text-lg">Invoice Status Breakdown</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Count of invoices by status</p>
-          <div className="mt-4">
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={invoiceStatusBreakdown} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis
-                  dataKey="status"
-                  tickFormatter={(value: InvoiceStatus) => INVOICE_STATUS_LABELS[value]}
-                  tickLine={false}
-                  axisLine={false}
-                  tick={axisTick}
-                  interval={0}
-                  angle={-20}
-                  textAnchor="end"
-                  height={50}
-                />
-                <YAxis tickLine={false} axisLine={false} tick={axisTick} allowDecimals={false} />
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  formatter={(value, name, item) => [
-                    `${value} invoice(s) · ${formatCurrency(item.payload.total)}`,
-                    INVOICE_STATUS_LABELS[item.payload.status as InvoiceStatus],
-                  ]}
-                />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                  {invoiceStatusBreakdown.map((entry) => (
-                    <Cell key={entry.status} fill={INVOICE_STATUS_COLORS[entry.status]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+        <div className="mt-4">
+          <RevenueChart data={monthlyTrend} />
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-lg border border-border bg-card p-5">
-          <h2 className="font-heading text-lg">Revenue by Category</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Confirmed, in-use &amp; returned bookings</p>
-          <div className="mt-4">
-            {categoryRevenue.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-                No category revenue yet.
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart
-                  data={categoryRevenue}
-                  layout="vertical"
-                  margin={{ top: 10, right: 24, left: 12, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                  <XAxis
-                    type="number"
-                    tickLine={false}
-                    axisLine={false}
-                    tick={axisTick}
-                    tickFormatter={(value: number) => `₹${(value / 1000).toFixed(0)}k`}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="category"
-                    tickLine={false}
-                    axisLine={false}
-                    tick={axisTick}
-                    width={100}
-                  />
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    formatter={(value) => [formatCurrency(Number(value)), "Revenue"]}
-                  />
-                  <Bar dataKey="revenue" fill="var(--gold)" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
+        <TabularCard
+          title="Booking Status"
+          subtitle="Share of all bookings"
+          rows={bookingRows}
+          emptyMessage="No bookings yet."
+        />
+        <TabularCard
+          title="Invoice Status"
+          subtitle="Count and value by status"
+          rows={invoiceRows}
+          emptyMessage="No invoices yet."
+        />
+      </div>
 
-        <div className="rounded-lg border border-border bg-card p-5">
-          <h2 className="font-heading text-lg">Top 5 Dresses</h2>
-          <p className="mt-1 text-sm text-muted-foreground">By number of bookings</p>
-          <div className="mt-4">
-            {topProducts.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-                No bookings yet.
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart
-                  data={topProducts}
-                  layout="vertical"
-                  margin={{ top: 10, right: 24, left: 12, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                  <XAxis type="number" tickLine={false} axisLine={false} tick={axisTick} allowDecimals={false} />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    tickLine={false}
-                    axisLine={false}
-                    tick={axisTick}
-                    width={130}
-                  />
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    formatter={(value, name, item) => [
-                      `${value} booking(s) · ${formatCurrency(item.payload.revenue)}`,
-                      "Bookings",
-                    ]}
-                  />
-                  <Bar dataKey="bookings" fill="var(--gold)" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <TabularCard
+          title="Revenue by Category"
+          subtitle="Confirmed, in-use & returned bookings"
+          rows={categoryRows}
+          emptyMessage="No category revenue yet."
+        />
+        <TabularCard
+          title="Top 5 Dresses"
+          subtitle="By number of bookings"
+          rows={productRows}
+          emptyMessage="No bookings yet."
+        />
       </div>
 
       <div className="rounded-lg border border-border bg-card p-5">
-        <h2 className="font-heading text-lg">Monthly Trend</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Last 12 months</p>
+        <h3 className="font-heading text-base">Monthly Detail</h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">Last 12 months, month by month</p>
 
         <div className="mt-4 space-y-3 lg:hidden">
           {monthlyTrend.length === 0 ? (
@@ -251,15 +170,21 @@ export function DashboardAnalytics({
                 <p className="font-medium">{row.label}</p>
                 <div className="mt-2 grid grid-cols-3 gap-2 text-sm">
                   <div>
-                    <p className="text-xs text-muted-foreground">Bookings</p>
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <CalendarCheck className="h-3 w-3" /> Bookings
+                    </p>
                     <p>{row.bookings}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Revenue</p>
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <IndianRupee className="h-3 w-3" /> Revenue
+                    </p>
                     <p>{formatCurrency(row.revenue)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">New Customers</p>
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Shirt className="h-3 w-3" /> New Customers
+                    </p>
                     <p>{row.newCustomers}</p>
                   </div>
                 </div>
@@ -282,7 +207,9 @@ export function DashboardAnalytics({
               {monthlyTrend.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">
-                    No data yet.
+                    <span className="inline-flex items-center gap-1.5">
+                      <Receipt className="h-3.5 w-3.5" /> No data yet.
+                    </span>
                   </td>
                 </tr>
               ) : (

@@ -344,7 +344,7 @@ async function computeDashboardAnalytics(
     monthlyCustomersResult,
   ] = await Promise.all([
     Booking.aggregate([
-      ...(hasRangeFilter ? [{ $match: { createdAt: createdAtFilter } }] : []),
+      { $match: { deletedAt: null, ...(hasRangeFilter ? { createdAt: createdAtFilter } : {}) } },
       { $group: { _id: "$status", count: { $sum: 1 } } },
     ]),
     Invoice.aggregate([
@@ -355,6 +355,7 @@ async function computeDashboardAnalytics(
       {
         $match: {
           status: { $in: REVENUE_STATUSES },
+          deletedAt: null,
           ...(hasRangeFilter ? { createdAt: createdAtFilter } : {}),
         },
       },
@@ -390,6 +391,7 @@ async function computeDashboardAnalytics(
       {
         $match: {
           status: { $in: REVENUE_STATUSES },
+          deletedAt: null,
           ...(hasRangeFilter ? { createdAt: createdAtFilter } : {}),
         },
       },
@@ -417,6 +419,7 @@ async function computeDashboardAnalytics(
       {
         $match: {
           status: { $in: REVENUE_STATUSES },
+          deletedAt: null,
           createdAt: { $gte: twelveMonthsAgo },
         },
       },
@@ -430,7 +433,7 @@ async function computeDashboardAnalytics(
       { $sort: { "_id.year": 1, "_id.month": 1 } },
     ]),
     User.aggregate([
-      { $match: { role: "customer", createdAt: { $gte: twelveMonthsAgo } } },
+      { $match: { role: "customer", deletedAt: null, createdAt: { $gte: twelveMonthsAgo } } },
       {
         $group: {
           _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
