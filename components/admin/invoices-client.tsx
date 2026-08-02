@@ -14,6 +14,7 @@ import {
   List,
   MoreHorizontal,
   Printer,
+  RotateCcw,
   Search,
   Table2,
   Trash2,
@@ -21,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -134,6 +136,15 @@ export function InvoicesClient({
     null
   );
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [permanentDeleteTarget, setPermanentDeleteTarget] = useState<InvoiceRow | null>(null);
+  const [bulkConfirmAction, setBulkConfirmAction] = useState<"delete" | "permanent-delete" | null>(
+    null
+  );
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
 
   async function withExportGuard(action: () => Promise<void>): Promise<void> {
     setIsExporting(true);
@@ -220,6 +231,81 @@ export function InvoicesClient({
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const permanentDeleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/invoices/${id}/permanent`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data;
+    },
+    onSuccess: () => {
+      toast.success("Invoice permanently deleted");
+      invalidate();
+      setPermanentDeleteTarget(null);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const bulkActionMutation = useMutation({
+    mutationFn: async ({
+      ids,
+      action,
+    }: {
+      ids: string[];
+      action: "delete" | "restore" | "permanent-delete";
+    }) => {
+      const res = await fetch("/api/admin/invoices/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, action }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data;
+    },
+    onSuccess: (data, variables) => {
+      if (variables.action === "permanent-delete") {
+        const { deleted } = data as { deleted: number };
+        if (deleted > 0) toast.success(`Permanently deleted ${deleted} invoice(s)`);
+      } else if (variables.action === "restore") {
+        toast.success(`Restored ${variables.ids.length} invoice(s)`);
+      } else {
+        const { deleted, blocked } = data as {
+          deleted: number;
+          blocked: { invoiceNumber: string; status: string }[];
+        };
+        if (deleted > 0) toast.success(`Moved ${deleted} invoice(s) to trash`);
+        if (blocked.length > 0) {
+          toast.warning(
+            `Skipped ${blocked.length} invoice(s) that aren't draft or cancelled: ${blocked
+              .map((b) => b.invoiceNumber)
+              .join(", ")}`,
+            { duration: 8000 }
+          );
+        }
+      }
+      invalidate();
+      clearSelection();
+      setBulkConfirmAction(null);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  function toggleSelectOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) =>
+      prev.size === invoices.length ? new Set() : new Set(invoices.map((invoice) => invoice._id))
+    );
+  }
+
   function toggleSort(field: string) {
     if (sortBy === field) {
       setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -249,9 +335,16 @@ export function InvoicesClient({
       {invoices.map((invoice) => (
         <div key={invoice._id} className="rounded-lg border border-border bg-card p-4">
           <div className="flex items-start justify-between gap-3">
-            <Link href={`/admin/invoices/${invoice._id}`} className="font-medium hover:text-accent">
-              {invoice.invoiceNumber}
-            </Link>
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Checkbox
+                checked={selectedIds.has(invoice._id)}
+                onCheckedChange={() => toggleSelectOne(invoice._id)}
+                aria-label={`Select ${invoice.invoiceNumber}`}
+              />
+              <Link href={`/admin/invoices/${invoice._id}`} className="truncate font-medium hover:text-accent">
+                {invoice.invoiceNumber}
+              </Link>
+            </div>
             <InvoiceStatusBadge status={invoice.status} />
           </div>
           <p className="mt-2 text-sm">{invoice.customer?.name ?? "—"}</p>
@@ -276,11 +369,30 @@ export function InvoicesClient({
             </div>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">Due {formatDate(invoice.dueDate)}</p>
-          <div className="mt-3 flex justify-end">
+          <div className="mt-3 flex justify-end gap-2">
             {view === "trash" ? (
-              <Button variant="outline" size="sm" onClick={() => restoreMutation.mutate(invoice._id)}>
-                Restore
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={restoreMutation.isPending}
+                  onClick={() => restoreMutation.mutate(invoice._id)}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Restore
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-destructive"
+                  aria-label="Delete permanently"
+                  title="Delete permanently"
+                  disabled={permanentDeleteMutation.isPending}
+                  onClick={() => setPermanentDeleteTarget(invoice)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </>
             ) : (
               <DropdownMenu>
                 <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
@@ -347,6 +459,7 @@ export function InvoicesClient({
             onChange={(event) => {
               setSearch(event.target.value);
               setPage(1);
+              clearSelection();
             }}
           />
         </div>
@@ -355,6 +468,7 @@ export function InvoicesClient({
           onValueChange={(value) => {
             setStatus(value ?? "all");
             setPage(1);
+            clearSelection();
           }}
         >
           <SelectTrigger className="w-48">
@@ -377,6 +491,7 @@ export function InvoicesClient({
           onValueChange={(value) => {
             setView((value as "active" | "trash") ?? "active");
             setPage(1);
+            clearSelection();
           }}
         >
           <SelectTrigger className="w-36">
@@ -439,6 +554,51 @@ export function InvoicesClient({
         </div>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2.5">
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <div className="ml-auto flex flex-wrap gap-2">
+            {view === "trash" ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={bulkActionMutation.isPending}
+                  onClick={() =>
+                    bulkActionMutation.mutate({ ids: Array.from(selectedIds), action: "restore" })
+                  }
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Restore
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={bulkActionMutation.isPending}
+                  onClick={() => setBulkConfirmAction("permanent-delete")}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete Permanently
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={bulkActionMutation.isPending}
+                onClick={() => setBulkConfirmAction("delete")}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Move to Trash
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={clearSelection}>
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="lg:hidden">{cardGrid}</div>
 
       {layout === "card" ? (
@@ -448,6 +608,13 @@ export function InvoicesClient({
         <table className="w-full min-w-[640px] text-sm whitespace-nowrap">
           <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
+              <th className="px-4 py-3">
+                <Checkbox
+                  checked={invoices.length > 0 && selectedIds.size === invoices.length}
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Select all"
+                />
+              </th>
               <th className="px-4 py-3">
                 <button className="flex items-center gap-1" onClick={() => toggleSort("invoiceNumber")}>
                   Invoice # <SortIcon field="invoiceNumber" sortBy={sortBy} sortDir={sortDir} />
@@ -478,6 +645,13 @@ export function InvoicesClient({
           <tbody>
             {invoices.map((invoice) => (
               <tr key={invoice._id} className="border-b border-border last:border-0">
+                <td className="px-4 py-3">
+                  <Checkbox
+                    checked={selectedIds.has(invoice._id)}
+                    onCheckedChange={() => toggleSelectOne(invoice._id)}
+                    aria-label={`Select ${invoice.invoiceNumber}`}
+                  />
+                </td>
                 <td className="px-4 py-3 font-medium">
                   <Link href={`/admin/invoices/${invoice._id}`} className="hover:text-accent">
                     {invoice.invoiceNumber}
@@ -507,13 +681,28 @@ export function InvoicesClient({
                 </td>
                 <td className="px-4 py-3 text-right">
                   {view === "trash" ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => restoreMutation.mutate(invoice._id)}
-                    >
-                      Restore
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={restoreMutation.isPending}
+                        onClick={() => restoreMutation.mutate(invoice._id)}
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Restore
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive"
+                        aria-label="Delete permanently"
+                        title="Delete permanently"
+                        disabled={permanentDeleteMutation.isPending}
+                        onClick={() => setPermanentDeleteTarget(invoice)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   ) : (
                     <DropdownMenu>
                       <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
@@ -554,7 +743,7 @@ export function InvoicesClient({
             ))}
             {invoices.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={10} className="px-4 py-10 text-center text-muted-foreground">
                   No invoices found.
                 </td>
               </tr>
@@ -569,7 +758,10 @@ export function InvoicesClient({
         totalPages={pagination.totalPages}
         total={pagination.total}
         itemLabel="invoices"
-        onPageChange={setPage}
+        onPageChange={(nextPage) => {
+          setPage(nextPage);
+          clearSelection();
+        }}
       />
 
       <ConfirmDialog
@@ -588,6 +780,46 @@ export function InvoicesClient({
           if (!confirmState) return;
           if (confirmState.type === "delete") deleteMutation.mutate(confirmState.id);
           else cancelMutation.mutate(confirmState.id);
+        }}
+      />
+
+      <ConfirmDialog
+        open={permanentDeleteTarget !== null}
+        onOpenChange={(open) => !open && setPermanentDeleteTarget(null)}
+        title="Permanently delete invoice?"
+        description={
+          permanentDeleteTarget
+            ? `Permanently delete ${permanentDeleteTarget.invoiceNumber}? This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete Permanently"
+        variant="destructive"
+        isLoading={permanentDeleteMutation.isPending}
+        onConfirm={() => {
+          if (permanentDeleteTarget) permanentDeleteMutation.mutate(permanentDeleteTarget._id);
+        }}
+      />
+
+      <ConfirmDialog
+        open={bulkConfirmAction !== null}
+        onOpenChange={(open) => !open && setBulkConfirmAction(null)}
+        title={
+          bulkConfirmAction === "permanent-delete"
+            ? `Permanently delete ${selectedIds.size} invoice(s)?`
+            : `Move ${selectedIds.size} invoice(s) to trash?`
+        }
+        description={
+          bulkConfirmAction === "permanent-delete"
+            ? "This cannot be undone."
+            : "Only draft or cancelled invoices can be moved to trash — any others selected will be skipped and reported back. You can restore these from the Trash view at any time."
+        }
+        confirmLabel={bulkConfirmAction === "permanent-delete" ? "Delete Permanently" : "Move to Trash"}
+        variant="destructive"
+        isLoading={bulkActionMutation.isPending}
+        onConfirm={() => {
+          if (bulkConfirmAction) {
+            bulkActionMutation.mutate({ ids: Array.from(selectedIds), action: bulkConfirmAction });
+          }
         }}
       />
     </div>
