@@ -7,7 +7,7 @@ import { InvoicesClient } from "@/components/admin/invoices-client";
 
 export const metadata: Metadata = { title: "Invoices" };
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 5;
 
 export default async function AdminInvoicesPage() {
   await connectToDatabase();

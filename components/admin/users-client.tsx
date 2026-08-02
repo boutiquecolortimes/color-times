@@ -26,9 +26,12 @@ import {
 } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { AdminPagination } from "@/components/admin/admin-pagination";
 import { createStaffSchema, type CreateStaffInput } from "@/lib/validations/staff";
 import { formatDate } from "@/lib/utils";
 import type { UserRole } from "@/models/User";
+
+const PAGE_SIZE = 5;
 
 interface StaffUser {
   _id: string;
@@ -118,12 +121,19 @@ export function UsersClient({
   const [resettingId, setResettingId] = useState<string | null>(null);
   const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
   const [layout, setLayout] = useState<"table" | "card">("table");
+  const [page, setPage] = useState(1);
 
   const { data: users = initialUsers } = useQuery({
     queryKey: ["admin", "users"],
     queryFn: fetchUsers,
     initialData: initialUsers,
   });
+
+  // Team rosters are small and fetched in one shot — paginate on the
+  // client instead of round-tripping to the server for each page.
+  const totalPages = Math.max(1, Math.ceil(users.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedUsers = users.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const canAssignPrivilegedRoles = currentUserRole === "super_admin";
   const roleOptions = canAssignPrivilegedRoles
@@ -242,7 +252,7 @@ export function UsersClient({
 
   const cardGrid = (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {users.map((user) => {
+      {pagedUsers.map((user) => {
           const isSelf = user._id === currentUserId;
           return (
             <div key={user._id} className="rounded-lg border border-border bg-card p-4">
@@ -363,7 +373,7 @@ export function UsersClient({
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => {
+            {pagedUsers.map((user) => {
               const isSelf = user._id === currentUserId;
               return (
                 <tr key={user._id} className="border-b border-border last:border-0">
@@ -437,6 +447,14 @@ export function UsersClient({
         </table>
       </div>
       )}
+
+      <AdminPagination
+        page={safePage}
+        totalPages={totalPages}
+        total={users.length}
+        itemLabel="team members"
+        onPageChange={setPage}
+      />
 
       {/* Create dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

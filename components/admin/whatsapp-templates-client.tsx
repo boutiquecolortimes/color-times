@@ -7,11 +7,14 @@ import { Grid3x3, List, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { AdminPagination } from "@/components/admin/admin-pagination";
 import {
   WhatsAppTemplateFormDialog,
   type WhatsAppTemplateRow,
 } from "@/components/admin/whatsapp-template-form-dialog";
 import { TRIGGER_EVENT_LABELS } from "@/lib/notifications/trigger-events";
+
+const PAGE_SIZE = 5;
 
 async function fetchTemplates(): Promise<WhatsAppTemplateRow[]> {
   const res = await fetch("/api/admin/whatsapp/templates");
@@ -30,12 +33,19 @@ export function WhatsAppTemplatesClient({
   const [editingTemplate, setEditingTemplate] = useState<WhatsAppTemplateRow | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [layout, setLayout] = useState<"table" | "card">("table");
+  const [page, setPage] = useState(1);
 
   const { data: templates = initialTemplates } = useQuery({
     queryKey: ["admin", "whatsapp", "templates"],
     queryFn: fetchTemplates,
     initialData: initialTemplates,
   });
+
+  // Template lists are small and fetched in one shot — paginate on the
+  // client instead of round-tripping to the server for each page.
+  const totalPages = Math.max(1, Math.ceil(templates.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedTemplates = templates.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -54,7 +64,7 @@ export function WhatsAppTemplatesClient({
 
   const cardGrid = (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {templates.map((template) => (
+      {pagedTemplates.map((template) => (
         <div key={template._id} className="rounded-lg border border-border bg-card p-4">
           <div className="flex items-start justify-between gap-3">
             <p className="font-medium">{template.name}</p>
@@ -153,7 +163,7 @@ export function WhatsAppTemplatesClient({
             </tr>
           </thead>
           <tbody>
-            {templates.map((template) => (
+            {pagedTemplates.map((template) => (
               <tr key={template._id} className="border-b border-border last:border-0">
                 <td className="px-4 py-3 font-medium">{template.name}</td>
                 <td className="px-4 py-3 text-muted-foreground">
@@ -206,6 +216,14 @@ export function WhatsAppTemplatesClient({
         </table>
       </div>
       )}
+
+      <AdminPagination
+        page={safePage}
+        totalPages={totalPages}
+        total={templates.length}
+        itemLabel="templates"
+        onPageChange={setPage}
+      />
 
       <WhatsAppTemplateFormDialog
         open={formOpen}

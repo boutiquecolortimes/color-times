@@ -5,7 +5,7 @@ import { CustomisationClient } from "@/components/admin/customisation-client";
 
 export const metadata: Metadata = { title: "Customisation" };
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 5;
 
 export default async function AdminCustomisationPage() {
   await connectToDatabase();

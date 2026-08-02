@@ -27,7 +27,7 @@ import type { InvoiceStatus } from "@/models/Invoice";
 import type { ServiceOrderStatus } from "@/models/ServiceOrder";
 import type { CustomisationOrderStatus } from "@/models/CustomisationOrder";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 5;
 
 type ReportType =
   | "products"

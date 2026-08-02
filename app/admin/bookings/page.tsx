@@ -7,7 +7,7 @@ import { BookingsClient } from "@/components/admin/bookings-client";
 
 export const metadata: Metadata = { title: "Bookings" };
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 5;
 
 export default async function AdminBookingsPage() {
   await connectToDatabase();

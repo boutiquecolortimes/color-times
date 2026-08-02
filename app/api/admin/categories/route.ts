@@ -13,11 +13,28 @@ export async function GET(request: NextRequest): Promise<Response> {
 
   await connectToDatabase();
 
-  const status = request.nextUrl.searchParams.get("status") ?? "active";
+  const searchParams = request.nextUrl.searchParams;
+  const status = searchParams.get("status") ?? "active";
   const filter = status === "trash" ? { deletedAt: { $ne: null } } : { deletedAt: null };
+  const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
+  const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize") ?? "5")));
+  const all = searchParams.get("all") === "true";
 
-  const categories = await Category.find(filter).sort({ displayOrder: 1, name: 1 }).lean();
-  return apiSuccess({ categories });
+  const [categories, total] = await Promise.all([
+    Category.find(filter)
+      .sort({ displayOrder: 1, name: 1 })
+      .skip(all ? 0 : (page - 1) * pageSize)
+      .limit(all ? 0 : pageSize)
+      .lean(),
+    Category.countDocuments(filter),
+  ]);
+
+  return apiSuccess({
+    categories,
+    pagination: all
+      ? { page: 1, pageSize: total || 1, total, totalPages: 1 }
+      : { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+  });
 }
 
 export async function POST(request: NextRequest): Promise<Response> {

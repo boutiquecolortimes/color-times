@@ -17,7 +17,7 @@ export async function GET(request: NextRequest): Promise<Response> {
 
   const searchParams = request.nextUrl.searchParams;
   const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
-  const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize") ?? "20")));
+  const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize") ?? "5")));
   const view = searchParams.get("view") ?? "active";
 
   const filter: Record<string, unknown> =

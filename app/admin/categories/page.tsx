@@ -5,11 +5,18 @@ import { CategoriesClient } from "@/components/admin/categories-client";
 
 export const metadata: Metadata = { title: "Categories" };
 
+const PAGE_SIZE = 5;
+
 export default async function AdminCategoriesPage() {
   await connectToDatabase();
-  const categories = await Category.find({ deletedAt: null })
-    .sort({ displayOrder: 1, name: 1 })
-    .lean();
+
+  const [categories, total] = await Promise.all([
+    Category.find({ deletedAt: null })
+      .sort({ displayOrder: 1, name: 1 })
+      .limit(PAGE_SIZE)
+      .lean(),
+    Category.countDocuments({ deletedAt: null }),
+  ]);
 
   const initialCategories = categories.map((category) => ({
     _id: String(category._id),
@@ -21,5 +28,15 @@ export default async function AdminCategoriesPage() {
     isFeatured: category.isFeatured,
   }));
 
-  return <CategoriesClient initialCategories={initialCategories} />;
+  return (
+    <CategoriesClient
+      initialCategories={initialCategories}
+      initialPagination={{
+        page: 1,
+        pageSize: PAGE_SIZE,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+      }}
+    />
+  );
 }

@@ -8,7 +8,7 @@ import { ProductsClient } from "@/components/admin/products-client";
 
 export const metadata: Metadata = { title: "Products" };
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 5;
 
 export default async function AdminProductsPage() {
   const currentUser = await getCurrentUser();

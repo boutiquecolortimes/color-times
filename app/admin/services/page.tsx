@@ -7,7 +7,7 @@ import { ServiceOrdersClient } from "@/components/admin/service-orders-client";
 
 export const metadata: Metadata = { title: "Dry Clean & Tailor" };
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 5;
 
 export default async function AdminServicesPage() {
   await connectToDatabase();

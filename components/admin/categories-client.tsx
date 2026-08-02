@@ -54,6 +54,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { ImageUploadField } from "@/components/admin/image-upload-field";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { AdminPagination } from "@/components/admin/admin-pagination";
 import { categorySchema, type CategoryInput } from "@/lib/validations/category";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 
@@ -61,11 +62,24 @@ interface CategoryRow extends CategoryInput {
   _id: string;
 }
 
-async function fetchCategories(status: string): Promise<CategoryRow[]> {
-  const res = await fetch(`/api/admin/categories?status=${status}`);
+interface Pagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+async function fetchCategories(params: {
+  status: string;
+  page: number;
+  all?: boolean;
+}): Promise<{ categories: CategoryRow[]; pagination: Pagination }> {
+  const searchParams = new URLSearchParams({ status: params.status, page: String(params.page) });
+  if (params.all) searchParams.set("all", "true");
+  const res = await fetch(`/api/admin/categories?${searchParams.toString()}`);
   const json = await res.json();
   if (!res.ok) throw new Error(json.error);
-  return json.data.categories;
+  return json.data;
 }
 
 function slugify(value: string): string {
@@ -76,12 +90,19 @@ function slugify(value: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
-export function CategoriesClient({ initialCategories }: { initialCategories: CategoryRow[] }) {
+export function CategoriesClient({
+  initialCategories,
+  initialPagination,
+}: {
+  initialCategories: CategoryRow[];
+  initialPagination: Pagination;
+}) {
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<CategoryRow | null>(null);
   const [view, setView] = useState<"table" | "card">("table");
   const [status, setStatus] = useState<"active" | "trash">("active");
+  const [page, setPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<CategoryRow | null>(null);
   const [permanentDeleteTarget, setPermanentDeleteTarget] = useState<CategoryRow | null>(null);
   const [bulkConfirmAction, setBulkConfirmAction] = useState<"delete" | "permanent-delete" | null>(
@@ -90,11 +111,18 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
   const [isExporting, setIsExporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const { data: categories = [] } = useQuery({
-    queryKey: ["admin", "categories", status],
-    queryFn: () => fetchCategories(status),
-    initialData: status === "active" ? initialCategories : undefined,
+  const isDefaultQuery = status === "active" && page === 1;
+
+  const { data } = useQuery({
+    queryKey: ["admin", "categories", { status, page }],
+    queryFn: () => fetchCategories({ status, page }),
+    initialData: isDefaultQuery
+      ? { categories: initialCategories, pagination: initialPagination }
+      : undefined,
   });
+
+  const categories = data?.categories ?? [];
+  const pagination = data?.pagination ?? initialPagination;
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["admin", "categories"] });
@@ -255,34 +283,44 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
 
   function changeStatus(next: "active" | "trash") {
     setStatus(next);
+    setPage(1);
     setSelectedIds(new Set());
   }
 
   const exportHeaders = ["Name", "Slug", "Description"];
 
-  function exportRows(): (string | number)[][] {
-    return categories.map((category) => [
-      category.name,
-      category.slug,
-      category.description ?? "",
-    ]);
+  function categoriesToRows(rows: CategoryRow[]): (string | number)[][] {
+    return rows.map((category) => [category.name, category.slug, category.description ?? ""]);
+  }
+
+  async function fetchAllCategoriesForExport(): Promise<CategoryRow[]> {
+    const result = await fetchCategories({ status, page: 1, all: true });
+    return result.categories;
   }
 
   async function withExportGuard(action: () => Promise<void>): Promise<void> {
     setIsExporting(true);
     try {
       await action();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Export failed");
     } finally {
       setIsExporting(false);
     }
   }
 
   function handleExportExcel() {
-    void withExportGuard(() => downloadExcel("categories", "Categories", exportHeaders, exportRows()));
+    void withExportGuard(async () => {
+      const rows = categoriesToRows(await fetchAllCategoriesForExport());
+      await downloadExcel("categories", "Categories", exportHeaders, rows);
+    });
   }
 
   function handleExportPdf() {
-    void withExportGuard(() => downloadPdf("categories", "Categories", exportHeaders, exportRows()));
+    void withExportGuard(async () => {
+      const rows = categoriesToRows(await fetchAllCategoriesForExport());
+      await downloadPdf("categories", "Categories", exportHeaders, rows);
+    });
   }
 
   function handlePrint() {
@@ -367,7 +405,7 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <p className="text-sm text-muted-foreground">{categories.length} categories</p>
+          <p className="text-sm text-muted-foreground">{pagination.total} categories</p>
           <Select value={status} onValueChange={(value) => changeStatus((value ?? "active") as "active" | "trash")}>
             <SelectTrigger className="w-32">
               <SelectValue>{(value: string) => (value === "trash" ? "Trash" : "Active")}</SelectValue>
@@ -566,6 +604,14 @@ export function CategoriesClient({ initialCategories }: { initialCategories: Cat
         </table>
       </div>
       )}
+
+      <AdminPagination
+        page={pagination.page}
+        totalPages={pagination.totalPages}
+        total={pagination.total}
+        itemLabel="categories"
+        onPageChange={setPage}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
