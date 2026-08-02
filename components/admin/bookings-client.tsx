@@ -12,6 +12,7 @@ import {
   Grid3x3,
   List,
   Printer,
+  RotateCcw,
   Search,
   Table2,
   Trash2,
@@ -107,6 +108,7 @@ async function fetchBookings(params: {
   from: string;
   to: string;
   search: string;
+  view?: "active" | "trash";
   all?: boolean;
 }): Promise<{ bookings: BookingRow[]; pagination: Pagination; summary: BookingsSummary }> {
   const searchParams = new URLSearchParams({ page: String(params.page) });
@@ -114,6 +116,7 @@ async function fetchBookings(params: {
   if (params.from) searchParams.set("from", params.from);
   if (params.to) searchParams.set("to", params.to);
   if (params.search) searchParams.set("search", params.search);
+  if (params.view) searchParams.set("view", params.view);
   if (params.all) searchParams.set("all", "true");
 
   const res = await fetch(`/api/admin/bookings?${searchParams.toString()}`);
@@ -138,16 +141,23 @@ export function BookingsClient({
   const [to, setTo] = useState("");
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"table" | "card" | "calendar">("table");
+  const [trashView, setTrashView] = useState<"active" | "trash">("active");
   const [returnDialogBookingId, setReturnDialogBookingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BookingRow | null>(null);
+  const [permanentDeleteTarget, setPermanentDeleteTarget] = useState<BookingRow | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
   const isDefaultQuery =
-    page === 1 && status === "all" && from === "" && to === "" && search === "";
+    page === 1 &&
+    status === "all" &&
+    from === "" &&
+    to === "" &&
+    search === "" &&
+    trashView === "active";
 
   const { data } = useQuery({
-    queryKey: ["admin", "bookings", { page, status, from, to, search }],
-    queryFn: () => fetchBookings({ page, status, from, to, search }),
+    queryKey: ["admin", "bookings", { page, status, from, to, search, trashView }],
+    queryFn: () => fetchBookings({ page, status, from, to, search, view: trashView }),
     initialData: isDefaultQuery
       ? { bookings: initialBookings, pagination: initialPagination, summary: initialSummary }
       : undefined,
@@ -189,9 +199,38 @@ export function BookingsClient({
       return json.data;
     },
     onSuccess: () => {
-      toast.success("Booking deleted");
+      toast.success("Booking moved to trash");
       queryClient.invalidateQueries({ queryKey: ["admin", "bookings"] });
       setDeleteTarget(null);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/bookings/${id}/restore`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data;
+    },
+    onSuccess: () => {
+      toast.success("Booking restored");
+      queryClient.invalidateQueries({ queryKey: ["admin", "bookings"] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const permanentDeleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/bookings/${id}/permanent`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data;
+    },
+    onSuccess: () => {
+      toast.success("Booking permanently deleted");
+      queryClient.invalidateQueries({ queryKey: ["admin", "bookings"] });
+      setPermanentDeleteTarget(null);
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -231,7 +270,15 @@ export function BookingsClient({
   }
 
   async function fetchAllBookingsForExport(): Promise<BookingRow[]> {
-    const result = await fetchBookings({ page: 1, status, from, to, search, all: true });
+    const result = await fetchBookings({
+      page: 1,
+      status,
+      from,
+      to,
+      search,
+      view: trashView,
+      all: true,
+    });
     return result.bookings;
   }
 
@@ -301,41 +348,71 @@ export function BookingsClient({
             </span>
           </div>
           <div className="mt-3 flex items-center gap-2">
-            <Select
-              value={booking.status}
-              onValueChange={(value) => {
-                if (!value || value === booking.status) return;
-                if (value === "returned") {
-                  setReturnDialogBookingId(booking._id);
-                  return;
-                }
-                updateStatusMutation.mutate({
-                  id: booking._id,
-                  status: value as BookingStatus,
-                });
-              }}
-            >
-              <SelectTrigger className="w-full" size="sm">
-                <SelectValue>{(value: string) => value.replace("_", " ")}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option.replace("_", " ")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="shrink-0 text-destructive hover:text-destructive"
-              aria-label="Delete booking"
-              onClick={() => setDeleteTarget(booking)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            {trashView === "trash" ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => restoreMutation.mutate(booking._id)}
+                  disabled={restoreMutation.isPending}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Restore
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 text-destructive hover:text-destructive"
+                  aria-label="Delete booking permanently"
+                  title="Delete permanently"
+                  onClick={() => setPermanentDeleteTarget(booking)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <Select
+                  value={booking.status}
+                  onValueChange={(value) => {
+                    if (!value || value === booking.status) return;
+                    if (value === "returned") {
+                      setReturnDialogBookingId(booking._id);
+                      return;
+                    }
+                    updateStatusMutation.mutate({
+                      id: booking._id,
+                      status: value as BookingStatus,
+                    });
+                  }}
+                >
+                  <SelectTrigger className="w-full" size="sm">
+                    <SelectValue>{(value: string) => value.replace("_", " ")}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option.replace("_", " ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 text-destructive hover:text-destructive"
+                  aria-label="Delete booking"
+                  title="Move to trash"
+                  onClick={() => setDeleteTarget(booking)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
+            )}
           </div>
         </div>
       ))}
@@ -381,6 +458,21 @@ export function BookingsClient({
                   {option.label}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={trashView}
+            onValueChange={(value) => {
+              setTrashView((value ?? "active") as "active" | "trash");
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="w-32">
+              <SelectValue>{(value: string) => (value === "trash" ? "Trash" : "Active")}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="trash">Trash</SelectItem>
             </SelectContent>
           </Select>
           <div className="flex items-center gap-2">
@@ -604,45 +696,74 @@ export function BookingsClient({
                       <BookingStatusBadge status={booking.status} />
                     </td>
                     <td className="px-4 py-3">
-                      <Select
-                        value={booking.status}
-                        onValueChange={(value) => {
-                          if (!value || value === booking.status) return;
-                          if (value === "returned") {
-                            setReturnDialogBookingId(booking._id);
-                            return;
-                          }
-                          updateStatusMutation.mutate({
-                            id: booking._id,
-                            status: value as BookingStatus,
-                          });
-                        }}
-                      >
-                        <SelectTrigger className="ml-auto w-40" size="sm">
-                          <SelectValue>
-                            {(value: string) => value.replace("_", " ")}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATUS_OPTIONS.map((option) => (
-                            <SelectItem key={option} value={option}>
-                              {option.replace("_", " ")}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {trashView === "trash" ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="ml-auto flex"
+                          onClick={() => restoreMutation.mutate(booking._id)}
+                          disabled={restoreMutation.isPending}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                          Restore
+                        </Button>
+                      ) : (
+                        <Select
+                          value={booking.status}
+                          onValueChange={(value) => {
+                            if (!value || value === booking.status) return;
+                            if (value === "returned") {
+                              setReturnDialogBookingId(booking._id);
+                              return;
+                            }
+                            updateStatusMutation.mutate({
+                              id: booking._id,
+                              status: value as BookingStatus,
+                            });
+                          }}
+                        >
+                          <SelectTrigger className="ml-auto w-40" size="sm">
+                            <SelectValue>
+                              {(value: string) => value.replace("_", " ")}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUS_OPTIONS.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option.replace("_", " ")}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive"
-                        aria-label="Delete booking"
-                        onClick={() => setDeleteTarget(booking)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {trashView === "trash" ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          aria-label="Delete booking permanently"
+                          title="Delete permanently"
+                          onClick={() => setPermanentDeleteTarget(booking)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          aria-label="Delete booking"
+                          title="Move to trash"
+                          onClick={() => setDeleteTarget(booking)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -680,17 +801,34 @@ export function BookingsClient({
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Delete booking?"
+        title="Move booking to trash?"
         description={
           deleteTarget
-            ? `Delete booking ${deleteTarget.bookingNumber}${deleteTarget.customer ? ` for ${deleteTarget.customer.name}` : ""}? This removes it permanently, including its billing history. This cannot be undone.`
+            ? `Move booking ${deleteTarget.bookingNumber}${deleteTarget.customer ? ` for ${deleteTarget.customer.name}` : ""} to Trash? It will disappear from this list but can be restored later, or permanently deleted from Trash.`
             : ""
         }
-        confirmLabel="Delete"
+        confirmLabel="Move to Trash"
         variant="destructive"
         isLoading={deleteMutation.isPending}
         onConfirm={() => {
           if (deleteTarget) deleteMutation.mutate(deleteTarget._id);
+        }}
+      />
+
+      <ConfirmDialog
+        open={permanentDeleteTarget !== null}
+        onOpenChange={(open) => !open && setPermanentDeleteTarget(null)}
+        title="Permanently delete booking?"
+        description={
+          permanentDeleteTarget
+            ? `Permanently delete booking ${permanentDeleteTarget.bookingNumber}${permanentDeleteTarget.customer ? ` for ${permanentDeleteTarget.customer.name}` : ""}? This cannot be undone. Blocked if any invoices or service orders still reference it.`
+            : ""
+        }
+        confirmLabel="Delete Permanently"
+        variant="destructive"
+        isLoading={permanentDeleteMutation.isPending}
+        onConfirm={() => {
+          if (permanentDeleteTarget) permanentDeleteMutation.mutate(permanentDeleteTarget._id);
         }}
       />
     </div>

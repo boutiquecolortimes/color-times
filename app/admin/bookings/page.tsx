@@ -13,14 +13,15 @@ export default async function AdminBookingsPage() {
   await connectToDatabase();
 
   const [bookings, total, summaryAgg] = await Promise.all([
-    Booking.find()
+    Booking.find({ deletedAt: null })
       .populate("customer", "name email")
       .populate("items.product", "name images")
       .sort({ createdAt: -1 })
       .limit(PAGE_SIZE)
       .lean(),
-    Booking.countDocuments(),
+    Booking.countDocuments({ deletedAt: null }),
     Booking.aggregate([
+      { $match: { deletedAt: null } },
       {
         $group: {
           _id: null,

@@ -26,8 +26,14 @@ export async function GET(request: NextRequest): Promise<Response> {
   const from = searchParams.get("from");
   const to = searchParams.get("to");
   const search = searchParams.get("search")?.trim();
+  // "view" (trash/active) is intentionally separate from "status" above —
+  // status is the booking lifecycle (inquiry/confirmed/...), this is purely
+  // whether the booking has been moved to Trash.
+  const view = searchParams.get("view") === "trash" ? "trash" : "active";
 
-  const filter: Record<string, unknown> = {};
+  const filter: Record<string, unknown> = {
+    deletedAt: view === "trash" ? { $ne: null } : null,
+  };
   if (status) {
     filter.status = status;
   }

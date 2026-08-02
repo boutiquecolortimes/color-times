@@ -60,6 +60,7 @@ export interface IBooking extends Document {
   depositRefunded?: boolean;
   finalSettlementAmount?: number;
   settledAt?: Date | null;
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -120,6 +121,7 @@ const bookingSchema = new Schema<IBooking>(
     depositRefunded: { type: Boolean, default: false },
     finalSettlementAmount: { type: Number, default: 0 },
     settledAt: { type: Date, default: null },
+    deletedAt: { type: Date, default: null, index: true },
   },
   { timestamps: true }
 );

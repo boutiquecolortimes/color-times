@@ -216,8 +216,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
   }
 }
 
-// Restricted to managers+ — deleting a booking removes it from all revenue
-// and history reporting, so it's gated tighter than a normal status change.
+// Restricted to managers+ — soft delete. Moves the booking to Trash instead
+// of erasing it outright: it drops out of every list/report immediately
+// (matching the old behavior for anyone glancing at the numbers), but stays
+// recoverable until someone explicitly permanently deletes it from Trash.
 export async function DELETE(request: NextRequest, { params }: RouteParams): Promise<Response> {
   const auth = await requireApiRole(MANAGER_ROLES);
   if ("error" in auth) return auth.error;
@@ -225,19 +227,21 @@ export async function DELETE(request: NextRequest, { params }: RouteParams): Pro
   const { id } = await params;
   await connectToDatabase();
 
-  const booking = await Booking.findById(id).lean();
+  const booking = await Booking.findByIdAndUpdate(
+    id,
+    { deletedAt: new Date() },
+    { returnDocument: "after" }
+  );
   if (!booking) {
     return apiError("Booking not found", 404);
   }
-
-  await Booking.findByIdAndDelete(id);
 
   await recordAuditLog({
     entityType: "Booking",
     entityId: id,
     action: "delete",
     actor: auth.user,
-    snapshot: booking as unknown as Record<string, unknown>,
+    snapshot: booking.toObject() as unknown as Record<string, unknown>,
   });
 
   // Release any dress this booking was holding, unless another active
@@ -248,6 +252,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams): Pro
       const stillActive = await Booking.exists({
         "items.product": productId,
         status: { $in: ACTIVE_BOOKING_STATUSES },
+        deletedAt: null,
       });
       if (!stillActive) {
         await Product.findByIdAndUpdate(productId, { status: "available" });
