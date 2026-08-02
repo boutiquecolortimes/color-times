@@ -1,12 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Grid3x3, List, Search } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Grid3x3, List, RotateCcw, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { CustomerImportDialog } from "@/components/admin/customer-import-dialog";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { formatDate } from "@/lib/utils";
 
@@ -28,9 +38,11 @@ interface Pagination {
 async function fetchCustomers(params: {
   page: number;
   search: string;
+  view?: "active" | "trash";
 }): Promise<{ customers: CustomerRow[]; pagination: Pagination }> {
   const searchParams = new URLSearchParams({ page: String(params.page) });
   if (params.search) searchParams.set("search", params.search);
+  if (params.view) searchParams.set("view", params.view);
 
   const res = await fetch(`/api/admin/customers?${searchParams.toString()}`);
   const json = await res.json();
@@ -45,15 +57,23 @@ export function CustomersClient({
   initialCustomers: CustomerRow[];
   initialPagination: Pagination;
 }) {
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [layout, setLayout] = useState<"table" | "card">("table");
+  const [trashView, setTrashView] = useState<"active" | "trash">("active");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteTarget, setDeleteTarget] = useState<CustomerRow | null>(null);
+  const [permanentDeleteTarget, setPermanentDeleteTarget] = useState<CustomerRow | null>(null);
+  const [bulkConfirmAction, setBulkConfirmAction] = useState<"delete" | "permanent-delete" | null>(
+    null
+  );
 
-  const isDefaultQuery = page === 1 && search === "";
+  const isDefaultQuery = page === 1 && search === "" && trashView === "active";
 
   const { data } = useQuery({
-    queryKey: ["admin", "customers", { page, search }],
-    queryFn: () => fetchCustomers({ page, search }),
+    queryKey: ["admin", "customers", { page, search, trashView }],
+    queryFn: () => fetchCustomers({ page, search, view: trashView }),
     initialData: isDefaultQuery
       ? { customers: initialCustomers, pagination: initialPagination }
       : undefined,
@@ -62,25 +82,188 @@ export function CustomersClient({
   const customers = data?.customers ?? [];
   const pagination = data?.pagination ?? initialPagination;
 
+  function invalidate() {
+    queryClient.invalidateQueries({ queryKey: ["admin", "customers"] });
+  }
+
+  function changeTrashView(next: "active" | "trash") {
+    setTrashView(next);
+    setPage(1);
+    setSelectedIds(new Set());
+  }
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/customers/${id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data;
+    },
+    onSuccess: () => {
+      toast.success("Customer moved to trash");
+      invalidate();
+      setDeleteTarget(null);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/customers/${id}/restore`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data;
+    },
+    onSuccess: () => {
+      toast.success("Customer restored");
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const permanentDeleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/customers/${id}/permanent`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data;
+    },
+    onSuccess: () => {
+      toast.success("Customer permanently deleted");
+      invalidate();
+      setPermanentDeleteTarget(null);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const bulkActionMutation = useMutation({
+    mutationFn: async ({
+      ids,
+      action,
+    }: {
+      ids: string[];
+      action: "delete" | "restore" | "permanent-delete";
+    }) => {
+      const res = await fetch("/api/admin/customers/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, action }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data;
+    },
+    onSuccess: (data, variables) => {
+      if (variables.action === "permanent-delete") {
+        const { deleted, blocked } = data as {
+          deleted: number;
+          blocked: { name: string; bookingCount: number; invoiceCount: number; reviewCount: number }[];
+        };
+        if (deleted > 0) {
+          toast.success(`Permanently deleted ${deleted} customer(s)`);
+        }
+        if (blocked.length > 0) {
+          toast.warning(
+            `Skipped ${blocked.length} customer(s) with booking, invoice, or review history: ${blocked
+              .map((b) => b.name)
+              .join(", ")}`,
+            { duration: 8000 }
+          );
+        }
+      } else if (variables.action === "restore") {
+        toast.success(`Restored ${variables.ids.length} customer(s)`);
+      } else {
+        toast.success(`Moved ${variables.ids.length} customer(s) to trash`);
+      }
+      invalidate();
+      setSelectedIds(new Set());
+      setBulkConfirmAction(null);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  function toggleSelectOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) =>
+      prev.size === customers.length ? new Set() : new Set(customers.map((c) => c._id))
+    );
+  }
+
   const cardGrid = (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {customers.map((customer) => (
         <div key={customer._id} className="rounded-lg border border-border bg-card p-4">
-          <p className="font-medium">{customer.name}</p>
+          <div className="flex items-start justify-between gap-2">
+            <Checkbox
+              checked={selectedIds.has(customer._id)}
+              onCheckedChange={() => toggleSelectOne(customer._id)}
+              aria-label={`Select ${customer.name}`}
+            />
+          </div>
+          <p className="mt-2 font-medium">{customer.name}</p>
           <p className="text-sm text-muted-foreground">{customer.email}</p>
           <p className="text-sm text-muted-foreground">{customer.phone ?? "—"}</p>
           <p className="mt-1 text-xs text-muted-foreground">
             Joined {formatDate(customer.createdAt)}
           </p>
-          <div className="mt-3 flex justify-end">
-            <ButtonLink variant="outline" size="sm" href={`/admin/customers/${customer._id}`}>
-              View
-            </ButtonLink>
+          <div className="mt-3 flex justify-end gap-1">
+            {trashView === "trash" ? (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Restore customer"
+                  title="Restore"
+                  disabled={restoreMutation.isPending}
+                  onClick={() => restoreMutation.mutate(customer._id)}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-destructive"
+                  aria-label="Delete customer permanently"
+                  title="Delete permanently"
+                  disabled={permanentDeleteMutation.isPending}
+                  onClick={() => setPermanentDeleteTarget(customer)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <ButtonLink variant="outline" size="sm" href={`/admin/customers/${customer._id}`}>
+                  View
+                </ButtonLink>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-destructive"
+                  aria-label="Delete customer"
+                  title="Move to trash"
+                  disabled={deleteMutation.isPending}
+                  onClick={() => setDeleteTarget(customer)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </>
+            )}
           </div>
         </div>
       ))}
       {customers.length === 0 && (
-        <p className="col-span-full py-10 text-center text-muted-foreground">No customers found.</p>
+        <p className="col-span-full py-10 text-center text-muted-foreground">
+          {trashView === "trash" ? "Trash is empty." : "No customers found."}
+        </p>
       )}
     </div>
   );
@@ -88,17 +271,31 @@ export function CustomersClient({
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-sm flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by name or email..."
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(1);
-            }}
-            className="pl-9"
-          />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative max-w-sm flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by name or email..."
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+              className="pl-9"
+            />
+          </div>
+          <Select
+            value={trashView}
+            onValueChange={(value) => changeTrashView((value ?? "active") as "active" | "trash")}
+          >
+            <SelectTrigger className="w-32">
+              <SelectValue>{(value: string) => (value === "trash" ? "Trash" : "Active")}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="trash">Trash</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex items-center gap-3">
           <p className="text-sm text-muted-foreground">{pagination.total} customers</p>
@@ -127,6 +324,51 @@ export function CustomersClient({
         </div>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2.5">
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <div className="ml-auto flex flex-wrap gap-2">
+            {trashView === "trash" ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={bulkActionMutation.isPending}
+                  onClick={() =>
+                    bulkActionMutation.mutate({ ids: Array.from(selectedIds), action: "restore" })
+                  }
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Restore
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={bulkActionMutation.isPending}
+                  onClick={() => setBulkConfirmAction("permanent-delete")}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete Permanently
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={bulkActionMutation.isPending}
+                onClick={() => setBulkConfirmAction("delete")}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Move to Trash
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="lg:hidden">{cardGrid}</div>
 
       {layout === "card" ? (
@@ -136,6 +378,13 @@ export function CustomersClient({
         <table className="w-full min-w-[640px] text-sm whitespace-nowrap">
           <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
+              <th className="px-4 py-3">
+                <Checkbox
+                  checked={customers.length > 0 && selectedIds.size === customers.length}
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Select all"
+                />
+              </th>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Email</th>
               <th className="px-4 py-3">Phone</th>
@@ -146,27 +395,75 @@ export function CustomersClient({
           <tbody>
             {customers.map((customer) => (
               <tr key={customer._id} className="border-b border-border last:border-0">
+                <td className="px-4 py-3">
+                  <Checkbox
+                    checked={selectedIds.has(customer._id)}
+                    onCheckedChange={() => toggleSelectOne(customer._id)}
+                    aria-label={`Select ${customer.name}`}
+                  />
+                </td>
                 <td className="px-4 py-3 font-medium">{customer.name}</td>
                 <td className="px-4 py-3 text-muted-foreground">{customer.email}</td>
                 <td className="px-4 py-3 text-muted-foreground">{customer.phone ?? "—"}</td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {formatDate(customer.createdAt)}
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <ButtonLink
-                    variant="ghost"
-                    size="sm"
-                    href={`/admin/customers/${customer._id}`}
-                  >
-                    View
-                  </ButtonLink>
+                <td className="px-4 py-3">
+                  <div className="flex justify-end gap-2">
+                    {trashView === "trash" ? (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="Restore customer"
+                          title="Restore"
+                          disabled={restoreMutation.isPending}
+                          onClick={() => restoreMutation.mutate(customer._id)}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-destructive"
+                          aria-label="Delete customer permanently"
+                          title="Delete permanently"
+                          disabled={permanentDeleteMutation.isPending}
+                          onClick={() => setPermanentDeleteTarget(customer)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <ButtonLink
+                          variant="ghost"
+                          size="sm"
+                          href={`/admin/customers/${customer._id}`}
+                        >
+                          View
+                        </ButtonLink>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-destructive"
+                          aria-label="Delete customer"
+                          title="Move to trash"
+                          disabled={deleteMutation.isPending}
+                          onClick={() => setDeleteTarget(customer)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
             {customers.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
-                  No customers found.
+                <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                  {trashView === "trash" ? "Trash is empty." : "No customers found."}
                 </td>
               </tr>
             )}
@@ -181,6 +478,63 @@ export function CustomersClient({
         total={pagination.total}
         itemLabel="customers"
         onPageChange={setPage}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Move customer to trash?"
+        description={
+          deleteTarget
+            ? `Move "${deleteTarget.name}" to trash? Their account will be disabled and they'll disappear from this list until restored.`
+            : ""
+        }
+        confirmLabel="Move to Trash"
+        variant="destructive"
+        isLoading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate(deleteTarget._id);
+        }}
+      />
+
+      <ConfirmDialog
+        open={permanentDeleteTarget !== null}
+        onOpenChange={(open) => !open && setPermanentDeleteTarget(null)}
+        title="Permanently delete customer?"
+        description={
+          permanentDeleteTarget
+            ? `Permanently delete "${permanentDeleteTarget.name}"? This cannot be undone. Blocked automatically if any booking, invoice, or review still references them.`
+            : ""
+        }
+        confirmLabel="Delete Permanently"
+        variant="destructive"
+        isLoading={permanentDeleteMutation.isPending}
+        onConfirm={() => {
+          if (permanentDeleteTarget) permanentDeleteMutation.mutate(permanentDeleteTarget._id);
+        }}
+      />
+
+      <ConfirmDialog
+        open={bulkConfirmAction !== null}
+        onOpenChange={(open) => !open && setBulkConfirmAction(null)}
+        title={
+          bulkConfirmAction === "permanent-delete"
+            ? `Permanently delete ${selectedIds.size} customer(s)?`
+            : `Move ${selectedIds.size} customer(s) to trash?`
+        }
+        description={
+          bulkConfirmAction === "permanent-delete"
+            ? "This cannot be undone. Any selected customer with booking, invoice, or review history will be skipped automatically and reported back."
+            : "Their accounts will be disabled. You can restore them from the Trash view at any time."
+        }
+        confirmLabel={bulkConfirmAction === "permanent-delete" ? "Delete Permanently" : "Move to Trash"}
+        variant="destructive"
+        isLoading={bulkActionMutation.isPending}
+        onConfirm={() => {
+          if (bulkConfirmAction) {
+            bulkActionMutation.mutate({ ids: Array.from(selectedIds), action: bulkConfirmAction });
+          }
+        }}
       />
     </div>
   );

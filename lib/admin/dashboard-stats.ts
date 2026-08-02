@@ -110,16 +110,17 @@ async function computeDashboardStats(): Promise<DashboardStats> {
     monthlyRevenue,
   ] = await Promise.all([
     Booking.aggregate([
-      { $match: { status: { $in: REVENUE_STATUSES } } },
+      { $match: { status: { $in: REVENUE_STATUSES }, deletedAt: null } },
       { $group: { _id: null, total: { $sum: "$totalAmount" } } },
     ]),
-    Booking.countDocuments(),
-    Booking.countDocuments({ status: "in_use" }),
-    User.countDocuments({ role: "customer" }),
+    Booking.countDocuments({ deletedAt: null }),
+    Booking.countDocuments({ status: "in_use", deletedAt: null }),
+    User.countDocuments({ role: "customer", deletedAt: null }),
     Product.countDocuments({ isActive: true, deletedAt: null }),
     Booking.countDocuments({
       status: { $in: ["confirmed", "in_use"] },
       rentalEndDate: { $lt: new Date() },
+      deletedAt: null,
     }),
     Invoice.aggregate([
       {
@@ -136,22 +137,36 @@ async function computeDashboardStats(): Promise<DashboardStats> {
       isActive: true,
       deletedAt: null,
     }),
-    Booking.countDocuments({ createdAt: { $gte: startOfToday, $lt: startOfTomorrow } }),
+    Booking.countDocuments({
+      createdAt: { $gte: startOfToday, $lt: startOfTomorrow },
+      deletedAt: null,
+    }),
     Booking.countDocuments({
       rentalStartDate: { $gte: startOfToday, $lt: startOfTomorrow },
       status: { $ne: "cancelled" },
+      deletedAt: null,
     }),
     Booking.countDocuments({
       rentalEndDate: { $gte: startOfToday, $lt: startOfTomorrow },
       status: { $ne: "cancelled" },
+      deletedAt: null,
     }),
-    Booking.countDocuments({ returnedAt: { $gte: startOfToday, $lt: startOfTomorrow } }),
+    Booking.countDocuments({
+      returnedAt: { $gte: startOfToday, $lt: startOfTomorrow },
+      deletedAt: null,
+    }),
     Invoice.countDocuments({
       deletedAt: null,
       status: { $in: ["sent", "partially_paid", "overdue"] },
     }),
     Booking.aggregate([
-      { $match: { status: { $in: REVENUE_STATUSES }, createdAt: { $gte: startOfMonth } } },
+      {
+        $match: {
+          status: { $in: REVENUE_STATUSES },
+          createdAt: { $gte: startOfMonth },
+          deletedAt: null,
+        },
+      },
       { $group: { _id: null, total: { $sum: "$totalAmount" } } },
     ]),
     Booking.aggregate([
@@ -159,6 +174,7 @@ async function computeDashboardStats(): Promise<DashboardStats> {
         $match: {
           status: { $in: REVENUE_STATUSES },
           createdAt: { $gte: startOfPreviousMonth, $lt: startOfMonth },
+          deletedAt: null,
         },
       },
       { $group: { _id: null, total: { $sum: "$totalAmount" } } },
@@ -169,14 +185,19 @@ async function computeDashboardStats(): Promise<DashboardStats> {
       { $unwind: "$variants" },
       { $group: { _id: "$_id", totalStock: { $sum: "$variants.quantityInStock" } } },
     ]),
-    User.countDocuments({ role: "customer", createdAt: { $gte: startOfMonth } }),
+    User.countDocuments({ role: "customer", createdAt: { $gte: startOfMonth }, deletedAt: null }),
     User.countDocuments({
       role: "customer",
       createdAt: { $gte: startOfPreviousMonth, $lt: startOfMonth },
+      deletedAt: null,
     }),
     Booking.aggregate([
       {
-        $match: { status: { $in: REVENUE_STATUSES }, createdAt: { $gte: startOfMonth } },
+        $match: {
+          status: { $in: REVENUE_STATUSES },
+          createdAt: { $gte: startOfMonth },
+          deletedAt: null,
+        },
       },
       { $unwind: "$items" },
       {
@@ -200,7 +221,7 @@ async function computeDashboardStats(): Promise<DashboardStats> {
       { $group: { _id: "$categoryDoc.name", bookings: { $sum: 1 } } },
       { $sort: { bookings: -1 } },
     ]),
-    Booking.find()
+    Booking.find({ deletedAt: null })
       .populate("customer", "name")
       .populate("items.product", "name")
       .sort({ createdAt: -1 })
@@ -211,6 +232,7 @@ async function computeDashboardStats(): Promise<DashboardStats> {
         $match: {
           status: { $in: REVENUE_STATUSES },
           createdAt: { $gte: sixMonthsAgo },
+          deletedAt: null,
         },
       },
       {

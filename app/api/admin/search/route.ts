@@ -34,7 +34,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         .select("name sku images")
         .limit(RESULT_LIMIT)
         .lean(),
-      User.find({ role: "customer", $or: [{ name: regex }, { phone: regex }] })
+      User.find({ role: "customer", deletedAt: null, $or: [{ name: regex }, { phone: regex }] })
         .select("name email phone")
         .limit(RESULT_LIMIT)
         .lean(),

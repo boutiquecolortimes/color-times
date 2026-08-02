@@ -12,7 +12,7 @@ export default async function NewBookingPage() {
   await connectToDatabase();
 
   const [customers, products] = await Promise.all([
-    User.find({ role: "customer" })
+    User.find({ role: "customer", deletedAt: null })
       .select("name email")
       .sort({ name: 1 })
       .limit(200)

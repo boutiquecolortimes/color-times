@@ -23,6 +23,7 @@ export interface IUser extends Document {
   // serverless instances, which don't share memory.
   failedLoginAttempts: number;
   lockedUntil?: Date;
+  deletedAt?: Date | null;
   wishlist: Types.ObjectId[];
   addresses: {
     label: string;
@@ -77,6 +78,7 @@ const userSchema = new Schema<IUser>(
     tokenVersion: { type: Number, default: 0, select: false },
     failedLoginAttempts: { type: Number, default: 0, select: false },
     lockedUntil: { type: Date, select: false },
+    deletedAt: { type: Date, default: null, index: true },
     wishlist: [{ type: Schema.Types.ObjectId, ref: "Product" }],
     addresses: { type: [addressSchema], default: [] },
   },

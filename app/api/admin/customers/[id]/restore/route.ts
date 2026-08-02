@@ -19,7 +19,7 @@ export async function POST(
 
     const customer = await User.findOneAndUpdate(
       { _id: id, role: "customer" },
-      { isActive: true },
+      { deletedAt: null, isActive: true },
       { returnDocument: "after" }
     ).select("name email phone isActive createdAt");
 

@@ -17,10 +17,14 @@ export async function GET(request: NextRequest): Promise<Response> {
 
   const searchParams = request.nextUrl.searchParams;
   const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
-  const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize") ?? "20")));
+  const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize") ?? "5")));
   const search = searchParams.get("search")?.trim();
+  const view = searchParams.get("view") === "trash" ? "trash" : "active";
 
-  const filter: Record<string, unknown> = { role: "customer" };
+  const filter: Record<string, unknown> = {
+    role: "customer",
+    deletedAt: view === "trash" ? { $ne: null } : null,
+  };
   if (search) {
     filter.$or = [
       { name: { $regex: search, $options: "i" } },

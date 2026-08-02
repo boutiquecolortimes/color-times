@@ -5,18 +5,18 @@ import { CustomersClient } from "@/components/admin/customers-client";
 
 export const metadata: Metadata = { title: "Customers" };
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 5;
 
 export default async function AdminCustomersPage() {
   await connectToDatabase();
 
   const [customers, total] = await Promise.all([
-    User.find({ role: "customer" })
+    User.find({ role: "customer", deletedAt: null })
       .select("name email phone createdAt")
       .sort({ createdAt: -1 })
       .limit(PAGE_SIZE)
       .lean(),
-    User.countDocuments({ role: "customer" }),
+    User.countDocuments({ role: "customer", deletedAt: null }),
   ]);
 
   const initialCustomers = customers.map((customer) => ({

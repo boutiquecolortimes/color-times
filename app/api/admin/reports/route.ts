@@ -113,7 +113,7 @@ async function buildBookingsReport(
   pageSize: number,
   all: boolean
 ) {
-  const filter: Record<string, unknown> = { ...dateFilter };
+  const filter: Record<string, unknown> = { ...dateFilter, deletedAt: null };
   if (status && status !== "all") filter.status = status;
 
   const { skip, limit } = skipLimit(page, pageSize, all);
@@ -225,12 +225,12 @@ async function buildCustomersReport(
   pageSize: number,
   all: boolean
 ) {
-  const filter: Record<string, unknown> = { ...dateFilter, role: "customer" };
+  const filter: Record<string, unknown> = { ...dateFilter, role: "customer", deletedAt: null };
   const { skip, limit } = skipLimit(page, pageSize, all);
 
   const [newCustomers, totalCustomersOverall, customers] = await Promise.all([
     User.countDocuments(filter),
-    User.countDocuments({ role: "customer" }),
+    User.countDocuments({ role: "customer", deletedAt: null }),
     User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
   ]);
 

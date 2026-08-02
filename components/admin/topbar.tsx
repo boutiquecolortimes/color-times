@@ -69,7 +69,7 @@ export function AdminTopbar({ user }: { user: SessionUser }) {
             <SheetHeader className="sr-only">
               <SheetTitle>Navigation</SheetTitle>
             </SheetHeader>
-            <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-sidebar-border px-6">
+            <div className="flex min-h-16 shrink-0 items-center gap-2.5 border-b border-sidebar-border px-4 py-3">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-white/90 p-0.5">
                 <Image
                   src="/logo-icon.png"
@@ -79,8 +79,11 @@ export function AdminTopbar({ user }: { user: SessionUser }) {
                   className="h-8 w-8 object-contain"
                 />
               </span>
-              <div className="leading-tight">
-                <p className="font-heading text-lg font-semibold tracking-wide text-sidebar-foreground">
+              <div className="min-w-0 leading-tight">
+                <p
+                  className="truncate font-heading text-base font-semibold text-sidebar-foreground"
+                  title={siteConfig.name}
+                >
                   {siteConfig.name}
                 </p>
                 <p className="text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/60">

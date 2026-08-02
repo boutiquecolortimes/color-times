@@ -13,7 +13,7 @@ export default async function NewInvoicePage() {
   await connectToDatabase();
 
   const [customers, bookings] = await Promise.all([
-    User.find({ role: "customer" })
+    User.find({ role: "customer", deletedAt: null })
       .select("name email")
       .sort({ name: 1 })
       .limit(200)

@@ -104,3 +104,33 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
     return apiErrorFromUnknown(error);
   }
 }
+
+// Soft delete — moves the customer to Trash instead of erasing the account.
+// Also deactivates login (isActive: false) so a trashed customer can't sign
+// in and place new orders while their account is out of the active list.
+// Reversible via restore; only Trash -> Permanent Delete actually erases it.
+export async function DELETE(request: NextRequest, { params }: RouteParams): Promise<Response> {
+  const auth = await requireApiRole(ADMIN_ROLES);
+  if ("error" in auth) return auth.error;
+
+  const { id } = await params;
+  await connectToDatabase();
+
+  const customer = await User.findOneAndUpdate(
+    { _id: id, role: "customer" },
+    { deletedAt: new Date(), isActive: false },
+    { returnDocument: "after" }
+  );
+  if (!customer) {
+    return apiError("Customer not found", 404);
+  }
+
+  await recordAuditLog({
+    entityType: "Customer",
+    entityId: id,
+    action: "delete",
+    actor: auth.user,
+  });
+
+  return apiSuccess({ deleted: true });
+}
