@@ -1,53 +1,38 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { siteConfig } from "@/lib/config/site";
 import { AdminNavLinks } from "@/components/admin/nav-links";
 import { VisitWebsiteLink } from "@/components/admin/visit-website-link";
-import { ADMIN_SIDEBAR_COOKIE_KEY } from "@/lib/admin/sidebar-cookie";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/models/User";
 
-function persistSidebarExpanded(expanded: boolean): void {
-  document.cookie = `${ADMIN_SIDEBAR_COOKIE_KEY}=${expanded}; path=/; max-age=31536000; SameSite=Lax`;
-}
-
 export function AdminSidebar({
   role,
-  initialExpanded,
+  expanded,
+  onToggle,
 }: {
   role: UserRole;
-  initialExpanded: boolean;
+  expanded: boolean;
+  onToggle: () => void;
 }) {
-  // Seeded from a cookie read server-side in app/admin/layout.tsx (same
-  // pattern as the theme provider), so there's no post-mount flash and no
-  // client effect needed just to sync an initial value.
-  const [expanded, setExpanded] = useState(initialExpanded);
-
-  function toggle() {
-    setExpanded((prev) => {
-      const next = !prev;
-      persistSidebarExpanded(next);
-      return next;
-    });
-  }
-
   return (
     <aside
       className={cn(
-        "admin-sidebar-gradient fixed inset-y-0 left-0 z-40 hidden flex-col",
+        "admin-sidebar-gradient relative hidden shrink-0 flex-col",
         "shadow-[2px_0_16px_rgba(0,0,0,0.18)] transition-[width] duration-200 ease-out",
         "lg:flex lg:text-sidebar-foreground",
         expanded ? "w-64" : "w-16"
       )}
     >
       {/* Toggle handle — sits half-outside the right edge so it's always
-          reachable regardless of collapsed/expanded state. */}
+          reachable regardless of collapsed/expanded state. The sidebar is a
+          normal flex sibling (not fixed/overlay), so toggling this resizes
+          the content area next to it instead of covering it. */}
       <button
         type="button"
-        onClick={toggle}
+        onClick={onToggle}
         aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
         title={expanded ? "Collapse sidebar" : "Expand sidebar"}
         className="absolute -right-3 top-20 z-10 grid h-6 w-6 place-items-center rounded-full border border-sidebar-border bg-sidebar text-sidebar-foreground shadow-md transition-colors hover:bg-sidebar-accent hover:text-white"
