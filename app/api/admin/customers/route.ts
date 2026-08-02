@@ -16,6 +16,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   await connectToDatabase();
 
   const searchParams = request.nextUrl.searchParams;
+  const all = searchParams.get("all") === "true";
   const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
   const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize") ?? "5")));
   const search = searchParams.get("search")?.trim();
@@ -32,19 +33,18 @@ export async function GET(request: NextRequest): Promise<Response> {
     ];
   }
 
+  const baseQuery = User.find(filter).select("name email phone createdAt").sort({ createdAt: -1 });
+
   const [customers, total] = await Promise.all([
-    User.find(filter)
-      .select("name email phone createdAt")
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * pageSize)
-      .limit(pageSize)
-      .lean(),
+    all ? baseQuery.lean() : baseQuery.skip((page - 1) * pageSize).limit(pageSize).lean(),
     User.countDocuments(filter),
   ]);
 
   return apiSuccess({
     customers,
-    pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    pagination: all
+      ? { page: 1, pageSize: total || 1, total, totalPages: 1 }
+      : { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
   });
 }
 

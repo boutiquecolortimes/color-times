@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { useQueryClient } from "@tanstack/react-query";
-import { LogOut, Menu, Moon, Settings, Sun, User as UserIcon } from "lucide-react";
+import { LogOut, Menu, Moon, Settings, Sun, Trash2, User as UserIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -146,6 +146,10 @@ export function AdminTopbar({ user }: { user: SessionUser }) {
           <DropdownMenuItem render={<Link href="/admin/account" />}>
             <Settings className="h-4 w-4" />
             Account Settings
+          </DropdownMenuItem>
+          <DropdownMenuItem render={<Link href="/admin/trash" />}>
+            <Trash2 className="h-4 w-4" />
+            Trash
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
