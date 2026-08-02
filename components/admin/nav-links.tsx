@@ -14,9 +14,18 @@ function isActive(pathname: string, href: string): boolean {
 export function AdminNavLinks({
   role,
   onNavigate,
+  collapsedOnRail = false,
 }: {
   role: UserRole;
   onNavigate?: () => void;
+  /**
+   * Set when this is rendered inside the hover-expand desktop rail
+   * (components/admin/sidebar.tsx) — group headings and item labels stay
+   * hidden until the rail's `group/rail` ancestor is hovered/expanded.
+   * The mobile Sheet menu (topbar.tsx) doesn't pass this, so it keeps
+   * labels visible at all times as before.
+   */
+  collapsedOnRail?: boolean;
 }) {
   const pathname = usePathname();
   const groups = groupedNavItemsForRole(role);
@@ -25,7 +34,13 @@ export function AdminNavLinks({
     <nav className="flex-1 space-y-5 px-3 py-4">
       {groups.map((group) => (
         <div key={group.label}>
-          <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/60">
+          <p
+            className={cn(
+              "px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap text-sidebar-foreground/60",
+              collapsedOnRail &&
+                "max-h-0 overflow-hidden pb-0 opacity-0 transition-all duration-200 ease-out group-hover/rail:max-h-6 group-hover/rail:pb-1.5 group-hover/rail:opacity-100"
+            )}
+          >
             {group.label}
           </p>
           <div className="space-y-0.5">
@@ -36,6 +51,7 @@ export function AdminNavLinks({
                   key={item.href}
                   href={item.href}
                   onClick={onNavigate}
+                  title={collapsedOnRail ? item.label : undefined}
                   className={cn(
                     "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
                     active
@@ -50,7 +66,15 @@ export function AdminNavLinks({
                     )}
                   />
                   <item.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
-                  {item.label}
+                  <span
+                    className={cn(
+                      "whitespace-nowrap",
+                      collapsedOnRail &&
+                        "max-w-0 overflow-hidden opacity-0 transition-all duration-200 ease-out group-hover/rail:max-w-[180px] group-hover/rail:opacity-100"
+                    )}
+                  >
+                    {item.label}
+                  </span>
                 </Link>
               );
             })}

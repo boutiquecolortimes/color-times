@@ -20,6 +20,10 @@ export function AdminShell({
       <SessionRefresher />
       <div className="flex h-svh overflow-hidden bg-secondary/30">
         <AdminSidebar role={user.role} />
+        {/* Reserves the collapsed rail's width in the flow — the sidebar
+            itself is `fixed` so it can expand on hover as an overlay
+            without ever resizing this content area. */}
+        <div className="hidden w-16 shrink-0 lg:block" aria-hidden="true" />
         <div className="flex min-w-0 flex-1 flex-col">
           <AdminTopbar user={user} />
           <main className="flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
