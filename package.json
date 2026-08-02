@@ -11,7 +11,8 @@
     "seed:catalog": "tsx --env-file=.env.local scripts/seed-catalog.ts",
     "seed:whatsapp": "tsx --env-file=.env.local scripts/seed-whatsapp-templates.ts",
     "seed:demo-data": "tsx --env-file=.env.local scripts/seed-demo-data.ts",
-    "migrate:booking-items": "tsx --env-file=.env.local scripts/migrate-booking-items.ts"
+    "migrate:booking-items": "tsx --env-file=.env.local scripts/migrate-booking-items.ts",
+    "reset:transactional-data": "tsx --env-file=.env.local scripts/reset-transactional-data.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
