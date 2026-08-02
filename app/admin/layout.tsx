@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth/session";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { ADMIN_THEME_COOKIE_KEY } from "@/lib/admin/theme-cookie";
+import { ADMIN_SIDEBAR_COOKIE_KEY } from "@/lib/admin/sidebar-cookie";
 
 export const metadata: Metadata = {
   title: {
@@ -23,9 +24,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const cookieStore = await cookies();
   const initialTheme = cookieStore.get(ADMIN_THEME_COOKIE_KEY)?.value === "dark" ? "dark" : "light";
+  const initialSidebarExpanded = cookieStore.get(ADMIN_SIDEBAR_COOKIE_KEY)?.value === "true";
 
   return (
-    <AdminShell user={user} initialTheme={initialTheme}>
+    <AdminShell
+      user={user}
+      initialTheme={initialTheme}
+      initialSidebarExpanded={initialSidebarExpanded}
+    >
       {children}
     </AdminShell>
   );

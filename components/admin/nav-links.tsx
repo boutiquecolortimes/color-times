@@ -14,18 +14,18 @@ function isActive(pathname: string, href: string): boolean {
 export function AdminNavLinks({
   role,
   onNavigate,
-  collapsedOnRail = false,
+  hideLabels = false,
 }: {
   role: UserRole;
   onNavigate?: () => void;
   /**
-   * Set when this is rendered inside the hover-expand desktop rail
-   * (components/admin/sidebar.tsx) — group headings and item labels stay
-   * hidden until the rail's `group/rail` ancestor is hovered/expanded.
-   * The mobile Sheet menu (topbar.tsx) doesn't pass this, so it keeps
-   * labels visible at all times as before.
+   * Set by the desktop rail (components/admin/sidebar.tsx) while it's
+   * collapsed — group headings and item labels shrink to nothing instead
+   * of being rendered, and each link gets a title tooltip as a fallback.
+   * The mobile Sheet menu (topbar.tsx) never passes this, so it keeps
+   * showing full labels at all times as before.
    */
-  collapsedOnRail?: boolean;
+  hideLabels?: boolean;
 }) {
   const pathname = usePathname();
   const groups = groupedNavItemsForRole(role);
@@ -36,9 +36,8 @@ export function AdminNavLinks({
         <div key={group.label}>
           <p
             className={cn(
-              "px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap text-sidebar-foreground/60",
-              collapsedOnRail &&
-                "max-h-0 overflow-hidden pb-0 opacity-0 transition-all duration-200 ease-out group-hover/rail:max-h-6 group-hover/rail:pb-1.5 group-hover/rail:opacity-100"
+              "overflow-hidden px-3 text-[10px] font-semibold whitespace-nowrap uppercase tracking-wider text-sidebar-foreground/60 transition-all duration-200 ease-out",
+              hideLabels ? "max-h-0 pb-0 opacity-0" : "max-h-6 pb-1.5 opacity-100"
             )}
           >
             {group.label}
@@ -51,9 +50,9 @@ export function AdminNavLinks({
                   key={item.href}
                   href={item.href}
                   onClick={onNavigate}
-                  title={collapsedOnRail ? item.label : undefined}
+                  title={hideLabels ? item.label : undefined}
                   className={cn(
-                    "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+                    "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
                     active
                       ? "bg-sidebar-accent font-semibold text-white"
                       : "text-sidebar-foreground/85 hover:bg-sidebar-accent/60 hover:text-white"
@@ -68,9 +67,8 @@ export function AdminNavLinks({
                   <item.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
                   <span
                     className={cn(
-                      "whitespace-nowrap",
-                      collapsedOnRail &&
-                        "max-w-0 overflow-hidden opacity-0 transition-all duration-200 ease-out group-hover/rail:max-w-[180px] group-hover/rail:opacity-100"
+                      "overflow-hidden whitespace-nowrap transition-all duration-200 ease-out",
+                      hideLabels ? "max-w-0 opacity-0" : "max-w-[180px] opacity-100"
                     )}
                   >
                     {item.label}

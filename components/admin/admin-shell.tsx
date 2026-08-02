@@ -9,19 +9,21 @@ import type { SessionUser } from "@/types/auth";
 export function AdminShell({
   user,
   initialTheme,
+  initialSidebarExpanded,
   children,
 }: {
   user: SessionUser;
   initialTheme: Theme;
+  initialSidebarExpanded: boolean;
   children: React.ReactNode;
 }) {
   return (
     <AdminThemeProvider initialTheme={initialTheme}>
       <SessionRefresher />
       <div className="flex h-svh overflow-hidden bg-secondary/30">
-        <AdminSidebar role={user.role} />
+        <AdminSidebar role={user.role} initialExpanded={initialSidebarExpanded} />
         {/* Reserves the collapsed rail's width in the flow — the sidebar
-            itself is `fixed` so it can expand on hover as an overlay
+            itself is `fixed` so it can expand/collapse as an overlay
             without ever resizing this content area. */}
         <div className="hidden w-16 shrink-0 lg:block" aria-hidden="true" />
         <div className="flex min-w-0 flex-1 flex-col">
