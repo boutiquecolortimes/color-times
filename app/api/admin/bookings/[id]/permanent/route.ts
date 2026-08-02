@@ -2,8 +2,6 @@ import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Booking } from "@/models/Booking";
 import { Product } from "@/models/Product";
-import { Invoice } from "@/models/Invoice";
-import { ServiceOrder } from "@/models/ServiceOrder";
 import { ACTIVE_BOOKING_STATUSES } from "@/lib/admin/booking-availability";
 import { requireApiRole } from "@/lib/api/require-role";
 import { MANAGER_ROLES } from "@/lib/auth/roles";
@@ -30,22 +28,10 @@ export async function DELETE(
       return apiError("Move this booking to trash before permanently deleting it", 409);
     }
 
-    // Invoices and dry-clean/repair orders can carry a link back to the
-    // booking they came from. Erasing the booking would orphan that link —
-    // the invoice/service order would survive but lose its traceable origin,
-    // which matters for an accounting record. Block it, same pattern as
-    // Categories/Products.
-    const [invoiceCount, serviceOrderCount] = await Promise.all([
-      Invoice.countDocuments({ booking: id }),
-      ServiceOrder.countDocuments({ booking: id }),
-    ]);
-    if (invoiceCount > 0 || serviceOrderCount > 0) {
-      return apiError(
-        `Cannot permanently delete — ${invoiceCount} invoice(s) and ${serviceOrderCount} service order(s) still reference this booking. Leave it in Trash instead.`,
-        409
-      );
-    }
-
+    // No reference-integrity guard: invoices/service orders left pointing at
+    // this booking already render defensively when the populated booking
+    // comes back null. The full document is preserved in the audit log
+    // snapshot below.
     await Booking.findByIdAndDelete(id);
 
     await recordAuditLog({

@@ -2,8 +2,6 @@ import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Booking } from "@/models/Booking";
 import { Product } from "@/models/Product";
-import { Invoice } from "@/models/Invoice";
-import { ServiceOrder } from "@/models/ServiceOrder";
 import { ACTIVE_BOOKING_STATUSES } from "@/lib/admin/booking-availability";
 import { requireApiRole } from "@/lib/api/require-role";
 import { MANAGER_ROLES } from "@/lib/auth/roles";
@@ -30,73 +28,41 @@ export async function POST(request: NextRequest): Promise<Response> {
         return apiError("No trashed items found among the selected bookings", 404);
       }
 
-      // Same protection as the single-item permanent delete: don't erase a
-      // booking that an invoice or service order still traces back to. One
-      // pair of aggregates covers every selected booking instead of a query
-      // per row.
-      const bookingIds = bookings.map((b) => b._id);
-      const [invoiceCounts, serviceOrderCounts] = await Promise.all([
-        Invoice.aggregate([
-          { $match: { booking: { $in: bookingIds } } },
-          { $group: { _id: "$booking", count: { $sum: 1 } } },
-        ]),
-        ServiceOrder.aggregate([
-          { $match: { booking: { $in: bookingIds } } },
-          { $group: { _id: "$booking", count: { $sum: 1 } } },
-        ]),
-      ]);
-      const invoiceCountById = new Map<string, number>(
-        invoiceCounts.map((row) => [String(row._id), row.count as number])
-      );
-      const serviceOrderCountById = new Map<string, number>(
-        serviceOrderCounts.map((row) => [String(row._id), row.count as number])
-      );
-      const hasHistory = (id: string) =>
-        (invoiceCountById.get(id) ?? 0) > 0 || (serviceOrderCountById.get(id) ?? 0) > 0;
+      // No reference-integrity guard: invoices/service orders left pointing
+      // at a purged booking already render defensively when the populated
+      // booking comes back null.
+      await Booking.deleteMany({ _id: { $in: bookings.map((b) => b._id) } });
 
-      const deletable = bookings.filter((b) => !hasHistory(String(b._id)));
-      const blocked = bookings
-        .filter((b) => hasHistory(String(b._id)))
-        .map((b) => ({
-          bookingNumber: b.bookingNumber,
-          invoiceCount: invoiceCountById.get(String(b._id)) ?? 0,
-          serviceOrderCount: serviceOrderCountById.get(String(b._id)) ?? 0,
-        }));
-
-      if (deletable.length > 0) {
-        await Booking.deleteMany({ _id: { $in: deletable.map((b) => b._id) } });
-
-        // Belt-and-suspenders release of dress holds, same as the
-        // single-item route — a trashed booking should already have
-        // released its holds, but double-check here too.
-        for (const booking of deletable) {
-          if (!ACTIVE_BOOKING_STATUSES.includes(booking.status)) continue;
-          for (const item of booking.items) {
-            const stillActive = await Booking.exists({
-              "items.product": item.product,
-              status: { $in: ACTIVE_BOOKING_STATUSES },
-              deletedAt: null,
-            });
-            if (!stillActive) {
-              await Product.findByIdAndUpdate(item.product, { status: "available" });
-            }
+      // Belt-and-suspenders release of dress holds, same as the
+      // single-item route — a trashed booking should already have
+      // released its holds, but double-check here too.
+      for (const booking of bookings) {
+        if (!ACTIVE_BOOKING_STATUSES.includes(booking.status)) continue;
+        for (const item of booking.items) {
+          const stillActive = await Booking.exists({
+            "items.product": item.product,
+            status: { $in: ACTIVE_BOOKING_STATUSES },
+            deletedAt: null,
+          });
+          if (!stillActive) {
+            await Product.findByIdAndUpdate(item.product, { status: "available" });
           }
         }
-
-        await recordAuditLog({
-          entityType: "Booking",
-          entityId: "bulk",
-          action: "bulk_delete",
-          actor: auth.user,
-          metadata: {
-            permanent: true,
-            count: deletable.length,
-            ids: deletable.map((b) => String(b._id)),
-          },
-        });
       }
 
-      return apiSuccess({ deleted: deletable.length, blocked });
+      await recordAuditLog({
+        entityType: "Booking",
+        entityId: "bulk",
+        action: "bulk_delete",
+        actor: auth.user,
+        metadata: {
+          permanent: true,
+          count: bookings.length,
+          ids: bookings.map((b) => String(b._id)),
+        },
+      });
+
+      return apiSuccess({ deleted: bookings.length, blocked: [] });
     }
 
     // "delete" (soft, move to Trash) and "restore" just hide/unhide — no

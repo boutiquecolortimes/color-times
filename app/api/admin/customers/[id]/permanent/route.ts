@@ -1,9 +1,6 @@
 import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { User } from "@/models/User";
-import { Booking } from "@/models/Booking";
-import { Invoice } from "@/models/Invoice";
-import { Review } from "@/models/Review";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
@@ -29,21 +26,10 @@ export async function DELETE(
       return apiError("Move this customer to trash before permanently deleting it", 409);
     }
 
-    // Bookings, invoices, and reviews all carry a link back to the customer
-    // — erasing the account would orphan that billing/history trail. Block
-    // it, same pattern as Categories/Products/Bookings.
-    const [bookingCount, invoiceCount, reviewCount] = await Promise.all([
-      Booking.countDocuments({ customer: id }),
-      Invoice.countDocuments({ customer: id }),
-      Review.countDocuments({ customer: id }),
-    ]);
-    if (bookingCount > 0 || invoiceCount > 0 || reviewCount > 0) {
-      return apiError(
-        `Cannot permanently delete — ${bookingCount} booking(s), ${invoiceCount} invoice(s), and ${reviewCount} review(s) still reference this customer. Leave it in Trash instead.`,
-        409
-      );
-    }
-
+    // No reference-integrity guard: bookings/invoices/reviews left pointing
+    // at this customer already render defensively when the populated
+    // customer comes back null. The full document is preserved in the audit
+    // log snapshot below.
     await User.findByIdAndDelete(id);
 
     await recordAuditLog({

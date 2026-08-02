@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Category } from "@/models/Category";
-import { Product } from "@/models/Product";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
@@ -27,14 +26,9 @@ export async function DELETE(
       return apiError("Move this category to trash before permanently deleting it", 409);
     }
 
-    const productCount = await Product.countDocuments({ category: id });
-    if (productCount > 0) {
-      return apiError(
-        `Cannot permanently delete — ${productCount} product(s) still reference this category`,
-        409
-      );
-    }
-
+    // No reference-integrity guard: products left pointing at this category
+    // just render "—" for category (already handled with `?.` on the
+    // products list), no different from an unassigned product.
     await Category.findByIdAndDelete(id);
 
     await recordAuditLog({

@@ -1,8 +1,6 @@
 import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Product } from "@/models/Product";
-import { Booking } from "@/models/Booking";
-import { ServiceOrder } from "@/models/ServiceOrder";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
@@ -28,22 +26,11 @@ export async function DELETE(
       return apiError("Move this product to trash before permanently deleting it", 409);
     }
 
-    // Erasing the product document would silently blank out its name/code on
-    // every booking and dry-clean/repair order that ever referenced it,
-    // wiping that history out of the earnings & expense numbers those
-    // records feed into. Only allow a true purge when there's no history to
-    // lose (e.g. a duplicate/typo product created and trashed right away).
-    const [bookingCount, serviceOrderCount] = await Promise.all([
-      Booking.countDocuments({ "items.product": id }),
-      ServiceOrder.countDocuments({ product: id }),
-    ]);
-    if (bookingCount > 0 || serviceOrderCount > 0) {
-      return apiError(
-        `Cannot permanently delete — this dress has ${bookingCount} booking(s) and ${serviceOrderCount} service order(s) in its history, and deleting it would erase that from your records. Leave it in Trash instead — it stays out of every list but keeps the history intact.`,
-        409
-      );
-    }
-
+    // No reference-integrity guard: the admin can purge a trashed product
+    // even if bookings/service orders still point to it. The full document
+    // is preserved in the audit log snapshot below, so the record isn't
+    // truly lost — it just stops resolving on old bookings/orders (those
+    // already render defensively when a populated product comes back null).
     await Product.findByIdAndDelete(id);
 
     await recordAuditLog({

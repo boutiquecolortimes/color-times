@@ -76,6 +76,11 @@ async function fetchInvoice(id: string): Promise<InvoiceDetail> {
   const invoice = json.data.invoice;
   return {
     ...invoice,
+    // The customer can be permanently deleted while this invoice stays in
+    // the system as a billing record — populate then comes back null.
+    // Fall back the same way the initial server-rendered load already does
+    // instead of crashing on refetch.
+    customer: invoice.customer ?? { name: "—", email: "—" },
     payments: invoice.payments.map((payment: RawInvoicePayment) => ({
       _id: payment._id,
       amount: payment.amount,

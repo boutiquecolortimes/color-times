@@ -51,7 +51,6 @@ interface EntityConfig {
   permanentPath: (id: string) => string;
   restorePath: (id: string) => string;
   mapRow: (raw: Record<string, unknown>) => TrashRow;
-  blockedLabel: (item: Record<string, unknown>) => string;
 }
 
 function asString(value: unknown): string | undefined {
@@ -81,7 +80,6 @@ const ENTITIES: EntityConfig[] = [
       secondary: asString(raw.sku),
       deletedAt: asString(raw.deletedAt) ?? null,
     }),
-    blockedLabel: (item) => `${asString(item.name) ?? "Product"} (${asString(item.sku) ?? "—"})`,
   },
   {
     key: "categories",
@@ -99,8 +97,6 @@ const ENTITIES: EntityConfig[] = [
       primary: asString(raw.name) ?? "Untitled category",
       deletedAt: asString(raw.deletedAt) ?? null,
     }),
-    blockedLabel: (item) =>
-      `${asString(item.name) ?? "Category"} — ${Number(item.productCount ?? 0)} product(s) still in it`,
   },
   {
     key: "bookings",
@@ -119,10 +115,6 @@ const ENTITIES: EntityConfig[] = [
       secondary: customerName(raw),
       deletedAt: asString(raw.deletedAt) ?? null,
     }),
-    blockedLabel: (item) =>
-      `${asString(item.bookingNumber) ?? "Booking"} — ${Number(item.invoiceCount ?? 0)} invoice(s), ${Number(
-        item.serviceOrderCount ?? 0
-      )} service order(s)`,
   },
   {
     key: "customers",
@@ -141,10 +133,6 @@ const ENTITIES: EntityConfig[] = [
       secondary: asString(raw.email),
       deletedAt: asString(raw.deletedAt) ?? null,
     }),
-    blockedLabel: (item) =>
-      `${asString(item.name) ?? "Customer"} — ${Number(item.bookingCount ?? 0)} booking(s), ${Number(
-        item.invoiceCount ?? 0
-      )} invoice(s), ${Number(item.reviewCount ?? 0)} review(s)`,
   },
   {
     key: "invoices",
@@ -163,7 +151,6 @@ const ENTITIES: EntityConfig[] = [
       secondary: customerName(raw),
       deletedAt: asString(raw.deletedAt) ?? null,
     }),
-    blockedLabel: (item) => asString(item.invoiceNumber) ?? "Invoice",
   },
 ];
 
@@ -284,20 +271,9 @@ function EntityTrashPanel({ entity }: { entity: EntityConfig }) {
       if (!res.ok) throw new Error(json.error);
       return json.data;
     },
-    onSuccess: (result: { deleted?: number; affected?: number; blocked?: Record<string, unknown>[] }, variables) => {
+    onSuccess: (result: { deleted?: number; affected?: number }, variables) => {
       if (variables.action === "permanent-delete") {
-        const deleted = result.deleted ?? 0;
-        const blocked = result.blocked ?? [];
-        if (deleted > 0) toast.success(`Permanently deleted ${deleted} ${entity.itemLabel}`);
-        if (blocked.length > 0) {
-          toast.warning(
-            `Skipped ${blocked.length} item(s) still referenced elsewhere: ${blocked
-              .map((item) => entity.blockedLabel(item))
-              .join(", ")}`,
-            { duration: 10000 }
-          );
-        }
-        if (deleted === 0 && blocked.length === 0) toast.info("Nothing to delete");
+        toast.success(`Permanently deleted ${result.deleted ?? variables.ids.length} ${entity.itemLabel}`);
       } else {
         toast.success(`Restored ${result.affected ?? variables.ids.length} ${entity.itemLabel}`);
       }
@@ -315,7 +291,7 @@ function EntityTrashPanel({ entity }: { entity: EntityConfig }) {
   const emptyTrashMutation = useMutation({
     mutationFn: async () => {
       const ids = await fetchAllTrashIds(entity);
-      if (ids.length === 0) return { deleted: 0, blocked: [] };
+      if (ids.length === 0) return { deleted: 0 };
       const res = await fetch(entity.bulkPath, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -323,19 +299,14 @@ function EntityTrashPanel({ entity }: { entity: EntityConfig }) {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
-      return json.data as { deleted: number; blocked: Record<string, unknown>[] };
+      return json.data as { deleted: number };
     },
     onSuccess: (result) => {
-      if (result.deleted > 0) toast.success(`Emptied trash — deleted ${result.deleted} ${entity.itemLabel}`);
-      if (result.blocked.length > 0) {
-        toast.warning(
-          `Kept ${result.blocked.length} item(s) still referenced elsewhere: ${result.blocked
-            .map((item) => entity.blockedLabel(item))
-            .join(", ")}`,
-          { duration: 10000 }
-        );
+      if (result.deleted > 0) {
+        toast.success(`Emptied trash — deleted ${result.deleted} ${entity.itemLabel}`);
+      } else {
+        toast.info("Trash is already empty");
       }
-      if (result.deleted === 0 && result.blocked.length === 0) toast.info("Trash is already empty");
       invalidate();
       setEmptyTrashConfirm(false);
     },
@@ -508,7 +479,7 @@ function EntityTrashPanel({ entity }: { entity: EntityConfig }) {
         title={confirmAction === "permanent-delete" ? `Permanently delete ${selectedIds.size} item(s)?` : `Restore ${selectedIds.size} item(s)?`}
         description={
           confirmAction === "permanent-delete"
-            ? "This cannot be undone. Items still referenced elsewhere (bookings, invoices, etc.) will be skipped and reported."
+            ? "This cannot be undone, even if bookings, invoices, or other records still reference these items."
             : `These ${entity.itemLabel} will move back to their active list.`
         }
         confirmLabel={confirmAction === "permanent-delete" ? "Delete Permanently" : "Restore"}
@@ -524,7 +495,7 @@ function EntityTrashPanel({ entity }: { entity: EntityConfig }) {
         open={emptyTrashConfirm}
         onOpenChange={setEmptyTrashConfirm}
         title={`Empty ${entity.label} trash?`}
-        description={`Every trashed ${entity.itemLabel.slice(0, -1)} will be permanently deleted. Items still referenced elsewhere (bookings, invoices, etc.) will be skipped and reported instead of failing the whole operation.`}
+        description={`Every trashed ${entity.itemLabel.slice(0, -1)} will be permanently deleted, even if bookings, invoices, or other records still reference it. This cannot be undone.`}
         confirmLabel="Empty Trash"
         variant="destructive"
         isLoading={emptyTrashMutation.isPending}
