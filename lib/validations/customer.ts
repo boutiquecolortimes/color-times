@@ -1,8 +1,9 @@
 import { z } from "zod";
+import { optionalPhoneSchema } from "@/lib/validations/phone";
 
 export const customerUpdateSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(120),
-  phone: z.string().trim().optional(),
+  phone: optionalPhoneSchema,
   fatherName: z.string().trim().optional(),
   addressLine1: z.string().trim().optional(),
   addressCity: z.string().trim().optional(),
@@ -15,12 +16,7 @@ export type CustomerUpdateInput = z.infer<typeof customerUpdateSchema>;
 export const customerCreateSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(120),
   email: z.string().trim().toLowerCase().email("Enter a valid email address"),
-  phone: z
-    .string()
-    .trim()
-    .regex(/^[0-9+\-\s()]{7,20}$/, "Enter a valid phone number")
-    .optional()
-    .or(z.literal("")),
+  phone: optionalPhoneSchema,
   fatherName: z.string().trim().optional().or(z.literal("")),
   addressLine1: z.string().trim().optional().or(z.literal("")),
   addressCity: z.string().trim().optional().or(z.literal("")),

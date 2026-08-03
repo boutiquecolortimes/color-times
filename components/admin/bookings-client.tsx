@@ -36,6 +36,7 @@ import {
 import { BookingStatusBadge } from "@/components/admin/booking-status-badge";
 import { BookingCalendar } from "@/components/admin/booking-calendar";
 import { ReturnBookingDialog } from "@/components/admin/return-booking-dialog";
+import { ConfirmBookingDialog } from "@/components/admin/confirm-booking-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -143,6 +144,7 @@ export function BookingsClient({
   const [view, setView] = useState<"table" | "card" | "calendar">("table");
   const [trashView, setTrashView] = useState<"active" | "trash">("active");
   const [returnDialogBookingId, setReturnDialogBookingId] = useState<string | null>(null);
+  const [confirmDialogBooking, setConfirmDialogBooking] = useState<BookingRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BookingRow | null>(null);
   const [permanentDeleteTarget, setPermanentDeleteTarget] = useState<BookingRow | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -269,6 +271,24 @@ export function BookingsClient({
     ]);
   }
 
+  function bookingsExportTotals(rows: BookingRow[]): (string | number)[] {
+    return [
+      "TOTAL",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      rows.reduce((sum, b) => sum + b.totalAmount, 0),
+      rows.reduce((sum, b) => sum + b.securityDeposit, 0),
+      rows.reduce((sum, b) => sum + b.advancePaid, 0),
+      rows.reduce((sum, b) => sum + (b.totalAmount - b.advancePaid), 0),
+      "",
+    ];
+  }
+
   async function fetchAllBookingsForExport(): Promise<BookingRow[]> {
     const result = await fetchBookings({
       page: 1,
@@ -295,15 +315,27 @@ export function BookingsClient({
 
   function handleExportExcel() {
     void withExportGuard(async () => {
-      const rows = bookingsToRows(await fetchAllBookingsForExport());
-      await downloadExcel("bookings", "Bookings", exportHeaders, rows);
+      const bookingRows = await fetchAllBookingsForExport();
+      await downloadExcel(
+        "bookings",
+        "Bookings",
+        exportHeaders,
+        bookingsToRows(bookingRows),
+        bookingsExportTotals(bookingRows)
+      );
     });
   }
 
   function handleExportPdf() {
     void withExportGuard(async () => {
-      const rows = bookingsToRows(await fetchAllBookingsForExport());
-      await downloadPdf("bookings", "Bookings", exportHeaders, rows);
+      const bookingRows = await fetchAllBookingsForExport();
+      await downloadPdf(
+        "bookings",
+        "Bookings",
+        exportHeaders,
+        bookingsToRows(bookingRows),
+        bookingsExportTotals(bookingRows)
+      );
     });
   }
 
@@ -381,6 +413,10 @@ export function BookingsClient({
                     if (!value || value === booking.status) return;
                     if (value === "returned") {
                       setReturnDialogBookingId(booking._id);
+                      return;
+                    }
+                    if (value === "confirmed") {
+                      setConfirmDialogBooking(booking);
                       return;
                     }
                     updateStatusMutation.mutate({
@@ -717,6 +753,10 @@ export function BookingsClient({
                               setReturnDialogBookingId(booking._id);
                               return;
                             }
+                            if (value === "confirmed") {
+                              setConfirmDialogBooking(booking);
+                              return;
+                            }
                             updateStatusMutation.mutate({
                               id: booking._id,
                               status: value as BookingStatus,
@@ -797,6 +837,18 @@ export function BookingsClient({
         open={returnDialogBookingId !== null}
         onOpenChange={(open) => !open && setReturnDialogBookingId(null)}
       />
+
+      {confirmDialogBooking && (
+        <ConfirmBookingDialog
+          bookingId={confirmDialogBooking._id}
+          summary={{
+            totalAmount: confirmDialogBooking.totalAmount,
+            advancePaid: confirmDialogBooking.advancePaid,
+          }}
+          open={confirmDialogBooking !== null}
+          onOpenChange={(open) => !open && setConfirmDialogBooking(null)}
+        />
+      )}
 
       <ConfirmDialog
         open={deleteTarget !== null}

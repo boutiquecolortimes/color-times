@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { BookingStatusBadge } from "@/components/admin/booking-status-badge";
 import { ReturnBookingDialog } from "@/components/admin/return-booking-dialog";
+import { ConfirmBookingDialog } from "@/components/admin/confirm-booking-dialog";
 import { AuditLogList } from "@/components/admin/audit-log-list";
 import {
   ServiceOrderFormDialog,
@@ -101,6 +102,7 @@ async function fetchBooking(id: string): Promise<BookingDetail> {
 export function BookingDetailClient({ initialBooking }: { initialBooking: BookingDetail }) {
   const queryClient = useQueryClient();
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [dryCleanValues, setDryCleanValues] = useState<ServiceOrderInitialValues | null>(null);
   const [dryCleanDialogOpen, setDryCleanDialogOpen] = useState(false);
 
@@ -176,6 +178,10 @@ export function BookingDetailClient({ initialBooking }: { initialBooking: Bookin
               if (!value || value === booking.status) return;
               if (value === "returned") {
                 setReturnDialogOpen(true);
+                return;
+              }
+              if (value === "confirmed") {
+                setConfirmDialogOpen(true);
                 return;
               }
               updateStatusMutation.mutate(value as BookingStatus);
@@ -437,6 +443,13 @@ export function BookingDetailClient({ initialBooking }: { initialBooking: Bookin
         bookingId={booking._id}
         open={returnDialogOpen}
         onOpenChange={setReturnDialogOpen}
+      />
+
+      <ConfirmBookingDialog
+        bookingId={booking._id}
+        summary={{ totalAmount: booking.totalAmount, advancePaid: booking.advancePaid ?? 0 }}
+        open={confirmDialogOpen}
+        onOpenChange={setConfirmDialogOpen}
       />
 
       <ServiceOrderFormDialog

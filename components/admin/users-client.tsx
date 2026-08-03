@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Copy, Grid3x3, KeyRound, List, Loader2, Pencil, Plus, ShieldOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -500,7 +501,7 @@ export function UsersClient({
                   <FormItem>
                     <FormLabel>Phone (optional)</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <PhoneInput {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -577,7 +578,7 @@ export function UsersClient({
                   <FormItem>
                     <FormLabel>Phone</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <PhoneInput {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

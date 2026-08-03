@@ -56,7 +56,8 @@ export async function downloadPdf(
   filename: string,
   title: string,
   headers: string[],
-  rows: (string | number)[][]
+  rows: (string | number)[][],
+  totals?: (string | number)[]
 ): Promise<void> {
   const doc = new jsPDF({ orientation: rows.length && headers.length > 6 ? "landscape" : "portrait" });
 
@@ -77,9 +78,11 @@ export async function downloadPdf(
   autoTable(doc, {
     head: [headers],
     body: rows.map((row) => row.map((cell) => String(cell))),
+    foot: totals ? [totals.map((cell) => String(cell))] : undefined,
     startY: 28,
     styles: { fontSize: 8 },
     headStyles: { fillColor: [32, 26, 22] },
+    footStyles: { fillColor: [245, 240, 233], textColor: [32, 26, 22], fontStyle: "bold" },
   });
 
   doc.save(`${filename}.pdf`);
@@ -93,7 +96,8 @@ export async function downloadExcel(
   filename: string,
   title: string,
   headers: string[],
-  rows: (string | number)[][]
+  rows: (string | number)[][],
+  totals?: (string | number)[]
 ): Promise<void> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Color Times Boutique";
@@ -154,8 +158,19 @@ export async function downloadExcel(
     });
   });
 
+  if (totals) {
+    const totalsRow = sheet.getRow(headerRowIndex + 1 + rows.length);
+    totals.forEach((value, colIndex) => {
+      const cell = totalsRow.getCell(colIndex + 1);
+      cell.value = value;
+      cell.font = { bold: true, color: { argb: "FF201A16" } };
+      cell.border = { top: { style: "thin", color: { argb: BRAND_WINE } } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT_ROW_FILL } };
+    });
+  }
+
   headers.forEach((header, index) => {
-    const longestValue = rows.reduce(
+    const longestValue = [...rows, ...(totals ? [totals] : [])].reduce(
       (max, row) => Math.max(max, String(row[index] ?? "").length),
       header.length
     );

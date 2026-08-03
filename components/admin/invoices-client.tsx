@@ -315,7 +315,11 @@ export function InvoicesClient({
     }
   }
 
-  async function exportRows(): Promise<{ headers: string[]; rows: (string | number)[][] }> {
+  async function exportRows(): Promise<{
+    headers: string[];
+    rows: (string | number)[][];
+    totals: (string | number)[];
+  }> {
     const full = await fetchInvoices({ page: 1, status, view, search, sortBy, sortDir, all: true });
     const headers = ["Invoice #", "Customer", "Total", "Paid", "Due", "Status", "Due Date"];
     const rows = full.invoices.map((invoice) => [
@@ -327,7 +331,16 @@ export function InvoicesClient({
       STATUS_FILTERS.find((option) => option.value === invoice.status)?.label ?? invoice.status,
       formatDate(invoice.dueDate),
     ]);
-    return { headers, rows };
+    const totals = [
+      "TOTAL",
+      "",
+      full.invoices.reduce((sum, invoice) => sum + invoice.total, 0),
+      full.invoices.reduce((sum, invoice) => sum + invoice.amountPaid, 0),
+      full.invoices.reduce((sum, invoice) => sum + invoice.amountDue, 0),
+      "",
+      "",
+    ];
+    return { headers, rows, totals };
   }
 
   const cardGrid = (
@@ -528,8 +541,8 @@ export function InvoicesClient({
             disabled={isExporting}
             onClick={() =>
               withExportGuard(async () => {
-                const { headers, rows } = await exportRows();
-                await downloadExcel("invoices", "Invoices", headers, rows);
+                const { headers, rows, totals } = await exportRows();
+                await downloadExcel("invoices", "Invoices", headers, rows, totals);
               })
             }
           >
@@ -541,8 +554,8 @@ export function InvoicesClient({
             disabled={isExporting}
             onClick={() =>
               withExportGuard(async () => {
-                const { headers, rows } = await exportRows();
-                await downloadPdf("invoices", "Invoices", headers, rows);
+                const { headers, rows, totals } = await exportRows();
+                await downloadPdf("invoices", "Invoices", headers, rows, totals);
               })
             }
           >

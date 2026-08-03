@@ -7,6 +7,7 @@ import { NotificationLog } from "@/models/NotificationLog";
 import { requireApiRole } from "@/lib/api/require-role";
 import { SETTINGS_ROLES } from "@/lib/auth/roles";
 import { sendWhatsAppMessage } from "@/lib/notifications/brevo-whatsapp";
+import { sendMetaWhatsAppMessage } from "@/lib/notifications/meta-whatsapp";
 import { DEFAULT_WHATSAPP_SETTINGS, type WhatsAppSettingsInput } from "@/lib/validations/whatsapp-settings";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 
@@ -33,15 +34,29 @@ export async function POST(request: NextRequest): Promise<Response> {
     const settingsDoc = await Settings.findOne({ module: "whatsapp" }).lean();
     const settings = (settingsDoc?.data as WhatsAppSettingsInput) ?? DEFAULT_WHATSAPP_SETTINGS;
 
-    if (!settings.senderLabel) {
-      return apiError("Set your WhatsApp sender number in settings first", 422);
+    let result: { success: boolean; messageId?: string; error?: string };
+    if (settings.provider === "meta") {
+      if (!template.metaTemplateName) {
+        return apiError("This template has no Meta Template Name configured", 422);
+      }
+      result = await sendMetaWhatsAppMessage({
+        to: input.phone,
+        templateName: template.metaTemplateName,
+        languageCode: template.metaLanguageCode || "en_US",
+      });
+    } else {
+      if (!settings.senderLabel) {
+        return apiError("Set your WhatsApp sender number in settings first", 422);
+      }
+      if (!template.brevoTemplateId) {
+        return apiError("This template has no Brevo Template ID configured", 422);
+      }
+      result = await sendWhatsAppMessage({
+        to: input.phone,
+        senderNumber: settings.senderLabel,
+        templateId: template.brevoTemplateId,
+      });
     }
-
-    const result = await sendWhatsAppMessage({
-      to: input.phone,
-      senderNumber: settings.senderLabel,
-      templateId: template.brevoTemplateId,
-    });
 
     await NotificationLog.create({
       channel: "whatsapp",

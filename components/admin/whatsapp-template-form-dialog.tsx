@@ -43,12 +43,15 @@ import {
   TRIGGER_EVENT_VARIABLES,
   type WhatsAppTriggerEvent,
 } from "@/lib/notifications/trigger-events";
+import { WhatsAppChatBubble } from "@/components/admin/whatsapp-chat-preview";
 
 export interface WhatsAppTemplateRow {
   _id: string;
   name: string;
   triggerEvent: WhatsAppTriggerEvent;
-  brevoTemplateId: number;
+  brevoTemplateId?: number;
+  metaTemplateName?: string;
+  metaLanguageCode?: string;
   previewBody: string;
   isActive: boolean;
 }
@@ -56,7 +59,9 @@ export interface WhatsAppTemplateRow {
 const EMPTY_VALUES: WhatsAppTemplateInput = {
   name: "",
   triggerEvent: "booking_confirmed",
-  brevoTemplateId: 0,
+  brevoTemplateId: undefined,
+  metaTemplateName: "",
+  metaLanguageCode: "en_US",
   previewBody: "",
   isActive: false,
 };
@@ -85,6 +90,8 @@ export function WhatsAppTemplateFormDialog({
               name: editingTemplate.name,
               triggerEvent: editingTemplate.triggerEvent,
               brevoTemplateId: editingTemplate.brevoTemplateId,
+              metaTemplateName: editingTemplate.metaTemplateName ?? "",
+              metaLanguageCode: editingTemplate.metaLanguageCode || "en_US",
               previewBody: editingTemplate.previewBody,
               isActive: editingTemplate.isActive,
             }
@@ -94,6 +101,7 @@ export function WhatsAppTemplateFormDialog({
   }, [open, editingTemplate, form]);
 
   const triggerEvent = form.watch("triggerEvent");
+  const previewBody = form.watch("previewBody");
   const availableVariables = TRIGGER_EVENT_VARIABLES[triggerEvent as WhatsAppTriggerEvent] ?? [];
 
   const mutation = useMutation({
@@ -120,15 +128,16 @@ export function WhatsAppTemplateFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{editingTemplate ? "Edit Template" : "New Template"}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
-            className="space-y-4"
+            className="grid gap-6 md:grid-cols-[1fr_260px]"
           >
+          <div className="space-y-4">
             <FormField
               control={form.control}
               name="name"
@@ -181,19 +190,53 @@ export function WhatsAppTemplateFormDialog({
                       type="number"
                       value={field.value ? field.value : ""}
                       onChange={(event) =>
-                        field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                        field.onChange(
+                          event.target.value === "" ? undefined : Number(event.target.value)
+                        )
                       }
                     />
                   </FormControl>
                   <FormDescription>
-                    The numeric ID of the approved WhatsApp template from your Brevo dashboard.
-                    Brevo only sends pre-approved templates — this app cannot inject variables
-                    into the live message.
+                    Fill this in if sending via Brevo. The numeric ID of the approved WhatsApp
+                    template from your Brevo dashboard.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
+            <div className="grid grid-cols-[1fr_110px] gap-3">
+              <FormField
+                control={form.control}
+                name="metaTemplateName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Meta Template Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="booking_confirmed" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Fill this in if sending via Meta Cloud API — the exact template name
+                      approved in Meta Business Manager.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="metaLanguageCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Language</FormLabel>
+                    <FormControl>
+                      <Input placeholder="en_US" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <FormField
               control={form.control}
@@ -233,13 +276,33 @@ export function WhatsAppTemplateFormDialog({
                 </div>
               )}
             />
+          </div>
 
-            <DialogFooter>
-              <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                {editingTemplate ? "Save Changes" : "Create Template"}
-              </Button>
-            </DialogFooter>
+          <div className="space-y-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Live Preview
+            </p>
+            <WhatsAppChatBubble text={previewBody} />
+            {availableVariables.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {availableVariables.map((variable) => (
+                  <span
+                    key={variable}
+                    className="rounded-full border border-border bg-secondary/50 px-2 py-0.5 text-[11px] text-muted-foreground"
+                  >
+                    {`{{${variable}}}`}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="md:col-span-2">
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {editingTemplate ? "Save Changes" : "Create Template"}
+            </Button>
+          </DialogFooter>
           </form>
         </Form>
       </DialogContent>

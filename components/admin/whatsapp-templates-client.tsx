@@ -13,6 +13,7 @@ import {
   type WhatsAppTemplateRow,
 } from "@/components/admin/whatsapp-template-form-dialog";
 import { TRIGGER_EVENT_LABELS } from "@/lib/notifications/trigger-events";
+import { WhatsAppChatBubble } from "@/components/admin/whatsapp-chat-preview";
 
 const PAGE_SIZE = 5;
 
@@ -65,26 +66,33 @@ export function WhatsAppTemplatesClient({
   const cardGrid = (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {pagedTemplates.map((template) => (
-        <div key={template._id} className="rounded-lg border border-border bg-card p-4">
-          <div className="flex items-start justify-between gap-3">
-            <p className="font-medium">{template.name}</p>
-            <Badge
-              className={
-                template.isActive
-                  ? "rounded-full border-none bg-emerald-100 font-medium text-emerald-800"
-                  : "rounded-full border-none bg-secondary font-medium text-foreground"
-              }
-            >
-              {template.isActive ? "Active" : "Inactive"}
-            </Badge>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {TRIGGER_EVENT_LABELS[template.triggerEvent]}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Brevo Template ID {template.brevoTemplateId}
-          </p>
-          <div className="mt-3 flex justify-end gap-1">
+        <div
+          key={template._id}
+          className="overflow-hidden rounded-lg border border-border bg-card"
+        >
+          <WhatsAppChatBubble text={template.previewBody} delivered={template.isActive} />
+          <div className="p-4">
+            <div className="flex items-start justify-between gap-3">
+              <p className="font-medium">{template.name}</p>
+              <Badge
+                className={
+                  template.isActive
+                    ? "rounded-full border-none bg-emerald-100 font-medium text-emerald-800"
+                    : "rounded-full border-none bg-secondary font-medium text-foreground"
+                }
+              >
+                {template.isActive ? "Active" : "Inactive"}
+              </Badge>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {TRIGGER_EVENT_LABELS[template.triggerEvent]}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {template.brevoTemplateId && `Brevo Template ID ${template.brevoTemplateId}`}
+              {template.brevoTemplateId && template.metaTemplateName && " · "}
+              {template.metaTemplateName && `Meta: ${template.metaTemplateName}`}
+            </p>
+            <div className="mt-3 flex justify-end gap-1">
             <Button
               variant="ghost"
               size="icon"
@@ -95,14 +103,15 @@ export function WhatsAppTemplatesClient({
             >
               <Pencil className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-destructive"
-              onClick={() => setDeleteId(template._id)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-destructive"
+                onClick={() => setDeleteId(template._id)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       ))}
@@ -157,7 +166,7 @@ export function WhatsAppTemplatesClient({
             <tr>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Trigger</th>
-              <th className="px-4 py-3">Brevo Template ID</th>
+              <th className="px-4 py-3">Provider ID</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
@@ -169,7 +178,13 @@ export function WhatsAppTemplatesClient({
                 <td className="px-4 py-3 text-muted-foreground">
                   {TRIGGER_EVENT_LABELS[template.triggerEvent]}
                 </td>
-                <td className="px-4 py-3 text-muted-foreground">{template.brevoTemplateId}</td>
+                <td className="px-4 py-3 text-muted-foreground">
+                  {template.brevoTemplateId
+                    ? `Brevo #${template.brevoTemplateId}`
+                    : template.metaTemplateName
+                      ? `Meta: ${template.metaTemplateName}`
+                      : "—"}
+                </td>
                 <td className="px-4 py-3">
                   <Badge
                     className={

@@ -4,10 +4,17 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle2, Power, Zap, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Form,
   FormControl,
@@ -20,19 +27,30 @@ import {
 import {
   whatsAppSettingsSchema,
   type WhatsAppSettingsInput,
+  type WhatsAppProvider,
 } from "@/lib/validations/whatsapp-settings";
+
+const PROVIDER_LABELS: Record<WhatsAppProvider, string> = {
+  brevo: "Brevo",
+  meta: "Meta Cloud API (direct)",
+};
 
 export function WhatsAppSettingsForm({
   initialSettings,
-  isConfigured,
+  isBrevoConfigured,
+  isMetaConfigured,
 }: {
   initialSettings: WhatsAppSettingsInput;
-  isConfigured: boolean;
+  isBrevoConfigured: boolean;
+  isMetaConfigured: boolean;
 }) {
   const form = useForm<WhatsAppSettingsInput>({
     resolver: zodResolver(whatsAppSettingsSchema),
     defaultValues: initialSettings,
   });
+
+  const provider = form.watch("provider");
+  const isConfigured = provider === "meta" ? isMetaConfigured : isBrevoConfigured;
 
   const mutation = useMutation({
     mutationFn: async (values: WhatsAppSettingsInput) => {
@@ -67,7 +85,18 @@ export function WhatsAppSettingsForm({
           <AlertTriangle className="h-5 w-5 shrink-0" />
         )}
         <div className="text-sm">
-          {isConfigured ? (
+          {provider === "meta" ? (
+            isConfigured ? (
+              <p>Meta Cloud API credentials are configured. WhatsApp messages can be sent.</p>
+            ) : (
+              <p>
+                <span className="font-medium">META_WHATSAPP_ACCESS_TOKEN</span> and{" "}
+                <span className="font-medium">META_WHATSAPP_PHONE_NUMBER_ID</span> are not set.
+                Add them as environment variables (e.g. in Vercel) once you've completed Meta's
+                business verification — everything else here will still save normally.
+              </p>
+            )
+          ) : isConfigured ? (
             <p>Brevo API key is configured. WhatsApp messages can be sent.</p>
           ) : (
             <p>
@@ -85,12 +114,72 @@ export function WhatsAppSettingsForm({
           className="space-y-6"
         >
           <section className="rounded-lg border border-border bg-card p-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary">
+                <Radio className="h-4.5 w-4.5 text-muted-foreground" />
+              </div>
               <div>
-                <h2 className="font-heading text-lg">Enable WhatsApp Notifications</h2>
+                <h2 className="font-heading text-lg">Integration</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Master switch for all automatic WhatsApp sending.
+                  Which API sends the actual WhatsApp messages.
                 </p>
+              </div>
+            </div>
+
+            <div className="mt-4 sm:pl-12">
+              <FormField
+                control={form.control}
+                name="provider"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Provider</FormLabel>
+                    <Select value={field.value} onValueChange={(value) => field.onChange(value)}>
+                      <FormControl>
+                        <SelectTrigger className="w-full sm:w-72">
+                          <SelectValue>
+                            {(value: WhatsAppProvider) => PROVIDER_LABELS[value]}
+                          </SelectValue>
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="brevo">{PROVIDER_LABELS.brevo}</SelectItem>
+                        <SelectItem value="meta">{PROVIDER_LABELS.meta}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {provider === "meta" && (
+                <div className="mt-4 rounded-lg border border-border bg-secondary/30 p-3 text-xs text-muted-foreground">
+                  <p className="font-medium text-foreground">Webhook callback URL</p>
+                  <p className="mt-1 break-all font-mono">
+                    {typeof window !== "undefined" ? window.location.origin : ""}
+                    /api/webhooks/meta-whatsapp
+                  </p>
+                  <p className="mt-2">
+                    Paste this into your Meta App&apos;s WhatsApp &rarr; Configuration &rarr;
+                    Webhook settings, using the verify token you set as{" "}
+                    <span className="font-medium">META_WHATSAPP_WEBHOOK_VERIFY_TOKEN</span>.
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-border bg-card p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary">
+                  <Power className="h-4.5 w-4.5 text-muted-foreground" />
+                </div>
+                <div>
+                  <h2 className="font-heading text-lg">Enable WhatsApp Notifications</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Master switch for all automatic WhatsApp sending.
+                  </p>
+                </div>
               </div>
               <FormField
                 control={form.control}
@@ -112,7 +201,9 @@ export function WhatsAppSettingsForm({
                       <Input placeholder="919876543210" {...field} />
                     </FormControl>
                     <FormDescription>
-                      The WhatsApp Business number registered and approved in your Brevo account.
+                      {provider === "meta"
+                        ? "The display number for your Meta WhatsApp Business Account — the actual sending number comes from META_WHATSAPP_PHONE_NUMBER_ID."
+                        : "The WhatsApp Business number registered and approved in your Brevo account."}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -122,13 +213,20 @@ export function WhatsAppSettingsForm({
           </section>
 
           <section className="rounded-lg border border-border bg-card p-6">
-            <h2 className="font-heading text-lg">Automatic Sending</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Choose which events automatically trigger a WhatsApp message (using the active
-              template for that event).
-            </p>
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary">
+                <Zap className="h-4.5 w-4.5 text-muted-foreground" />
+              </div>
+              <div>
+                <h2 className="font-heading text-lg">Automatic Sending</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Choose which events automatically trigger a WhatsApp message (using the active
+                  template for that event).
+                </p>
+              </div>
+            </div>
 
-            <div className="mt-4 space-y-4">
+            <div className="mt-4 space-y-4 sm:pl-12">
               {(
                 [
                   ["autoSendOnBookingConfirmed", "Booking Confirmed"],

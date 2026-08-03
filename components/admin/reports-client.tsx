@@ -108,6 +108,8 @@ interface ColumnConfig {
   label: string;
   format?: (row: Row) => string;
   render?: (row: Row) => React.ReactNode;
+  /** Included as a summed grand-total in the exported file's totals row. */
+  isTotal?: boolean;
 }
 
 function DueBadge({ isOverdue, daysOverdue }: { isOverdue: boolean; daysOverdue: number }) {
@@ -168,7 +170,7 @@ const TABLE_CONFIGS: Record<ReportType, ColumnConfig[]> = {
     { key: "category", label: "Category" },
     { key: "rentalPricePerDay", label: "Rent", format: (r) => CURRENCY(r.rentalPricePerDay) },
     { key: "retailValue", label: "Retail Value", format: (r) => CURRENCY(r.retailValue) },
-    { key: "totalStock", label: "Stock" },
+    { key: "totalStock", label: "Stock", isTotal: true },
     { key: "isActive", label: "Status", format: (r) => (r.isActive ? "Active" : "Inactive") },
     { key: "createdAt", label: "Added", format: (r) => DATE(r.createdAt) },
   ],
@@ -182,7 +184,7 @@ const TABLE_CONFIGS: Record<ReportType, ColumnConfig[]> = {
       format: (r) => STATUS_OPTIONS.bookings.find((o) => o.value === r.status)?.label ?? String(r.status),
       render: (r) => <BookingStatusBadge status={r.status as BookingStatus} />,
     },
-    { key: "totalAmount", label: "Total", format: (r) => CURRENCY(r.totalAmount) },
+    { key: "totalAmount", label: "Total", format: (r) => CURRENCY(r.totalAmount), isTotal: true },
     { key: "rentalStartDate", label: "Start", format: (r) => DATE(r.rentalStartDate) },
     { key: "rentalEndDate", label: "End", format: (r) => DATE(r.rentalEndDate) },
     { key: "createdAt", label: "Created", format: (r) => DATE(r.createdAt) },
@@ -196,9 +198,9 @@ const TABLE_CONFIGS: Record<ReportType, ColumnConfig[]> = {
       format: (r) => STATUS_OPTIONS.invoices.find((o) => o.value === r.status)?.label ?? String(r.status),
       render: (r) => <InvoiceStatusBadge status={r.status as InvoiceStatus} />,
     },
-    { key: "total", label: "Total", format: (r) => CURRENCY(r.total) },
-    { key: "amountPaid", label: "Paid", format: (r) => CURRENCY(r.amountPaid) },
-    { key: "amountDue", label: "Due", format: (r) => CURRENCY(r.amountDue) },
+    { key: "total", label: "Total", format: (r) => CURRENCY(r.total), isTotal: true },
+    { key: "amountPaid", label: "Paid", format: (r) => CURRENCY(r.amountPaid), isTotal: true },
+    { key: "amountDue", label: "Due", format: (r) => CURRENCY(r.amountDue), isTotal: true },
     { key: "dueDate", label: "Due Date", format: (r) => DATE(r.dueDate) },
     { key: "createdAt", label: "Created", format: (r) => DATE(r.createdAt) },
   ],
@@ -218,11 +220,16 @@ const TABLE_CONFIGS: Record<ReportType, ColumnConfig[]> = {
     },
     { key: "description", label: "Description" },
     { key: "stitchingType", label: "Stitching Type" },
-    { key: "dryCleanCharge", label: "Dry Clean", format: (r) => CURRENCY(r.dryCleanCharge) },
-    { key: "ironCharge", label: "Iron", format: (r) => CURRENCY(r.ironCharge) },
-    { key: "stitchingCharge", label: "Stitching", format: (r) => CURRENCY(r.stitchingCharge) },
-    { key: "otherCharge", label: "Other", format: (r) => CURRENCY(r.otherCharge) },
-    { key: "totalAmount", label: "Total", format: (r) => CURRENCY(r.totalAmount) },
+    { key: "dryCleanCharge", label: "Dry Clean", format: (r) => CURRENCY(r.dryCleanCharge), isTotal: true },
+    { key: "ironCharge", label: "Iron", format: (r) => CURRENCY(r.ironCharge), isTotal: true },
+    {
+      key: "stitchingCharge",
+      label: "Stitching",
+      format: (r) => CURRENCY(r.stitchingCharge),
+      isTotal: true,
+    },
+    { key: "otherCharge", label: "Other", format: (r) => CURRENCY(r.otherCharge), isTotal: true },
+    { key: "totalAmount", label: "Total", format: (r) => CURRENCY(r.totalAmount), isTotal: true },
     {
       key: "status",
       label: "Status",
@@ -237,9 +244,9 @@ const TABLE_CONFIGS: Record<ReportType, ColumnConfig[]> = {
     { key: "customerName", label: "Customer" },
     { key: "customerPhone", label: "Mobile" },
     { key: "stitchingType", label: "Stitching Type" },
-    { key: "totalAmount", label: "Total", format: (r) => CURRENCY(r.totalAmount) },
-    { key: "advancePayment", label: "Advance", format: (r) => CURRENCY(r.advancePayment) },
-    { key: "dueAmount", label: "Due", format: (r) => CURRENCY(r.dueAmount) },
+    { key: "totalAmount", label: "Total", format: (r) => CURRENCY(r.totalAmount), isTotal: true },
+    { key: "advancePayment", label: "Advance", format: (r) => CURRENCY(r.advancePayment), isTotal: true },
+    { key: "dueAmount", label: "Due", format: (r) => CURRENCY(r.dueAmount), isTotal: true },
     {
       key: "status",
       label: "Status",
@@ -254,7 +261,7 @@ const TABLE_CONFIGS: Record<ReportType, ColumnConfig[]> = {
     { key: "customerName", label: "Customer" },
     { key: "customerPhone", label: "Mobile" },
     { key: "product", label: "Product" },
-    { key: "totalAmount", label: "Total", format: (r) => CURRENCY(r.totalAmount) },
+    { key: "totalAmount", label: "Total", format: (r) => CURRENCY(r.totalAmount), isTotal: true },
     { key: "saleDate", label: "Sale Date", format: (r) => DATE(r.saleDate) },
   ],
   "pending-returns": [
@@ -269,7 +276,12 @@ const TABLE_CONFIGS: Record<ReportType, ColumnConfig[]> = {
       format: (r) => (r.isOverdue ? `Overdue ${r.daysOverdue}d` : "On track"),
       render: (r) => <DueBadge isOverdue={Boolean(r.isOverdue)} daysOverdue={Number(r.daysOverdue ?? 0)} />,
     },
-    { key: "securityDeposit", label: "Deposit Held", format: (r) => CURRENCY(r.securityDeposit) },
+    {
+      key: "securityDeposit",
+      label: "Deposit Held",
+      format: (r) => CURRENCY(r.securityDeposit),
+      isTotal: true,
+    },
     {
       key: "_id",
       label: "Action",
@@ -406,7 +418,11 @@ export function ReportsClient() {
   const statusOptions = STATUS_OPTIONS[reportType];
   const pagination = data?.pagination;
 
-  async function exportRows(): Promise<{ headers: string[]; rows: (string | number)[][] }> {
+  async function exportRows(): Promise<{
+    headers: string[];
+    rows: (string | number)[][];
+    totals?: (string | number)[];
+  }> {
     const full = await fetchReport({
       type: reportType,
       range,
@@ -420,7 +436,18 @@ export function ReportsClient() {
     const rows = full.items.map((row) =>
       columns.map((c) => (c.format ? c.format(row) : (row[c.key] as string | number)))
     );
-    return { headers, rows };
+
+    const hasTotals = columns.some((c) => c.isTotal);
+    const totals = hasTotals
+      ? columns.map((c, index) => {
+          if (index === 0) return "TOTAL";
+          if (!c.isTotal) return "";
+          const sum = full.items.reduce((acc, row) => acc + (Number(row[c.key]) || 0), 0);
+          return c.format ? c.format({ [c.key]: sum } as Row) : sum;
+        })
+      : undefined;
+
+    return { headers, rows, totals };
   }
 
   async function withExportGuard(action: () => Promise<void>): Promise<void> {
@@ -623,12 +650,13 @@ export function ReportsClient() {
             disabled={isExporting}
             onClick={() =>
               withExportGuard(async () => {
-                const { headers, rows } = await exportRows();
+                const { headers, rows, totals } = await exportRows();
                 await downloadExcel(
                   `${reportType}-report`,
                   `${REPORT_TYPE_OPTIONS.find((o) => o.value === reportType)?.label} Report`,
                   headers,
-                  rows
+                  rows,
+                  totals
                 );
               })
             }
@@ -641,14 +669,15 @@ export function ReportsClient() {
             disabled={isExporting}
             onClick={() =>
               withExportGuard(async () => {
-                const { headers, rows } = await exportRows();
+                const { headers, rows, totals } = await exportRows();
                 const rangeSuffix =
                   reportType !== "pending-returns" && data?.range.label ? ` — ${data.range.label}` : "";
                 await downloadPdf(
                   `${reportType}-report`,
                   `${REPORT_TYPE_OPTIONS.find((o) => o.value === reportType)?.label} Report${rangeSuffix}`,
                   headers,
-                  rows
+                  rows,
+                  totals
                 );
               })
             }

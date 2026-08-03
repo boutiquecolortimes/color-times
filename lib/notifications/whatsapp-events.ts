@@ -4,6 +4,7 @@ import { Settings } from "@/models/Settings";
 import { WhatsAppTemplate, type WhatsAppTriggerEvent } from "@/models/WhatsAppTemplate";
 import { NotificationLog } from "@/models/NotificationLog";
 import { sendWhatsAppMessage } from "@/lib/notifications/brevo-whatsapp";
+import { sendMetaWhatsAppMessage } from "@/lib/notifications/meta-whatsapp";
 import { renderTemplate } from "@/lib/notifications/render-template";
 import {
   DEFAULT_WHATSAPP_SETTINGS,
@@ -59,11 +60,22 @@ async function sendTemplatedNotification(
       return;
     }
 
-    const result = await sendWhatsAppMessage({
-      to: context.customerPhone,
-      senderNumber: settings.senderLabel,
-      templateId: template.brevoTemplateId,
-    });
+    const result =
+      settings.provider === "meta"
+        ? template.metaTemplateName
+          ? await sendMetaWhatsAppMessage({
+              to: context.customerPhone,
+              templateName: template.metaTemplateName,
+              languageCode: template.metaLanguageCode || "en_US",
+            })
+          : { success: false, error: "Template has no Meta Template Name configured" }
+        : template.brevoTemplateId
+          ? await sendWhatsAppMessage({
+              to: context.customerPhone,
+              senderNumber: settings.senderLabel,
+              templateId: template.brevoTemplateId,
+            })
+          : { success: false, error: "Template has no Brevo Template ID configured" };
 
     await NotificationLog.create({
       channel: "whatsapp",

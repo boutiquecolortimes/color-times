@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { PasswordInput } from "@/components/ui/password-input";
 import {
   Form,
@@ -86,7 +87,7 @@ export function RegisterForm() {
             <FormItem>
               <FormLabel>Phone (optional)</FormLabel>
               <FormControl>
-                <Input placeholder="+91 98765 43210" {...field} />
+                <PhoneInput {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

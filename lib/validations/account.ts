@@ -1,13 +1,9 @@
 import { z } from "zod";
+import { optionalPhoneSchema } from "@/lib/validations/phone";
 
 export const updateAccountSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters").max(120),
-  phone: z
-    .string()
-    .trim()
-    .regex(/^[0-9+\-\s()]{7,20}$/, "Enter a valid phone number")
-    .optional()
-    .or(z.literal("")),
+  phone: optionalPhoneSchema,
 });
 
 export type UpdateAccountInput = z.infer<typeof updateAccountSchema>;
