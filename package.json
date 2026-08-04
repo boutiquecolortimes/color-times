@@ -12,6 +12,7 @@
     "seed:whatsapp": "tsx --env-file=.env.local scripts/seed-whatsapp-templates.ts",
     "seed:demo-data": "tsx --env-file=.env.local scripts/seed-demo-data.ts",
     "migrate:booking-items": "tsx --env-file=.env.local scripts/migrate-booking-items.ts",
+    "migrate:users-from-old-db": "tsx --env-file=.env.local scripts/migrate-users-from-old-db.ts",
     "reset:transactional-data": "tsx --env-file=.env.local scripts/reset-transactional-data.ts",
     "seed:team-member": "tsx --env-file=.env.local scripts/seed-team-member.ts"
   },

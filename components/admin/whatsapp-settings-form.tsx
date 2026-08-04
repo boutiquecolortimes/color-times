@@ -92,8 +92,8 @@ export function WhatsAppSettingsForm({
               <p>
                 <span className="font-medium">META_WHATSAPP_ACCESS_TOKEN</span> and{" "}
                 <span className="font-medium">META_WHATSAPP_PHONE_NUMBER_ID</span> are not set.
-                Add them as environment variables (e.g. in Vercel) once you've completed Meta's
-                business verification — everything else here will still save normally.
+                Add them as environment variables (e.g. in Vercel) once you&apos;ve completed
+                Meta&apos;s business verification — everything else here will still save normally.
               </p>
             )
           ) : isConfigured ? (
