@@ -61,6 +61,9 @@ export const bookingCreateSchema = z
     // suggested default when this isn't sent.
     securityDeposit: z.number().min(0).optional(),
     advancePaid: z.number().min(0).optional(),
+    // Free text (validated against the admin-editable list client-side, not
+    // a fixed enum here) so new payment methods don't need a schema change.
+    advancePaymentMethod: z.string().trim().max(40).optional().or(z.literal("")),
     measurements: measurementsZodSchema.optional(),
     notes: z.string().trim().optional().or(z.literal("")),
   })

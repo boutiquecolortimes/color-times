@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { getCurrentUser } from "@/lib/auth/session";
+import { SETTINGS_ROLES } from "@/lib/auth/roles";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Booking } from "@/models/Booking";
 import "@/models/User";
@@ -10,6 +12,9 @@ export const metadata: Metadata = { title: "Bookings" };
 const PAGE_SIZE = 5;
 
 export default async function AdminBookingsPage() {
+  const currentUser = await getCurrentUser();
+  const canManageSettings = Boolean(currentUser && SETTINGS_ROLES.includes(currentUser.role));
+
   await connectToDatabase();
 
   const [bookings, total, summaryAgg] = await Promise.all([
@@ -77,6 +82,7 @@ export default async function AdminBookingsPage() {
         advancePaid: summaryRow.advancePaid,
         dueAmount: summaryRow.totalAmount - summaryRow.advancePaid,
       }}
+      canManageSettings={canManageSettings}
     />
   );
 }

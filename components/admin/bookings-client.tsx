@@ -14,6 +14,7 @@ import {
   Printer,
   RotateCcw,
   Search,
+  Settings2,
   Table2,
   Trash2,
 } from "lucide-react";
@@ -130,10 +131,12 @@ export function BookingsClient({
   initialBookings,
   initialPagination,
   initialSummary,
+  canManageSettings,
 }: {
   initialBookings: BookingRow[];
   initialPagination: Pagination;
   initialSummary: BookingsSummary;
+  canManageSettings: boolean;
 }) {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
@@ -626,6 +629,17 @@ export function BookingsClient({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          {canManageSettings && (
+            <ButtonLink
+              variant="outline"
+              size="icon"
+              href="/admin/bookings/settings"
+              aria-label="Booking settings"
+              title="Booking settings"
+            >
+              <Settings2 className="h-4 w-4" />
+            </ButtonLink>
+          )}
           <ButtonLink href="/admin/bookings/new" size="sm">
             New Booking
           </ButtonLink>

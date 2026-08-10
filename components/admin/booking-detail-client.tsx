@@ -73,6 +73,7 @@ interface BookingDetail {
   securityDeposit: number;
   totalAmount: number;
   advancePaid?: number;
+  advancePaymentMethod?: string;
   deliveryAddress?: string;
   notes?: string;
   returnCondition?: ReturnCondition;
@@ -334,7 +335,10 @@ export function BookingDetailClient({ initialBooking }: { initialBooking: Bookin
                 </p>
                 {Boolean(booking.advancePaid) && (
                   <p className="flex justify-between">
-                    <span className="text-muted-foreground">Advance Paid</span>
+                    <span className="text-muted-foreground">
+                      Advance Paid
+                      {booking.advancePaymentMethod ? ` (${booking.advancePaymentMethod})` : ""}
+                    </span>
                     <span>{formatCurrency(booking.advancePaid ?? 0)}</span>
                   </p>
                 )}

@@ -74,6 +74,7 @@ export default async function BookingDetailPage({
           securityDeposit: booking.securityDeposit,
           totalAmount: booking.totalAmount,
           advancePaid: booking.advancePaid,
+          advancePaymentMethod: booking.advancePaymentMethod,
           deliveryAddress: booking.deliveryAddress,
           notes: booking.notes,
           returnCondition: booking.returnCondition,

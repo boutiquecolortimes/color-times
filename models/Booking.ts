@@ -46,6 +46,10 @@ export interface IBooking extends Document {
   securityDeposit: number;
   totalAmount: number;
   advancePaid: number;
+  // Free text, not an enum — matches the admin-editable payment methods
+  // list (Settings module "payment-methods"), so new options don't need a
+  // schema change.
+  advancePaymentMethod?: string;
   measurements?: MeasurementValues;
   deliveryAddress?: string;
   notes?: string;
@@ -107,6 +111,7 @@ const bookingSchema = new Schema<IBooking>(
     securityDeposit: { type: Number, required: true, min: 0 },
     totalAmount: { type: Number, required: true, min: 0 },
     advancePaid: { type: Number, required: true, min: 0, default: 0 },
+    advancePaymentMethod: { type: String, trim: true },
     measurements: { type: measurementsSchema, default: undefined },
     deliveryAddress: { type: String, trim: true },
     notes: { type: String },
