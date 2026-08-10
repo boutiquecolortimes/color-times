@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const MONGODB_URI = process.env.MONGODB_URI_MONGODB_URI;
+const MONGODB_URI = process.env.MONGODB_URI;
 
 interface MongooseCache {
   conn: typeof mongoose | null;
@@ -24,7 +24,7 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
 
   if (!MONGODB_URI) {
     throw new Error(
-      "MONGODB_URI_MONGODB_URI is not set. Add it to .env.local before making database calls."
+      "MONGODB_URI is not set. Add it to .env.local before making database calls."
     );
   }
 
