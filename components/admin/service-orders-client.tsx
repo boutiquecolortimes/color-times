@@ -3,8 +3,24 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Grid3x3, List } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ChevronDown,
+  Download,
+  FileDown,
+  Grid3x3,
+  List,
+  Pencil,
+  Plus,
+  Printer,
+  Search,
+  Table2,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -12,7 +28,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DatePicker } from "@/components/ui/date-picker";
 import { ServiceOrderStatusBadge } from "@/components/admin/service-order-status-badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
@@ -20,6 +43,7 @@ import {
   ServiceOrderFormDialog,
   type ServiceOrderRow,
 } from "@/components/admin/service-order-form-dialog";
+import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 import { formatDate } from "@/lib/utils";
 import type { ServiceOrderStatus, ServiceType } from "@/models/ServiceOrder";
 
@@ -53,6 +77,12 @@ async function fetchServiceOrders(params: {
   status: string;
   serviceType: ServiceType;
   view: string;
+  search?: string;
+  from?: string;
+  to?: string;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+  all?: boolean;
 }): Promise<{ orders: ServiceOrderRow[]; pagination: Pagination }> {
   const searchParams = new URLSearchParams({
     page: String(params.page),
@@ -60,11 +90,30 @@ async function fetchServiceOrders(params: {
     serviceType: params.serviceType,
   });
   if (params.status !== "all") searchParams.set("status", params.status);
+  if (params.search) searchParams.set("search", params.search);
+  if (params.from) searchParams.set("from", params.from);
+  if (params.to) searchParams.set("to", params.to);
+  if (params.sortBy) searchParams.set("sortBy", params.sortBy);
+  if (params.sortDir) searchParams.set("sortDir", params.sortDir);
+  if (params.all) searchParams.set("all", "true");
 
   const res = await fetch(`/api/admin/service-orders?${searchParams.toString()}`);
   const json = await res.json();
   if (!res.ok) throw new Error(json.error);
   return json.data;
+}
+
+function SortIcon({
+  field,
+  sortBy,
+  sortDir,
+}: {
+  field: string;
+  sortBy: string;
+  sortDir: "asc" | "desc";
+}) {
+  if (sortBy !== field) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
+  return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
 }
 
 export function ServiceOrdersClient({
@@ -82,16 +131,40 @@ export function ServiceOrdersClient({
   const [serviceType, setServiceType] = useState<ServiceType>("dry_clean");
   const [view, setView] = useState<"active" | "trash">("active");
   const [layout, setLayout] = useState<"table" | "card">("table");
+  const [search, setSearch] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [formOpen, setFormOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<ServiceOrderRow | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const isDefaultQuery =
-    page === 1 && status === "all" && serviceType === "dry_clean" && view === "active";
+    page === 1 &&
+    status === "all" &&
+    serviceType === "dry_clean" &&
+    view === "active" &&
+    search === "" &&
+    from === "" &&
+    to === "" &&
+    sortBy === "createdAt" &&
+    sortDir === "desc";
+
+  function toggleSort(field: string) {
+    if (sortBy === field) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(field);
+      setSortDir("asc");
+    }
+    setPage(1);
+  }
 
   const { data } = useQuery({
-    queryKey: ["admin", "service-orders", { page, status, serviceType, view }],
-    queryFn: () => fetchServiceOrders({ page, status, serviceType, view }),
+    queryKey: ["admin", "service-orders", { page, status, serviceType, view, search, from, to, sortBy, sortDir }],
+    queryFn: () => fetchServiceOrders({ page, status, serviceType, view, search, from, to, sortBy, sortDir }),
     initialData: isDefaultQuery
       ? { orders: initialOrders, pagination: initialPagination }
       : undefined,
@@ -102,6 +175,79 @@ export function ServiceOrdersClient({
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["admin", "service-orders"] });
+  }
+
+  const exportHeaders = [
+    "Sr No",
+    "Product",
+    "Description",
+    "Other",
+    "Total",
+    "Assigned To",
+    "Sent Date",
+    "Expected Return",
+    "Status",
+  ];
+
+  function ordersToRows(rows: ServiceOrderRow[]): (string | number)[][] {
+    return rows.map((order, index) => [
+      index + 1,
+      order.product?.name ?? "—",
+      order.description,
+      formatCurrency(order.otherCharge),
+      formatCurrency(order.totalAmount),
+      order.assignedTo ?? "—",
+      formatDate(order.sentDate),
+      formatDate(order.expectedReturnDate),
+      order.status.replace("_", " "),
+    ]);
+  }
+
+  async function fetchAllOrdersForExport(): Promise<ServiceOrderRow[]> {
+    const result = await fetchServiceOrders({
+      page: 1,
+      status,
+      serviceType,
+      view,
+      search,
+      from,
+      to,
+      sortBy,
+      sortDir,
+      all: true,
+    });
+    return result.orders;
+  }
+
+  async function withExportGuard(action: () => Promise<void>): Promise<void> {
+    setIsExporting(true);
+    try {
+      await action();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Export failed");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  function handleExportExcel() {
+    void withExportGuard(async () => {
+      const rows = ordersToRows(await fetchAllOrdersForExport());
+      const title = serviceType === "dry_clean" ? "Dry Clean Orders" : "Tailor Orders";
+      await downloadExcel("service-orders", title, exportHeaders, rows);
+    });
+  }
+
+  function handleExportPdf() {
+    void withExportGuard(async () => {
+      const rows = ordersToRows(await fetchAllOrdersForExport());
+      const title = serviceType === "dry_clean" ? "Dry Clean Orders" : "Tailor Orders";
+      await downloadPdf("service-orders", title, exportHeaders, rows);
+    });
+  }
+
+  function handlePrint() {
+    window.print();
   }
 
   const statusMutation = useMutation({
@@ -269,6 +415,18 @@ export function ServiceOrdersClient({
       </Tabs>
 
       <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-full max-w-xs">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search dress, description, assigned to..."
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(1);
+            }}
+            className="pl-9"
+          />
+        </div>
         <Select
           value={status}
           onValueChange={(value) => {
@@ -305,6 +463,38 @@ export function ServiceOrdersClient({
             <SelectItem value="trash">Trash</SelectItem>
           </SelectContent>
         </Select>
+        <div className="flex items-center gap-2">
+          <DatePicker
+            value={from}
+            onChange={(value) => {
+              setFrom(value);
+              setPage(1);
+            }}
+            placeholder="Sent from"
+          />
+          <span className="text-sm text-muted-foreground">to</span>
+          <DatePicker
+            value={to}
+            onChange={(value) => {
+              setTo(value);
+              setPage(1);
+            }}
+            placeholder="Sent to"
+          />
+          {(from || to) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setFrom("");
+                setTo("");
+                setPage(1);
+              }}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
         <div className="hidden items-center gap-1 rounded-md border border-border p-1 lg:flex">
           <Button
             variant={layout === "table" ? "secondary" : "ghost"}
@@ -323,6 +513,27 @@ export function ServiceOrdersClient({
             <Grid3x3 className="h-4 w-4" />
           </Button>
         </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button variant="outline" size="sm" disabled={isExporting} />}>
+            <Download className="h-4 w-4" />
+            Export
+            <ChevronDown className="h-3.5 w-3.5" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleExportExcel}>
+              <Table2 className="h-4 w-4" />
+              Excel
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportPdf}>
+              <FileDown className="h-4 w-4" />
+              PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handlePrint}>
+              <Printer className="h-4 w-4" />
+              Print
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="lg:hidden">{cardGrid}</div>
@@ -334,8 +545,13 @@ export function ServiceOrdersClient({
         <table className="w-full min-w-[820px] text-sm whitespace-nowrap">
           <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
+              <th className="px-4 py-3">Sr No</th>
               <th className="px-4 py-3">Product</th>
-              <th className="px-4 py-3">Description</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("description")}>
+                  Description <SortIcon field="description" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               {serviceType === "dry_clean" ? (
                 <>
                   <th className="px-4 py-3">Dry Clean</th>
@@ -348,16 +564,31 @@ export function ServiceOrdersClient({
                 </>
               )}
               <th className="px-4 py-3">Other</th>
-              <th className="px-4 py-3">Total</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("totalAmount")}>
+                  Total <SortIcon field="totalAmount" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3">Assigned To</th>
-              <th className="px-4 py-3">Expected Return</th>
-              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("expectedReturnDate")}>
+                  Expected Return <SortIcon field="expectedReturnDate" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("status")}>
+                  Status <SortIcon field="status" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {orders.map((order) => (
+            {orders.map((order, index) => (
               <tr key={order._id} className="border-b border-border last:border-0">
+                <td className="px-4 py-3 text-muted-foreground">
+                  {(pagination.page - 1) * pagination.pageSize + index + 1}
+                </td>
                 <td className="px-4 py-3 font-medium">{order.product?.name ?? "—"}</td>
                 <td className="px-4 py-3 text-muted-foreground">{order.description}</td>
                 {serviceType === "dry_clean" ? (
@@ -432,7 +663,7 @@ export function ServiceOrdersClient({
             ))}
             {orders.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={10} className="px-4 py-10 text-center text-muted-foreground">
                   No service orders found.
                 </td>
               </tr>

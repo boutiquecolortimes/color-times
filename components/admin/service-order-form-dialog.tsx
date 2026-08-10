@@ -180,80 +180,82 @@ export function ServiceOrderFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{editingOrder ? "Edit Service Order" : "New Service Order"}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
-            className="space-y-4"
+            className="max-h-[70vh] space-y-4 overflow-y-auto pr-1"
           >
-            <FormField
-              control={form.control}
-              name="serviceType"
-              render={() => (
-                <FormItem>
-                  <FormLabel>Service Type</FormLabel>
-                  <Select
-                    value={serviceTypeValue}
-                    onValueChange={(value) =>
-                      form.setValue("serviceType", value as "dry_clean" | "tailor")
-                    }
-                  >
-                    <FormControl>
-                      <SelectTrigger className="w-full">
-                        <SelectValue>
-                          {(value: "dry_clean" | "tailor") =>
-                            value === "dry_clean" ? "Dry Clean" : "Tailor / Alteration"
-                          }
-                        </SelectValue>
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="dry_clean">Dry Clean</SelectItem>
-                      <SelectItem value="tailor">Tailor / Alteration</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="serviceType"
+                render={() => (
+                  <FormItem>
+                    <FormLabel>Service Type</FormLabel>
+                    <Select
+                      value={serviceTypeValue}
+                      onValueChange={(value) =>
+                        form.setValue("serviceType", value as "dry_clean" | "tailor")
+                      }
+                    >
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue>
+                            {(value: "dry_clean" | "tailor") =>
+                              value === "dry_clean" ? "Dry Clean" : "Tailor / Alteration"
+                            }
+                          </SelectValue>
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="dry_clean">Dry Clean</SelectItem>
+                        <SelectItem value="tailor">Tailor / Alteration</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="product"
-              render={() => (
-                <FormItem>
-                  <FormLabel>Product</FormLabel>
-                  <Select
-                    value={productValue}
-                    onValueChange={(value) => form.setValue("product", value ?? "")}
-                    disabled={isProductLocked}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="w-full" disabled={isProductLocked}>
-                        <SelectValue placeholder="Select a product">
-                          {() =>
-                            selectedProduct
-                              ? `${selectedProduct.name} (${selectedProduct.sku})`
-                              : "Select a product"
-                          }
-                        </SelectValue>
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {products.map((product) => (
-                        <SelectItem key={product._id} value={product._id}>
-                          {product.name} ({product.sku})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="product"
+                render={() => (
+                  <FormItem>
+                    <FormLabel>Product</FormLabel>
+                    <Select
+                      value={productValue}
+                      onValueChange={(value) => form.setValue("product", value ?? "")}
+                      disabled={isProductLocked}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="w-full" disabled={isProductLocked}>
+                          <SelectValue placeholder="Select a product">
+                            {() =>
+                              selectedProduct
+                                ? `${selectedProduct.name} (${selectedProduct.sku})`
+                                : "Select a product"
+                            }
+                          </SelectValue>
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {products.map((product) => (
+                          <SelectItem key={product._id} value={product._id}>
+                            {product.name} ({product.sku})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <FormField
               control={form.control}
