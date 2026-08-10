@@ -257,6 +257,18 @@
   canvas {
     max-width: 100%;
   }
+  /* Amount/quantity fields (rent, security deposit, stock, etc.) are typed
+     into directly far more often than nudged with the spinner — the
+     increment/decrement arrows just get in the way and steal clicks near
+     the field's edge. Hidden site-wide rather than per-field. */
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
 }
 
 @layer utilities {
