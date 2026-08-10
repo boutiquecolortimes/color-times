@@ -18,27 +18,41 @@ export async function GET(request: NextRequest): Promise<Response> {
   await connectToDatabase();
 
   const searchParams = request.nextUrl.searchParams;
+  const all = searchParams.get("all") === "true";
   const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
   const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize") ?? "5")));
   const status = searchParams.get("status");
   const view = searchParams.get("view") ?? "active";
+  const sortBy = searchParams.get("sortBy");
+  const sortDir = searchParams.get("sortDir") === "desc" ? -1 : 1;
+  const SORTABLE_FIELDS: Record<string, string> = {
+    billNumber: "billNumber",
+    customerName: "customerName",
+    totalAmount: "totalAmount",
+    dueAmount: "dueAmount",
+    orderDate: "orderDate",
+    status: "status",
+  };
+  const sort = sortBy && SORTABLE_FIELDS[sortBy]
+    ? { [SORTABLE_FIELDS[sortBy]]: sortDir as 1 | -1 }
+    : { createdAt: -1 as const };
 
   const filter: Record<string, unknown> =
     view === "trash" ? { deletedAt: { $ne: null } } : { deletedAt: null };
   if (status && status !== "all") filter.status = status;
 
+  const baseQuery = CustomisationOrder.find(filter).sort(sort);
+
   const [orders, total] = await Promise.all([
-    CustomisationOrder.find(filter)
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * pageSize)
-      .limit(pageSize)
-      .lean(),
+    all ? baseQuery.lean() : baseQuery.skip((page - 1) * pageSize).limit(pageSize).lean(),
     CustomisationOrder.countDocuments(filter),
   ]);
 
   return apiSuccess({
     orders,
-    pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    pagination: all
+      ? { page: 1, pageSize: total || 1, total, totalPages: 1 }
+      : { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
   });
 }
 

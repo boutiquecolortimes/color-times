@@ -3,7 +3,22 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Send, Grid3x3, List } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ChevronDown,
+  Download,
+  FileDown,
+  Grid3x3,
+  List,
+  Pencil,
+  Plus,
+  Printer,
+  Send,
+  Table2,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -12,6 +27,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { CustomisationStatusBadge } from "@/components/admin/customisation-status-badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
@@ -19,6 +40,7 @@ import {
   CustomisationFormDialog,
   type CustomisationOrderRow,
 } from "@/components/admin/customisation-form-dialog";
+import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 import { formatDate } from "@/lib/utils";
 import type { CustomisationOrderStatus } from "@/models/CustomisationOrder";
 
@@ -45,14 +67,33 @@ async function fetchOrders(params: {
   page: number;
   status: string;
   view: string;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+  all?: boolean;
 }): Promise<{ orders: CustomisationOrderRow[]; pagination: Pagination }> {
   const searchParams = new URLSearchParams({ page: String(params.page), view: params.view });
   if (params.status !== "all") searchParams.set("status", params.status);
+  if (params.sortBy) searchParams.set("sortBy", params.sortBy);
+  if (params.sortDir) searchParams.set("sortDir", params.sortDir);
+  if (params.all) searchParams.set("all", "true");
 
   const res = await fetch(`/api/admin/customisation-orders?${searchParams.toString()}`);
   const json = await res.json();
   if (!res.ok) throw new Error(json.error);
   return json.data;
+}
+
+function SortIcon({
+  field,
+  sortBy,
+  sortDir,
+}: {
+  field: string;
+  sortBy: string;
+  sortDir: "asc" | "desc";
+}) {
+  if (sortBy !== field) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
+  return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
 }
 
 export function CustomisationClient({
@@ -67,15 +108,29 @@ export function CustomisationClient({
   const [status, setStatus] = useState("all");
   const [view, setView] = useState<"active" | "trash">("active");
   const [layout, setLayout] = useState<"table" | "card">("table");
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [formOpen, setFormOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<CustomisationOrderRow | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
-  const isDefaultQuery = page === 1 && status === "all" && view === "active";
+  const isDefaultQuery =
+    page === 1 && status === "all" && view === "active" && sortBy === "createdAt" && sortDir === "desc";
+
+  function toggleSort(field: string) {
+    if (sortBy === field) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(field);
+      setSortDir("asc");
+    }
+    setPage(1);
+  }
 
   const { data } = useQuery({
-    queryKey: ["admin", "customisation-orders", { page, status, view }],
-    queryFn: () => fetchOrders({ page, status, view }),
+    queryKey: ["admin", "customisation-orders", { page, status, view, sortBy, sortDir }],
+    queryFn: () => fetchOrders({ page, status, view, sortBy, sortDir }),
     initialData: isDefaultQuery
       ? { orders: initialOrders, pagination: initialPagination }
       : undefined,
@@ -86,6 +141,56 @@ export function CustomisationClient({
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["admin", "customisation-orders"] });
+  }
+
+  const exportHeaders = ["Sr No", "Bill #", "Customer", "Stitching Type", "Total", "Advance", "Due", "Order Date", "Status"];
+
+  function ordersToRows(rows: CustomisationOrderRow[]): (string | number)[][] {
+    return rows.map((order, index) => [
+      index + 1,
+      order.billNumber,
+      order.customerName,
+      order.stitchingType,
+      order.totalAmount,
+      order.advancePayment,
+      order.dueAmount,
+      formatDate(order.orderDate),
+      order.status.replace("_", " "),
+    ]);
+  }
+
+  async function fetchAllOrdersForExport(): Promise<CustomisationOrderRow[]> {
+    const result = await fetchOrders({ page: 1, status, view, sortBy, sortDir, all: true });
+    return result.orders;
+  }
+
+  async function withExportGuard(action: () => Promise<void>): Promise<void> {
+    setIsExporting(true);
+    try {
+      await action();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Export failed");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  function handleExportExcel() {
+    void withExportGuard(async () => {
+      const rows = ordersToRows(await fetchAllOrdersForExport());
+      await downloadExcel("customisation-orders", "Customisation Orders", exportHeaders, rows);
+    });
+  }
+
+  function handleExportPdf() {
+    void withExportGuard(async () => {
+      const rows = ordersToRows(await fetchAllOrdersForExport());
+      await downloadPdf("customisation-orders", "Customisation Orders", exportHeaders, rows);
+    });
+  }
+
+  function handlePrint() {
+    window.print();
   }
 
   const statusMutation = useMutation({
@@ -293,6 +398,27 @@ export function CustomisationClient({
             <Grid3x3 className="h-4 w-4" />
           </Button>
         </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button variant="outline" size="sm" disabled={isExporting} />}>
+            <Download className="h-4 w-4" />
+            Export
+            <ChevronDown className="h-3.5 w-3.5" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleExportExcel}>
+              <Table2 className="h-4 w-4" />
+              Excel
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportPdf}>
+              <FileDown className="h-4 w-4" />
+              PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handlePrint}>
+              <Printer className="h-4 w-4" />
+              Print
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="lg:hidden">{cardGrid}</div>
@@ -304,20 +430,44 @@ export function CustomisationClient({
         <table className="w-full min-w-[860px] text-sm whitespace-nowrap">
           <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
-              <th className="px-4 py-3">Bill #</th>
-              <th className="px-4 py-3">Customer</th>
+              <th className="px-4 py-3">Sr No</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("billNumber")}>
+                  Bill # <SortIcon field="billNumber" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("customerName")}>
+                  Customer <SortIcon field="customerName" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3">Stitching Type</th>
-              <th className="px-4 py-3">Total</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("totalAmount")}>
+                  Total <SortIcon field="totalAmount" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3">Advance</th>
-              <th className="px-4 py-3">Due</th>
-              <th className="px-4 py-3">Order Date</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("dueAmount")}>
+                  Due <SortIcon field="dueAmount" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("orderDate")}>
+                  Order Date <SortIcon field="orderDate" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {orders.map((order) => (
+            {orders.map((order, index) => (
               <tr key={order._id} className="border-b border-border last:border-0">
+                <td className="px-4 py-3 text-muted-foreground">
+                  {(pagination.page - 1) * pagination.pageSize + index + 1}
+                </td>
                 <td className="px-4 py-3 font-medium">{order.billNumber}</td>
                 <td className="px-4 py-3">
                   <p>{order.customerName}</p>
@@ -396,7 +546,7 @@ export function CustomisationClient({
             ))}
             {orders.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={10} className="px-4 py-10 text-center text-muted-foreground">
                   No customisation orders found.
                 </td>
               </tr>

@@ -388,6 +388,7 @@ function EntityTrashPanel({ entity }: { entity: EntityConfig }) {
         <table className="w-full min-w-[520px] text-sm">
           <thead className="border-b border-border bg-secondary/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
+              <th className="px-4 py-3">Sr No</th>
               <th className="w-10 px-4 py-3">
                 <Checkbox
                   checked={rows.length > 0 && selectedIds.size === rows.length}
@@ -401,8 +402,11 @@ function EntityTrashPanel({ entity }: { entity: EntityConfig }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {rows.map((row, index) => (
               <tr key={row.id} className="border-b border-border last:border-0">
+                <td className="px-4 py-3 text-muted-foreground">
+                  {((pagination?.page ?? 1) - 1) * (pagination?.pageSize ?? rows.length) + index + 1}
+                </td>
                 <td className="px-4 py-3">
                   <Checkbox
                     checked={selectedIds.has(row.id)}
@@ -454,7 +458,7 @@ function EntityTrashPanel({ entity }: { entity: EntityConfig }) {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
                   {isFetching ? "Loading..." : `Trash is empty — no ${entity.itemLabel} to show.`}
                 </td>
               </tr>
