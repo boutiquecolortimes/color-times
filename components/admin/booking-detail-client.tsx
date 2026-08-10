@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BookingStatusBadge } from "@/components/admin/booking-status-badge";
+import { BookingStatusBadge, STATUS_LABELS } from "@/components/admin/booking-status-badge";
 import { ReturnBookingDialog } from "@/components/admin/return-booking-dialog";
 import { ConfirmBookingDialog } from "@/components/admin/confirm-booking-dialog";
 import { AuditLogList } from "@/components/admin/audit-log-list";
@@ -189,12 +189,12 @@ export function BookingDetailClient({ initialBooking }: { initialBooking: Bookin
             }}
           >
             <SelectTrigger className="w-48">
-              <SelectValue>{(value: string) => value.replace("_", " ")}</SelectValue>
+              <SelectValue>{(value: BookingStatus) => STATUS_LABELS[value]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {STATUS_OPTIONS.map((option) => (
                 <SelectItem key={option} value={option}>
-                  {option.replace("_", " ")}
+                  {STATUS_LABELS[option]}
                 </SelectItem>
               ))}
             </SelectContent>

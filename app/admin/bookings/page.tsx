@@ -17,7 +17,7 @@ export default async function AdminBookingsPage() {
 
   await connectToDatabase();
 
-  const [bookings, total, summaryAgg] = await Promise.all([
+  const [bookings, total, summaryAgg, statusAgg] = await Promise.all([
     Booking.find({ deletedAt: null })
       .populate("customer", "name email")
       .populate("items.product", "name images")
@@ -35,6 +35,10 @@ export default async function AdminBookingsPage() {
           advancePaid: { $sum: "$advancePaid" },
         },
       },
+    ]),
+    Booking.aggregate([
+      { $match: { deletedAt: null } },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
     ]),
   ]);
 
@@ -67,6 +71,11 @@ export default async function AdminBookingsPage() {
 
   const summaryRow = summaryAgg[0] ?? { totalAmount: 0, securityDeposit: 0, advancePaid: 0 };
 
+  const rawStatusCounts: Record<string, number> = {};
+  for (const row of statusAgg as { _id: string; count: number }[]) {
+    rawStatusCounts[row._id] = row.count;
+  }
+
   return (
     <BookingsClient
       initialBookings={initialBookings}
@@ -81,6 +90,14 @@ export default async function AdminBookingsPage() {
         securityDeposit: summaryRow.securityDeposit,
         advancePaid: summaryRow.advancePaid,
         dueAmount: summaryRow.totalAmount - summaryRow.advancePaid,
+      }}
+      initialStatusCounts={{
+        all: Object.values(rawStatusCounts).reduce((sum, count) => sum + count, 0),
+        new: (rawStatusCounts.inquiry ?? 0) + (rawStatusCounts.pending_payment ?? 0),
+        confirmed: rawStatusCounts.confirmed ?? 0,
+        in_use: rawStatusCounts.in_use ?? 0,
+        returned: rawStatusCounts.returned ?? 0,
+        cancelled: rawStatusCounts.cancelled ?? 0,
       }}
       canManageSettings={canManageSettings}
     />

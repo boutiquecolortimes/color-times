@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   CalendarDays,
   ChevronDown,
   Download,
@@ -34,7 +37,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { BookingStatusBadge } from "@/components/admin/booking-status-badge";
+import { BookingStatusBadge, STATUS_LABELS } from "@/components/admin/booking-status-badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BookingCalendar } from "@/components/admin/booking-calendar";
 import { ReturnBookingDialog } from "@/components/admin/return-booking-dialog";
 import { ConfirmBookingDialog } from "@/components/admin/confirm-booking-dialog";
@@ -67,8 +71,39 @@ interface BookingsSummary {
   dueAmount: number;
 }
 
+interface StatusCounts {
+  all: number;
+  new: number;
+  confirmed: number;
+  in_use: number;
+  returned: number;
+  cancelled: number;
+}
+
+const EMPTY_STATUS_COUNTS: StatusCounts = {
+  all: 0,
+  new: 0,
+  confirmed: 0,
+  in_use: 0,
+  returned: 0,
+  cancelled: 0,
+};
+
 function formatINR(value: number): string {
   return `₹${Math.round(value).toLocaleString("en-IN")}`;
+}
+
+function SortIcon({
+  field,
+  sortBy,
+  sortDir,
+}: {
+  field: string;
+  sortBy: string;
+  sortDir: "asc" | "desc";
+}) {
+  if (sortBy !== field) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
+  return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
 }
 
 function productSummary(items: { product: { name: string } | null }[]): string {
@@ -85,14 +120,17 @@ interface Pagination {
   totalPages: number;
 }
 
-const STATUS_FILTERS: { value: string; label: string }[] = [
-  { value: "all", label: "All Statuses" },
-  { value: "inquiry", label: "Inquiry" },
-  { value: "pending_payment", label: "Pending Payment" },
-  { value: "confirmed", label: "Confirmed" },
-  { value: "in_use", label: "In Use" },
-  { value: "returned", label: "Returned" },
-  { value: "cancelled", label: "Cancelled" },
+// The bookings list is categorized by lifecycle stage instead of a plain
+// status dropdown — "New" collapses inquiry + pending_payment (nothing's
+// confirmed yet), the rest map 1:1 to a stored status value. Cancelled
+// bookings live under "All" only, same as before.
+const STATUS_TABS: { value: string; label: string; countKey: keyof StatusCounts }[] = [
+  { value: "all", label: "All", countKey: "all" },
+  { value: "new", label: "New Booking", countKey: "new" },
+  { value: "confirmed", label: "Confirmed", countKey: "confirmed" },
+  { value: "in_use", label: "Picked Up", countKey: "in_use" },
+  { value: "returned", label: "Returned", countKey: "returned" },
+  { value: "cancelled", label: "Cancelled", countKey: "cancelled" },
 ];
 
 const STATUS_OPTIONS: BookingStatus[] = [
@@ -110,13 +148,22 @@ async function fetchBookings(params: {
   from: string;
   to: string;
   search: string;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
   view?: "active" | "trash";
   all?: boolean;
-}): Promise<{ bookings: BookingRow[]; pagination: Pagination; summary: BookingsSummary }> {
+}): Promise<{
+  bookings: BookingRow[];
+  pagination: Pagination;
+  summary: BookingsSummary;
+  statusCounts: StatusCounts;
+}> {
   const searchParams = new URLSearchParams({ page: String(params.page) });
   if (params.status !== "all") searchParams.set("status", params.status);
   if (params.from) searchParams.set("from", params.from);
   if (params.to) searchParams.set("to", params.to);
+  if (params.sortBy) searchParams.set("sortBy", params.sortBy);
+  if (params.sortDir) searchParams.set("sortDir", params.sortDir);
   if (params.search) searchParams.set("search", params.search);
   if (params.view) searchParams.set("view", params.view);
   if (params.all) searchParams.set("all", "true");
@@ -131,11 +178,13 @@ export function BookingsClient({
   initialBookings,
   initialPagination,
   initialSummary,
+  initialStatusCounts,
   canManageSettings,
 }: {
   initialBookings: BookingRow[];
   initialPagination: Pagination;
   initialSummary: BookingsSummary;
+  initialStatusCounts?: StatusCounts;
   canManageSettings: boolean;
 }) {
   const queryClient = useQueryClient();
@@ -144,6 +193,8 @@ export function BookingsClient({
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [view, setView] = useState<"table" | "card" | "calendar">("table");
   const [trashView, setTrashView] = useState<"active" | "trash">("active");
   const [returnDialogBookingId, setReturnDialogBookingId] = useState<string | null>(null);
@@ -158,19 +209,37 @@ export function BookingsClient({
     from === "" &&
     to === "" &&
     search === "" &&
+    sortBy === "createdAt" &&
+    sortDir === "desc" &&
     trashView === "active";
 
+  function toggleSort(field: string) {
+    if (sortBy === field) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(field);
+      setSortDir("asc");
+    }
+    setPage(1);
+  }
+
   const { data } = useQuery({
-    queryKey: ["admin", "bookings", { page, status, from, to, search, trashView }],
-    queryFn: () => fetchBookings({ page, status, from, to, search, view: trashView }),
+    queryKey: ["admin", "bookings", { page, status, from, to, search, sortBy, sortDir, trashView }],
+    queryFn: () => fetchBookings({ page, status, from, to, search, sortBy, sortDir, view: trashView }),
     initialData: isDefaultQuery
-      ? { bookings: initialBookings, pagination: initialPagination, summary: initialSummary }
+      ? {
+          bookings: initialBookings,
+          pagination: initialPagination,
+          summary: initialSummary,
+          statusCounts: initialStatusCounts ?? EMPTY_STATUS_COUNTS,
+        }
       : undefined,
   });
 
   const bookings = data?.bookings ?? [];
   const pagination = data?.pagination ?? initialPagination;
   const summary = data?.summary ?? initialSummary;
+  const statusCounts = data?.statusCounts ?? initialStatusCounts ?? EMPTY_STATUS_COUNTS;
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({
@@ -241,6 +310,7 @@ export function BookingsClient({
   });
 
   const exportHeaders = [
+    "Sr No",
     "Booking #",
     "Bill #",
     "Booking Date",
@@ -257,7 +327,8 @@ export function BookingsClient({
   ];
 
   function bookingsToRows(rows: BookingRow[]): (string | number)[][] {
-    return rows.map((booking) => [
+    return rows.map((booking, index) => [
+      index + 1,
       booking.bookingNumber,
       booking.billNumber || "—",
       formatDate(booking.bookingDate),
@@ -270,12 +341,13 @@ export function BookingsClient({
       booking.securityDeposit,
       booking.advancePaid,
       booking.totalAmount - booking.advancePaid,
-      booking.status.replace("_", " "),
+      STATUS_LABELS[booking.status],
     ]);
   }
 
   function bookingsExportTotals(rows: BookingRow[]): (string | number)[] {
     return [
+      "",
       "TOTAL",
       "",
       "",
@@ -299,6 +371,8 @@ export function BookingsClient({
       from,
       to,
       search,
+      sortBy,
+      sortDir,
       view: trashView,
       all: true,
     });
@@ -429,12 +503,12 @@ export function BookingsClient({
                   }}
                 >
                   <SelectTrigger className="w-full" size="sm">
-                    <SelectValue>{(value: string) => value.replace("_", " ")}</SelectValue>
+                    <SelectValue>{(value: BookingStatus) => STATUS_LABELS[value]}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {STATUS_OPTIONS.map((option) => (
                       <SelectItem key={option} value={option}>
-                        {option.replace("_", " ")}
+                        {STATUS_LABELS[option]}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -463,6 +537,32 @@ export function BookingsClient({
 
   return (
     <div className="space-y-6">
+      <Tabs
+        value={status}
+        onValueChange={(value) => {
+          setStatus(value ?? "all");
+          setPage(1);
+        }}
+      >
+        <TabsList>
+          {STATUS_TABS.map((tab) => (
+            <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5">
+              {tab.label}
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-0.5 text-xs tabular-nums",
+                  status === tab.value
+                    ? "bg-accent/15 text-accent"
+                    : "bg-secondary text-muted-foreground"
+                )}
+              >
+                {statusCounts[tab.countKey]}
+              </span>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative w-full max-w-xs">
@@ -477,28 +577,6 @@ export function BookingsClient({
               className="pl-9"
             />
           </div>
-          <Select
-            value={status}
-            onValueChange={(value) => {
-              setStatus(value ?? "all");
-              setPage(1);
-            }}
-          >
-            <SelectTrigger className="w-full sm:w-56">
-              <SelectValue>
-                {(value: string) =>
-                  STATUS_FILTERS.find((option) => option.value === value)?.label ?? value
-                }
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {STATUS_FILTERS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Select
             value={trashView}
             onValueChange={(value) => {
@@ -680,17 +758,50 @@ export function BookingsClient({
             <table className="w-full min-w-[1240px] text-sm whitespace-nowrap">
               <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
+                  <th className="px-4 py-3">Sr No</th>
                   <th className="px-4 py-3">Booking #</th>
                   <th className="px-4 py-3">Bill #</th>
-                  <th className="px-4 py-3">Booking Date</th>
+                  <th className="px-4 py-3">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-foreground"
+                      onClick={() => toggleSort("bookingDate")}
+                    >
+                      Booking Date <SortIcon field="bookingDate" sortBy={sortBy} sortDir={sortDir} />
+                    </button>
+                  </th>
                   <th className="px-4 py-3">Customer</th>
                   <th className="px-4 py-3">Product</th>
                   <th className="px-4 py-3">Rental Dates</th>
-                  <th className="px-4 py-3">Total</th>
+                  <th className="px-4 py-3">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-foreground"
+                      onClick={() => toggleSort("totalAmount")}
+                    >
+                      Total <SortIcon field="totalAmount" sortBy={sortBy} sortDir={sortDir} />
+                    </button>
+                  </th>
                   <th className="px-4 py-3">Security</th>
-                  <th className="px-4 py-3">Advance</th>
+                  <th className="px-4 py-3">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-foreground"
+                      onClick={() => toggleSort("advancePaid")}
+                    >
+                      Advance <SortIcon field="advancePaid" sortBy={sortBy} sortDir={sortDir} />
+                    </button>
+                  </th>
                   <th className="px-4 py-3">Due</th>
-                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-foreground"
+                      onClick={() => toggleSort("status")}
+                    >
+                      Status <SortIcon field="status" sortBy={sortBy} sortDir={sortDir} />
+                    </button>
+                  </th>
                   <th className="px-4 py-3 text-right">Update</th>
                   <th className="px-4 py-3 text-right">
                     <span className="sr-only">Delete</span>
@@ -698,11 +809,14 @@ export function BookingsClient({
                 </tr>
               </thead>
               <tbody>
-                {bookings.map((booking) => (
+                {bookings.map((booking, index) => (
                   <tr
                     key={booking._id}
                     className="border-b border-border last:border-0"
                   >
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {(pagination.page - 1) * pagination.pageSize + index + 1}
+                    </td>
                     <td className="px-4 py-3 font-medium">
                       <Link
                         href={`/admin/bookings/${booking._id}`}
@@ -779,13 +893,13 @@ export function BookingsClient({
                         >
                           <SelectTrigger className="ml-auto w-40" size="sm">
                             <SelectValue>
-                              {(value: string) => value.replace("_", " ")}
+                              {(value: BookingStatus) => STATUS_LABELS[value]}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             {STATUS_OPTIONS.map((option) => (
                               <SelectItem key={option} value={option}>
-                                {option.replace("_", " ")}
+                                {STATUS_LABELS[option]}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -824,7 +938,7 @@ export function BookingsClient({
                 {bookings.length === 0 && (
                   <tr>
                     <td
-                      colSpan={13}
+                      colSpan={14}
                       className="px-4 py-10 text-center text-muted-foreground"
                     >
                       No bookings found.

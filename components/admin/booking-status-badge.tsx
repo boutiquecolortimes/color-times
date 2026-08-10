@@ -11,11 +11,14 @@ const STATUS_STYLES: Record<BookingStatus, string> = {
   cancelled: "bg-red-100 text-red-800",
 };
 
-const STATUS_LABELS: Record<BookingStatus, string> = {
+// "in_use" is the underlying stored value (unchanged, so existing bookings
+// don't need a data migration) — only the label shown to staff changed from
+// "In Use" to "Picked Up" per their workflow.
+export const STATUS_LABELS: Record<BookingStatus, string> = {
   inquiry: "Inquiry",
   pending_payment: "Pending Payment",
   confirmed: "Confirmed",
-  in_use: "In Use",
+  in_use: "Picked Up",
   returned: "Returned",
   cancelled: "Cancelled",
 };

@@ -26,6 +26,8 @@ export async function GET(request: NextRequest): Promise<Response> {
   const from = searchParams.get("from");
   const to = searchParams.get("to");
   const search = searchParams.get("search")?.trim();
+  const sortBy = searchParams.get("sortBy") || "createdAt";
+  const sortDir = searchParams.get("sortDir") === "asc" ? 1 : -1;
   // "view" (trash/active) is intentionally separate from "status" above —
   // status is the booking lifecycle (inquiry/confirmed/...), this is purely
   // whether the booking has been moved to Trash.
@@ -34,7 +36,11 @@ export async function GET(request: NextRequest): Promise<Response> {
   const filter: Record<string, unknown> = {
     deletedAt: view === "trash" ? { $ne: null } : null,
   };
-  if (status) {
+  // "new" is a virtual tab collapsing the two pre-confirmation statuses —
+  // there's no single stored value for it.
+  if (status === "new") {
+    filter.status = { $in: ["inquiry", "pending_payment"] };
+  } else if (status && status !== "all") {
     filter.status = status;
   }
   // Supports a one-sided range too (just "from" or just "to"), not only both —
@@ -65,12 +71,30 @@ export async function GET(request: NextRequest): Promise<Response> {
     ];
   }
 
+  const SORTABLE_FIELDS: Record<string, string> = {
+    bookingNumber: "bookingNumber",
+    bookingDate: "bookingDate",
+    rentalStartDate: "rentalStartDate",
+    totalAmount: "totalAmount",
+    securityDeposit: "securityDeposit",
+    advancePaid: "advancePaid",
+    status: "status",
+    createdAt: "createdAt",
+  };
+  const sortField = SORTABLE_FIELDS[sortBy] ?? "createdAt";
+
   const baseQuery = Booking.find(filter)
     .populate("customer", "name email")
     .populate("items.product", "name images")
-    .sort({ createdAt: -1 });
+    .sort({ [sortField]: sortDir, createdAt: -1 });
 
-  const [bookings, total, summaryAgg] = await Promise.all([
+  // Tab counts (and the earnings summary) ignore the "status" filter itself
+  // so every tab can show its own count regardless of which one is active —
+  // they still respect search/date/trash-view filters.
+  const countFilter: Record<string, unknown> = { ...filter };
+  delete countFilter.status;
+
+  const [bookings, total, summaryAgg, statusAgg] = await Promise.all([
     all ? baseQuery.lean() : baseQuery.skip((page - 1) * pageSize).limit(pageSize).lean(),
     Booking.countDocuments(filter),
     // Earnings summary is computed over every booking matching the current
@@ -87,6 +111,10 @@ export async function GET(request: NextRequest): Promise<Response> {
         },
       },
     ]),
+    Booking.aggregate([
+      { $match: countFilter },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]),
   ]);
 
   const summaryRow = summaryAgg[0] ?? { totalAmount: 0, securityDeposit: 0, advancePaid: 0 };
@@ -95,6 +123,19 @@ export async function GET(request: NextRequest): Promise<Response> {
     securityDeposit: summaryRow.securityDeposit,
     advancePaid: summaryRow.advancePaid,
     dueAmount: summaryRow.totalAmount - summaryRow.advancePaid,
+  };
+
+  const rawStatusCounts: Record<string, number> = {};
+  for (const row of statusAgg as { _id: string; count: number }[]) {
+    rawStatusCounts[row._id] = row.count;
+  }
+  const statusCounts = {
+    all: Object.values(rawStatusCounts).reduce((sum, count) => sum + count, 0),
+    new: (rawStatusCounts.inquiry ?? 0) + (rawStatusCounts.pending_payment ?? 0),
+    confirmed: rawStatusCounts.confirmed ?? 0,
+    in_use: rawStatusCounts.in_use ?? 0,
+    returned: rawStatusCounts.returned ?? 0,
+    cancelled: rawStatusCounts.cancelled ?? 0,
   };
 
   // Older bookings predate the bookingDate/advancePaid fields, so a plain
@@ -112,6 +153,7 @@ export async function GET(request: NextRequest): Promise<Response> {
       ? { page: 1, pageSize: total || 1, total, totalPages: 1 }
       : { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
     summary,
+    statusCounts,
   });
 }
 
@@ -187,7 +229,10 @@ export async function POST(request: NextRequest): Promise<Response> {
       rentalEndDate,
       // No longer collected in the form — defaults to the pickup date.
       eventDate: input.eventDate ? new Date(input.eventDate) : rentalStartDate,
-      status: "inquiry",
+      // Any advance received means the customer has committed — skip the
+      // "inquiry" stage and go straight to Confirmed instead of making
+      // staff manually flip it after every booking with a deposit.
+      status: (input.advancePaid ?? 0) > 0 ? "confirmed" : "inquiry",
       securityDeposit,
       totalAmount,
       advancePaid: input.advancePaid ?? 0,
