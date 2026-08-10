@@ -321,8 +321,9 @@ export function InvoicesClient({
     totals: (string | number)[];
   }> {
     const full = await fetchInvoices({ page: 1, status, view, search, sortBy, sortDir, all: true });
-    const headers = ["Invoice #", "Customer", "Total", "Paid", "Due", "Status", "Due Date"];
-    const rows = full.invoices.map((invoice) => [
+    const headers = ["Sr No", "Invoice #", "Customer", "Total", "Paid", "Due", "Status", "Due Date"];
+    const rows = full.invoices.map((invoice, index) => [
+      index + 1,
       invoice.invoiceNumber,
       invoice.customer?.name ?? "—",
       invoice.total,
@@ -332,6 +333,7 @@ export function InvoicesClient({
       formatDate(invoice.dueDate),
     ]);
     const totals = [
+      "",
       "TOTAL",
       "",
       full.invoices.reduce((sum, invoice) => sum + invoice.total, 0),
@@ -621,6 +623,7 @@ export function InvoicesClient({
         <table className="w-full min-w-[640px] text-sm whitespace-nowrap">
           <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
+              <th className="px-4 py-3">Sr No</th>
               <th className="px-4 py-3">
                 <Checkbox
                   checked={invoices.length > 0 && selectedIds.size === invoices.length}
@@ -656,8 +659,11 @@ export function InvoicesClient({
             </tr>
           </thead>
           <tbody>
-            {invoices.map((invoice) => (
+            {invoices.map((invoice, index) => (
               <tr key={invoice._id} className="border-b border-border last:border-0">
+                <td className="px-4 py-3 text-muted-foreground">
+                  {(pagination.page - 1) * pagination.pageSize + index + 1}
+                </td>
                 <td className="px-4 py-3">
                   <Checkbox
                     checked={selectedIds.has(invoice._id)}
@@ -756,7 +762,7 @@ export function InvoicesClient({
             ))}
             {invoices.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={11} className="px-4 py-10 text-center text-muted-foreground">
                   No invoices found.
                 </td>
               </tr>

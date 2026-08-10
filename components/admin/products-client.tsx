@@ -431,11 +431,12 @@ export function ProductsClient({
     }
   }
 
-const exportHeaders = ["Name", "Code", "Category", "Rent", "Stock", "Status"];
+const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Stock", "Status"];
 
   async function fetchExportRows(): Promise<(string | number)[][]> {
     const full = await fetchProducts({ page: 1, search, category, status, sortBy, sortDir, all: true });
-    return full.products.map((product) => [
+    return full.products.map((product, index) => [
+      index + 1,
       product.name,
       product.sku,
       product.category?.name ?? "",
@@ -702,6 +703,7 @@ const exportHeaders = ["Name", "Code", "Category", "Rent", "Stock", "Status"];
           <table className="w-full min-w-[640px] text-sm whitespace-nowrap">
             <thead className="sticky top-0 z-10 border-b border-border bg-secondary/60 text-left text-xs uppercase tracking-wide text-muted-foreground backdrop-blur">
               <tr>
+                <th className="px-4 py-3">Sr No</th>
                 <th className="w-10 px-4 py-3">
                   <Checkbox
                     checked={products.length > 0 && selectedIds.size === products.length}
@@ -736,8 +738,11 @@ const exportHeaders = ["Name", "Code", "Category", "Rent", "Stock", "Status"];
               </tr>
             </thead>
             <tbody>
-              {products.map((product) => (
+              {products.map((product, index) => (
                 <tr key={product._id} className="border-b border-border last:border-0">
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {(pagination.page - 1) * pagination.pageSize + index + 1}
+                  </td>
                   <td className="px-4 py-3">
                     <Checkbox
                       checked={selectedIds.has(product._id)}
@@ -1007,7 +1012,7 @@ const exportHeaders = ["Name", "Code", "Category", "Rent", "Stock", "Status"];
               ))}
               {products.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
                     {isFetching ? "Loading..." : "No products found."}
                   </td>
                 </tr>

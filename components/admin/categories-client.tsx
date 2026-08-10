@@ -6,6 +6,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   ChevronDown,
   Download,
   FileDown,
@@ -72,9 +75,13 @@ interface Pagination {
 async function fetchCategories(params: {
   status: string;
   page: number;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
   all?: boolean;
 }): Promise<{ categories: CategoryRow[]; pagination: Pagination }> {
   const searchParams = new URLSearchParams({ status: params.status, page: String(params.page) });
+  if (params.sortBy) searchParams.set("sortBy", params.sortBy);
+  if (params.sortDir) searchParams.set("sortDir", params.sortDir);
   if (params.all) searchParams.set("all", "true");
   const res = await fetch(`/api/admin/categories?${searchParams.toString()}`);
   const json = await res.json();
@@ -90,6 +97,19 @@ function slugify(value: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
+function SortIcon({
+  field,
+  sortBy,
+  sortDir,
+}: {
+  field: string;
+  sortBy: string;
+  sortDir: "asc" | "desc";
+}) {
+  if (sortBy !== field) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
+  return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+}
+
 export function CategoriesClient({
   initialCategories,
   initialPagination,
@@ -103,6 +123,8 @@ export function CategoriesClient({
   const [view, setView] = useState<"table" | "card">("table");
   const [status, setStatus] = useState<"active" | "trash">("active");
   const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState("displayOrder");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [deleteTarget, setDeleteTarget] = useState<CategoryRow | null>(null);
   const [permanentDeleteTarget, setPermanentDeleteTarget] = useState<CategoryRow | null>(null);
   const [bulkConfirmAction, setBulkConfirmAction] = useState<"delete" | "permanent-delete" | null>(
@@ -111,11 +133,26 @@ export function CategoriesClient({
   const [isExporting, setIsExporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const isDefaultQuery = status === "active" && page === 1;
+  const isDefaultQuery = status === "active" && page === 1 && sortBy === "displayOrder";
+
+  function toggleSort(field: string) {
+    if (sortBy === field) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(field);
+      setSortDir("asc");
+    }
+    setPage(1);
+  }
+
+  // "displayOrder" is the default/unsorted state (matches the server's own
+  // fallback sort) — only send an explicit sortBy once the user picks a
+  // column, so the default view still respects each category's manual order.
+  const activeSortBy = sortBy === "displayOrder" ? undefined : sortBy;
 
   const { data } = useQuery({
-    queryKey: ["admin", "categories", { status, page }],
-    queryFn: () => fetchCategories({ status, page }),
+    queryKey: ["admin", "categories", { status, page, sortBy, sortDir }],
+    queryFn: () => fetchCategories({ status, page, sortBy: activeSortBy, sortDir }),
     initialData: isDefaultQuery
       ? { categories: initialCategories, pagination: initialPagination }
       : undefined,
@@ -287,14 +324,19 @@ export function CategoriesClient({
     setSelectedIds(new Set());
   }
 
-  const exportHeaders = ["Name", "Slug", "Description"];
+  const exportHeaders = ["Sr No", "Name", "Slug", "Description"];
 
   function categoriesToRows(rows: CategoryRow[]): (string | number)[][] {
-    return rows.map((category) => [category.name, category.slug, category.description ?? ""]);
+    return rows.map((category, index) => [
+      index + 1,
+      category.name,
+      category.slug,
+      category.description ?? "",
+    ]);
   }
 
   async function fetchAllCategoriesForExport(): Promise<CategoryRow[]> {
-    const result = await fetchCategories({ status, page: 1, all: true });
+    const result = await fetchCategories({ status, page: 1, sortBy: activeSortBy, sortDir, all: true });
     return result.categories;
   }
 
@@ -519,6 +561,7 @@ export function CategoriesClient({
         <table className="w-full min-w-[640px] text-sm whitespace-nowrap">
           <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
+              <th className="px-4 py-3">Sr No</th>
               <th className="px-4 py-3">
                 <Checkbox
                   checked={categories.length > 0 && selectedIds.size === categories.length}
@@ -527,14 +570,25 @@ export function CategoriesClient({
                 />
               </th>
               <th className="px-4 py-3">Image</th>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Slug</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("name")}>
+                  Name <SortIcon field="name" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("slug")}>
+                  Slug <SortIcon field="slug" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {categories.map((category) => (
+            {categories.map((category, index) => (
               <tr key={category._id} className="border-b border-border last:border-0">
+                <td className="px-4 py-3 text-muted-foreground">
+                  {(pagination.page - 1) * pagination.pageSize + index + 1}
+                </td>
                 <td className="px-4 py-3">
                   <Checkbox
                     checked={selectedIds.has(category._id)}
@@ -595,7 +649,7 @@ export function CategoriesClient({
             ))}
             {categories.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
                   {status === "trash" ? "Trash is empty." : "No categories yet. Create your first one."}
                 </td>
               </tr>

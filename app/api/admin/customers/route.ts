@@ -21,6 +21,17 @@ export async function GET(request: NextRequest): Promise<Response> {
   const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize") ?? "5")));
   const search = searchParams.get("search")?.trim();
   const view = searchParams.get("view") === "trash" ? "trash" : "active";
+  const sortBy = searchParams.get("sortBy");
+  const sortDir = searchParams.get("sortDir") === "desc" ? -1 : 1;
+  const SORTABLE_FIELDS: Record<string, string> = {
+    name: "name",
+    email: "email",
+    phone: "phone",
+    createdAt: "createdAt",
+  };
+  const sort = sortBy && SORTABLE_FIELDS[sortBy]
+    ? { [SORTABLE_FIELDS[sortBy]]: sortDir as 1 | -1 }
+    : { createdAt: -1 as const };
 
   const filter: Record<string, unknown> = {
     role: "customer",
@@ -33,7 +44,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     ];
   }
 
-  const baseQuery = User.find(filter).select("name email phone createdAt").sort({ createdAt: -1 });
+  const baseQuery = User.find(filter).select("name email phone createdAt").sort(sort);
 
   const [customers, total] = await Promise.all([
     all ? baseQuery.lean() : baseQuery.skip((page - 1) * pageSize).limit(pageSize).lean(),

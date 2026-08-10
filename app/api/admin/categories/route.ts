@@ -19,10 +19,16 @@ export async function GET(request: NextRequest): Promise<Response> {
   const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
   const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize") ?? "5")));
   const all = searchParams.get("all") === "true";
+  const sortBy = searchParams.get("sortBy");
+  const sortDir = searchParams.get("sortDir") === "desc" ? -1 : 1;
+  const SORTABLE_FIELDS: Record<string, string> = { name: "name", slug: "slug", createdAt: "createdAt" };
+  const sort = sortBy && SORTABLE_FIELDS[sortBy]
+    ? { [SORTABLE_FIELDS[sortBy]]: sortDir as 1 | -1 }
+    : { displayOrder: 1 as const, name: 1 as const };
 
   const [categories, total] = await Promise.all([
     Category.find(filter)
-      .sort({ displayOrder: 1, name: 1 })
+      .sort(sort)
       .skip(all ? 0 : (page - 1) * pageSize)
       .limit(all ? 0 : pageSize)
       .lean(),
