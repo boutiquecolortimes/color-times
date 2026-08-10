@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Check, Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -116,6 +116,7 @@ const FIELD_TABS: Record<string, string> = {
 
 export function ProductForm({ categories, productId, defaultValues }: ProductFormProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const isEditing = Boolean(productId);
   const [activeTab, setActiveTab] = useState<(typeof TAB_ORDER)[number]>("basic");
   const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(["basic"]));
@@ -194,6 +195,13 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
     },
     onSuccess: () => {
       toast.success(isEditing ? "Product updated" : "Product created");
+      // The products list's React Query cache persists across navigation
+      // (it's owned by the top-level QueryClient, not this page), so
+      // router.refresh() alone wasn't enough to guarantee the list showed
+      // this change — it only re-runs the server component, which doesn't
+      // touch an already-populated client cache. Invalidate it explicitly,
+      // same as every other admin list does after its own mutations.
+      queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
       router.push("/admin/products");
       router.refresh();
     },
