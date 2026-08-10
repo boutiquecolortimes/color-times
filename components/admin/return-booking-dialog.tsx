@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -56,6 +57,7 @@ export function ReturnBookingDialog({
   onSuccess?: () => void;
 }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [condition, setCondition] = useState<ReturnCondition>("good");
   const [notes, setNotes] = useState("");
   const [dryCleaningRequired, setDryCleaningRequired] = useState(false);
@@ -63,6 +65,7 @@ export function ReturnBookingDialog({
   const [damageCharges, setDamageCharges] = useState(0);
   const [pendingRentOverride, setPendingRentOverride] = useState<number | null>(null);
   const [depositRefunded, setDepositRefunded] = useState(true);
+  const [showInvoicePrompt, setShowInvoicePrompt] = useState(false);
 
   const { data: financials, isLoading: isLoadingFinancials } = useQuery<BookingFinancials | null>({
     queryKey: ["admin", "booking", bookingId, "financials"],
@@ -90,6 +93,17 @@ export function ReturnBookingDialog({
   const depositRefundAmount = netPosition < 0 ? -netPosition : 0;
   const finalSettlementAmount = netPosition;
 
+  function resetForm() {
+    setCondition("good");
+    setNotes("");
+    setDryCleaningRequired(false);
+    setStitchingRequired(false);
+    setDamageCharges(0);
+    setPendingRentOverride(null);
+    setDepositRefunded(true);
+    setShowInvoicePrompt(false);
+  }
+
   const mutation = useMutation({
     mutationFn: async () => {
       const res = await fetch(`/api/admin/bookings/${bookingId}`, {
@@ -116,21 +130,92 @@ export function ReturnBookingDialog({
       queryClient.invalidateQueries({ queryKey: ["admin", "booking", bookingId] });
       queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "service-orders"] });
-      setCondition("good");
-      setNotes("");
-      setDryCleaningRequired(false);
-      setStitchingRequired(false);
-      setDamageCharges(0);
-      setPendingRentOverride(null);
-      setDepositRefunded(true);
-      onOpenChange(false);
       onSuccess?.();
+      // Keep the dialog open one more step — ask whether to bill the
+      // settlement right away instead of leaving it for someone to
+      // remember to do later from the Invoices screen.
+      setShowInvoicePrompt(true);
     },
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const generateInvoiceMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/invoices/from-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data.invoice as { _id: string };
+    },
+    onSuccess: (invoice) => {
+      toast.success("Invoice generated and added to Sale");
+      queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "sales"] });
+      resetForm();
+      onOpenChange(false);
+      router.push(`/admin/invoices/${invoice._id}`);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  function handleSkipInvoice() {
+    resetForm();
+    onOpenChange(false);
+  }
+
+  const isBusy = mutation.isPending || generateInvoiceMutation.isPending;
+
   return (
-    <Dialog open={open} onOpenChange={(next) => !mutation.isPending && onOpenChange(next)}>
+    <Dialog open={open} onOpenChange={(next) => !isBusy && onOpenChange(next)}>
+      {showInvoicePrompt ? (
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Return confirmed</DialogTitle>
+            <DialogDescription>
+              Generate an invoice for this booking&rsquo;s settlement now? It&rsquo;ll be pre-filled
+              from the booking and also added to the Sale menu automatically.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">
+                {finalSettlementAmount > 0 ? "Pending amount" : "Refund due"}
+              </span>
+              <span
+                className={cn(
+                  "font-medium",
+                  finalSettlementAmount > 0 ? "text-destructive" : "text-emerald-600"
+                )}
+              >
+                {formatCurrency(
+                  finalSettlementAmount > 0 ? finalSettlementAmount : depositRefundAmount
+                )}
+              </span>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleSkipInvoice} disabled={isBusy}>
+              Skip for now
+            </Button>
+            <Button
+              disabled={isBusy}
+              onClick={() => generateInvoiceMutation.mutate()}
+            >
+              {generateInvoiceMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4" />
+              )}
+              Generate Invoice
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      ) : (
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Mark as returned</DialogTitle>
@@ -260,11 +345,11 @@ export function ReturnBookingDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isBusy}>
             Cancel
           </Button>
           <Button
-            disabled={mutation.isPending || isLoadingFinancials}
+            disabled={isBusy || isLoadingFinancials}
             onClick={() => mutation.mutate()}
           >
             {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -272,6 +357,7 @@ export function ReturnBookingDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+      )}
     </Dialog>
   );
 }
