@@ -96,6 +96,32 @@ function formatCurrency(value: number): string {
   return `₹${value.toLocaleString("en-IN")}`;
 }
 
+// Belt-and-suspenders check run right before submit — the item picker
+// already disables a dress once it's used as many times as it has stock,
+// but this catches anything that slips past that (e.g. stock changing
+// after the picker options were rendered) instead of letting it 409 out
+// of the API with a less specific message.
+function findStockViolation(
+  items: BookingCreateInput["items"],
+  products: ProductOption[]
+): string | null {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    if (!item.product) continue;
+    counts.set(item.product, (counts.get(item.product) ?? 0) + 1);
+  }
+  for (const [productId, count] of counts) {
+    if (count < 2) continue;
+    const product = products.find((p) => p._id === productId);
+    if (!product) continue;
+    const totalStock = product.variants.reduce((sum, variant) => sum + variant.quantityInStock, 0);
+    if (count > totalStock) {
+      return `"${product.name}" is added ${count} times in this booking, but only ${totalStock} unit(s) are in stock. Remove the extra item(s) or choose a different dress.`;
+    }
+  }
+  return null;
+}
+
 async function fetchAvailability(
   productId: string,
   from: string,
@@ -118,11 +144,21 @@ async function fetchBookedProductIds(from: string, to: string): Promise<string[]
   return json.data.productIds;
 }
 
+// Admin-editable list (Settings > Booking settings) — new options show up
+// here without a code change.
+async function fetchPaymentMethods(): Promise<string[]> {
+  const res = await fetch("/api/admin/settings/payment-methods");
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error);
+  return (json.data.settings.options as string[] | undefined) ?? [];
+}
+
 function BookingItemRow({
   index,
   control,
   products,
   bookedProductIds,
+  productUsageCounts,
   rentalStartDate,
   rentalEndDate,
   canRemove,
@@ -134,6 +170,11 @@ function BookingItemRow({
   control: Control<BookingCreateInput>;
   products: ProductOption[];
   bookedProductIds: Set<string>;
+  // How many item rows in THIS form (not yet saved) currently have each
+  // product selected — the "already booked" set above only knows about
+  // other, already-saved bookings, so picking the same one-in-stock dress
+  // twice in one new booking slipped through without this.
+  productUsageCounts: Map<string, number>;
   rentalStartDate: string;
   rentalEndDate: string;
   canRemove: boolean;
@@ -184,13 +225,35 @@ function BookingItemRow({
                   options={products.map((product) => {
                     const isBooked =
                       bookedProductIds.has(product._id) && product._id !== field.value;
+
+                    const totalStock = product.variants.reduce(
+                      (sum, variant) => sum + variant.quantityInStock,
+                      0
+                    );
+                    // Excludes this row's own current selection — only
+                    // counts how many OTHER item rows already claim this
+                    // dress, so it doesn't lock a row out of the value it
+                    // already holds.
+                    const usedElsewhere =
+                      (productUsageCounts.get(product._id) ?? 0) -
+                      (product._id === field.value ? 1 : 0);
+                    const exceedsStock = usedElsewhere > 0 && usedElsewhere >= totalStock;
+
+                    let sublabel = `${product.color} · ${formatCurrency(product.rentalPricePerDay)} rent`;
+                    if (isBooked) {
+                      sublabel = "Already booked for these dates";
+                    } else if (exceedsStock) {
+                      sublabel =
+                        totalStock <= 1
+                          ? "Only 1 in stock — already added to this booking"
+                          : `Only ${totalStock} in stock — already added ${usedElsewhere} time(s) in this booking`;
+                    }
+
                     return {
                       value: product._id,
                       label: `${product.name} (${product.sku})`,
-                      sublabel: isBooked
-                        ? "Already booked for these dates"
-                        : `${product.color} · ${formatCurrency(product.rentalPricePerDay)} rent`,
-                      disabled: isBooked,
+                      sublabel,
+                      disabled: isBooked || exceedsStock,
                     };
                   })}
                 />
@@ -358,9 +421,17 @@ export function BookingForm({
       rentalEndDate: "",
       securityDeposit: 0,
       advancePaid: 0,
+      advancePaymentMethod: "",
       notes: "",
     },
   });
+
+  const paymentMethodsQuery = useQuery({
+    queryKey: ["admin", "settings", "payment-methods"],
+    queryFn: fetchPaymentMethods,
+    staleTime: 5 * 60 * 1000,
+  });
+  const paymentMethods = paymentMethodsQuery.data ?? [];
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -382,10 +453,19 @@ export function BookingForm({
   const grandTotal = rentTotal + securityDepositValue;
   const dueAmount = grandTotal - advancePaidValue;
 
-  // Suggested deposit is 10% of the total rent across all items — not a sum
+  // How many item rows (in this unsaved form) currently have each product
+  // selected — used to stop the same one-in-stock dress being picked twice
+  // in a single booking before it's even saved.
+  const productUsageCounts = new Map<string, number>();
+  for (const item of items) {
+    if (!item.product) continue;
+    productUsageCounts.set(item.product, (productUsageCounts.get(item.product) ?? 0) + 1);
+  }
+
+  // Suggested deposit is 30% of the total rent across all items — not a sum
   // of each dress's own deposit (that overcharged multi-item bookings, e.g.
   // 5 dresses meant 5x the deposit). Still editable below.
-  const suggestedSecurityDeposit = Math.round(rentTotal * 0.1);
+  const suggestedSecurityDeposit = Math.round(rentTotal * 0.3);
 
   // Flags dresses already held by another active booking for these dates so
   // the picker can show that upfront, before the user selects one.
@@ -480,7 +560,14 @@ export function BookingForm({
     <>
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
+        onSubmit={form.handleSubmit((values) => {
+          const stockViolation = findStockViolation(values.items, products);
+          if (stockViolation) {
+            toast.error(stockViolation);
+            return;
+          }
+          mutation.mutate(values);
+        })}
         className="space-y-6"
       >
         <section className="space-y-4 rounded-lg border border-border bg-card p-6">
@@ -599,6 +686,7 @@ export function BookingForm({
               control={form.control}
               products={products}
               bookedProductIds={bookedProductIds}
+              productUsageCounts={productUsageCounts}
               rentalStartDate={rentalStartDate}
               rentalEndDate={rentalEndDate}
               canRemove={fields.length > 1}
@@ -633,7 +721,7 @@ export function BookingForm({
             <span className="font-medium">{formatCurrency(rentTotal)}</span>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <FormField
               control={form.control}
               name="securityDeposit"
@@ -652,7 +740,7 @@ export function BookingForm({
                     />
                   </FormControl>
                   <p className="text-xs text-muted-foreground">
-                    Suggested: 10% of rent total ({formatCurrency(suggestedSecurityDeposit)}) — editable
+                    Suggested: 30% of rent total ({formatCurrency(suggestedSecurityDeposit)}) — editable
                   </p>
                   <FormMessage />
                 </FormItem>
@@ -672,6 +760,30 @@ export function BookingForm({
                       onChange={(event) => field.onChange(Number(event.target.value) || 0)}
                     />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="advancePaymentMethod"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Payment Method</FormLabel>
+                  <Select value={field.value || undefined} onValueChange={(value) => field.onChange(value ?? "")}>
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="How was it paid?" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {paymentMethods.map((method) => (
+                        <SelectItem key={method} value={method}>
+                          {method}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

@@ -167,12 +167,12 @@ export async function POST(request: NextRequest): Promise<Response> {
       });
     }
 
-    // Suggested deposit is 10% of the total rent across all items — not a sum
+    // Suggested deposit is 30% of the total rent across all items — not a sum
     // of each dress's own deposit, which overcharged multi-item bookings
     // (e.g. 5 dresses previously meant 5x the deposit). Still overridable
     // from the form.
     const totalRent = items.reduce((sum, item) => sum + item.rentalFee, 0);
-    const suggestedSecurityDeposit = Math.round(totalRent * 0.1);
+    const suggestedSecurityDeposit = Math.round(totalRent * 0.3);
     const securityDeposit = input.securityDeposit ?? suggestedSecurityDeposit;
     const totalAmount = items.reduce((sum, item) => sum + item.rentalFee, 0) + securityDeposit;
     const bookingNumber = await generateBookingNumber();
@@ -191,6 +191,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       securityDeposit,
       totalAmount,
       advancePaid: input.advancePaid ?? 0,
+      advancePaymentMethod: input.advancePaymentMethod || undefined,
       measurements: input.measurements,
       deliveryAddress: input.deliveryAddress,
       notes: input.notes || undefined,
