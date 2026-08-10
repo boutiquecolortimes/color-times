@@ -1,6 +1,10 @@
 import mongoose from "mongoose";
 
-const MONGODB_URI = process.env.MONGODB_URI;
+// Accepts either name — some environments (e.g. Vercel) may still have the
+// connection string saved under the old MONGODB_URI_MONGODB_URI typo'd key
+// from before that was fixed in code. Checking both means the app connects
+// either way, without anyone having to go rename anything in a dashboard.
+const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGODB_URI_MONGODB_URI;
 
 interface MongooseCache {
   conn: typeof mongoose | null;
@@ -24,7 +28,7 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
 
   if (!MONGODB_URI) {
     throw new Error(
-      "MONGODB_URI is not set. Add it to .env.local before making database calls."
+      "MONGODB_URI (or MONGODB_URI_MONGODB_URI) is not set. Add it to .env.local before making database calls."
     );
   }
 
