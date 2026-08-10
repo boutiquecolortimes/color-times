@@ -4,8 +4,24 @@ import * as React from "react"
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover"
 import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react"
 import { cn, formatDate } from "@/lib/utils"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
+const MONTH_LABELS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+]
+// Old bookings/records can go back further than a fresh calendar makes
+// convenient to reach one month-click at a time — a direct year/month
+// jump matters more than the exact bound, so this is generous on purpose.
+const YEARS_BACK = 20
+const YEARS_FORWARD = 2
 
 function toIsoDate(date: Date): string {
   const year = date.getFullYear()
@@ -44,6 +60,18 @@ function DatePicker({ value, onChange, placeholder = "Select date", className }:
     setOpen(nextOpen)
   }
 
+  // Bounded around today, but stretched to always include whatever year is
+  // currently in view — e.g. an existing booking dated further back than
+  // the default window shouldn't leave the year select without a match.
+  const yearOptions = React.useMemo(() => {
+    const thisYear = new Date().getFullYear()
+    const min = Math.min(thisYear - YEARS_BACK, cursor.getFullYear())
+    const max = Math.max(thisYear + YEARS_FORWARD, cursor.getFullYear())
+    const years: number[] = []
+    for (let year = max; year >= min; year -= 1) years.push(year)
+    return years
+  }, [cursor])
+
   const monthStart = cursor
   const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0)
   const gridStart = new Date(monthStart)
@@ -79,23 +107,63 @@ function DatePicker({ value, onChange, placeholder = "Select date", className }:
       </PopoverPrimitive.Trigger>
       <PopoverPrimitive.Portal>
         <PopoverPrimitive.Positioner className="isolate z-50 outline-none" align="start" sideOffset={6}>
-          <PopoverPrimitive.Popup className="w-72 origin-(--transform-origin) rounded-lg bg-popover p-3 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
-            <div className="flex items-center justify-between pb-2">
+          <PopoverPrimitive.Popup className="w-80 origin-(--transform-origin) rounded-lg bg-popover p-3 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
+            <div className="flex items-center justify-between gap-1 pb-2">
               <button
                 type="button"
                 onClick={() => setCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
-                className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                 aria-label="Previous month"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <p className="font-heading text-sm">
-                {cursor.toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
-              </p>
+
+              {/* Year first, then month — jumping straight to a year (e.g.
+                  older records from 2023) beats clicking "previous month"
+                  dozens of times. */}
+              <div className="flex flex-1 items-center justify-center gap-1.5">
+                <Select
+                  value={String(cursor.getFullYear())}
+                  onValueChange={(next) => {
+                    if (!next) return
+                    setCursor((prev) => new Date(Number(next), prev.getMonth(), 1))
+                  }}
+                >
+                  <SelectTrigger size="sm" className="w-[74px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="center">
+                    {yearOptions.map((year) => (
+                      <SelectItem key={year} value={String(year)}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={String(cursor.getMonth())}
+                  onValueChange={(next) => {
+                    if (!next) return
+                    setCursor((prev) => new Date(prev.getFullYear(), Number(next), 1))
+                  }}
+                >
+                  <SelectTrigger size="sm" className="w-[76px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="center">
+                    {MONTH_LABELS.map((label, index) => (
+                      <SelectItem key={label} value={String(index)}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <button
                 type="button"
                 onClick={() => setCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
-                className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                 aria-label="Next month"
               >
                 <ChevronRight className="h-4 w-4" />
