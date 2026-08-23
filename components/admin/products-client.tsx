@@ -96,7 +96,6 @@ interface ProductsResponse {
 const COLUMN_DEFS = [
   { key: "category", label: "Category" },
   { key: "price", label: "Rent" },
-  { key: "stock", label: "Stock" },
   { key: "status", label: "Status" },
 ];
 
@@ -173,7 +172,6 @@ export function ProductsClient({
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({
     category: true,
     price: true,
-    stock: true,
     status: true,
   });
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
@@ -442,7 +440,7 @@ export function ProductsClient({
     }
   }
 
-const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Stock", "Status"];
+const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Status"];
 
   async function fetchExportRows(): Promise<(string | number)[][]> {
     const full = await fetchProducts({ page: 1, search, category, status, sortBy, sortDir, all: true });
@@ -452,7 +450,6 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Stock", "St
       product.sku,
       product.category?.name ?? "",
       product.rentalPricePerDay,
-      totalStock(product.variants),
       product.isActive ? "Active" : "Inactive",
     ]);
   }
@@ -769,7 +766,6 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Stock", "St
                     </button>
                   </th>
                 )}
-                {columnVisibility.stock && <th className="px-4 py-3">Stock</th>}
                 {columnVisibility.status && <th className="px-4 py-3">Status</th>}
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -865,23 +861,6 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Stock", "St
                           &#8377;{product.rentalPricePerDay.toLocaleString("en-IN")}
                         </button>
                       )}
-                    </td>
-                  )}
-                  {columnVisibility.stock && (
-                    <td className="px-4 py-3">
-                      {(() => {
-                        const stock = totalStock(product.variants);
-                        const isLow = stock <= lowStockThreshold;
-                        return (
-                          <span
-                            className={isLow ? "font-medium text-destructive" : undefined}
-                            title={isLow ? `At or below low-stock threshold (${lowStockThreshold})` : undefined}
-                          >
-                            {stock}
-                            {isLow && " ⚠"}
-                          </span>
-                        );
-                      })()}
                     </td>
                   )}
                   {columnVisibility.status && (
