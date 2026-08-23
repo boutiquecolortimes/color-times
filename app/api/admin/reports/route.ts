@@ -377,7 +377,11 @@ async function buildSaleReport(
   pageSize: number,
   all: boolean
 ) {
-  const filter: Record<string, unknown> = { ...dateFilter, deletedAt: null };
+  // Excludes auto-generated "source: booking" ledger entries (see
+  // models/Sale.ts) — their totalAmount duplicates revenue already counted
+  // in the Bookings report, so including them here would double-count it
+  // and mislabel rental income as outright sales.
+  const filter: Record<string, unknown> = { ...dateFilter, deletedAt: null, source: "manual" };
 
   const { skip, limit } = skipLimit(page, pageSize, all);
 

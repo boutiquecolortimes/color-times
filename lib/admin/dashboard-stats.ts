@@ -6,6 +6,8 @@ import { Product } from "@/models/Product";
 import { Category } from "@/models/Category";
 import { User } from "@/models/User";
 import { Invoice, type InvoiceStatus } from "@/models/Invoice";
+import { Sale } from "@/models/Sale";
+import { CustomisationOrder } from "@/models/CustomisationOrder";
 import { Settings } from "@/models/Settings";
 import { DEFAULT_INVENTORY_SETTINGS } from "@/lib/validations/inventory-settings";
 
@@ -108,6 +110,14 @@ async function computeDashboardStats(): Promise<DashboardStats> {
     categoryBookingBreakdownResult,
     recentBookings,
     monthlyRevenue,
+    saleRevenueTotalResult,
+    saleMonthlyRevenueTotalResult,
+    salePreviousMonthRevenueTotalResult,
+    saleMonthlyRevenueBreakdown,
+    customisationRevenueTotalResult,
+    customisationMonthlyRevenueTotalResult,
+    customisationPreviousMonthRevenueTotalResult,
+    customisationMonthlyRevenueBreakdown,
   ] = await Promise.all([
     Booking.aggregate([
       { $match: { status: { $in: REVENUE_STATUSES }, deletedAt: null } },
@@ -244,10 +254,131 @@ async function computeDashboardStats(): Promise<DashboardStats> {
       },
       { $sort: { "_id.year": 1, "_id.month": 1 } },
     ]),
+    // Outright sales and customisation orders are real revenue too, not
+    // just rentals — folded into totalRevenue/monthlyRevenueTotal/
+    // monthlyRevenue below. "source: booking" Sale records are excluded
+    // here since they're just a duplicate ledger entry for a booking's own
+    // settlement (see models/Sale.ts) and already counted via Booking.
+    Sale.aggregate([
+      { $match: { source: "manual", deletedAt: null } },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+    ]),
+    Sale.aggregate([
+      {
+        $match: { source: "manual", deletedAt: null, createdAt: { $gte: startOfMonth } },
+      },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+    ]),
+    Sale.aggregate([
+      {
+        $match: {
+          source: "manual",
+          deletedAt: null,
+          createdAt: { $gte: startOfPreviousMonth, $lt: startOfMonth },
+        },
+      },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+    ]),
+    Sale.aggregate([
+      {
+        $match: { source: "manual", deletedAt: null, createdAt: { $gte: sixMonthsAgo } },
+      },
+      {
+        $group: {
+          _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+          revenue: { $sum: "$totalAmount" },
+        },
+      },
+    ]),
+    CustomisationOrder.aggregate([
+      { $match: { status: { $ne: "cancelled" }, deletedAt: null } },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+    ]),
+    CustomisationOrder.aggregate([
+      {
+        $match: {
+          status: { $ne: "cancelled" },
+          deletedAt: null,
+          createdAt: { $gte: startOfMonth },
+        },
+      },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+    ]),
+    CustomisationOrder.aggregate([
+      {
+        $match: {
+          status: { $ne: "cancelled" },
+          deletedAt: null,
+          createdAt: { $gte: startOfPreviousMonth, $lt: startOfMonth },
+        },
+      },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+    ]),
+    CustomisationOrder.aggregate([
+      {
+        $match: {
+          status: { $ne: "cancelled" },
+          deletedAt: null,
+          createdAt: { $gte: sixMonthsAgo },
+        },
+      },
+      {
+        $group: {
+          _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+          revenue: { $sum: "$totalAmount" },
+        },
+      },
+    ]),
   ]);
 
+  const saleRevenueByMonthKey = new Map<string, number>(
+    saleMonthlyRevenueBreakdown.map(
+      (entry: { _id: { year: number; month: number }; revenue: number }) => [
+        `${entry._id.year}-${entry._id.month}`,
+        entry.revenue,
+      ]
+    )
+  );
+  const customisationRevenueByMonthKey = new Map<string, number>(
+    customisationMonthlyRevenueBreakdown.map(
+      (entry: { _id: { year: number; month: number }; revenue: number }) => [
+        `${entry._id.year}-${entry._id.month}`,
+        entry.revenue,
+      ]
+    )
+  );
+  const bookingRevenueByMonthKey = new Map<string, { revenue: number; bookings: number }>(
+    monthlyRevenue.map((entry) => [
+      `${entry._id.year}-${entry._id.month}`,
+      { revenue: entry.revenue, bookings: entry.bookings },
+    ])
+  );
+  // Zero-filled, fixed 6-month window (rather than only the months that
+  // happen to have a Booking) so a month with only Sale/Customisation
+  // revenue still shows up, instead of silently vanishing from the chart.
+  const monthlyRevenueSeries: DashboardStats["monthlyRevenue"] = Array.from(
+    { length: 6 },
+    (_, i) => {
+      const monthDate = new Date(sixMonthsAgo);
+      monthDate.setMonth(monthDate.getMonth() + i);
+      const key = `${monthDate.getFullYear()}-${monthDate.getMonth() + 1}`;
+      const bookingEntry = bookingRevenueByMonthKey.get(key);
+      return {
+        label: monthDate.toLocaleDateString("en-IN", { month: "short", year: "2-digit" }),
+        revenue:
+          (bookingEntry?.revenue ?? 0) +
+          (saleRevenueByMonthKey.get(key) ?? 0) +
+          (customisationRevenueByMonthKey.get(key) ?? 0),
+        bookings: bookingEntry?.bookings ?? 0,
+      };
+    }
+  );
+
   return {
-    totalRevenue: totalRevenueResult[0]?.total ?? 0,
+    totalRevenue:
+      (totalRevenueResult[0]?.total ?? 0) +
+      (saleRevenueTotalResult[0]?.total ?? 0) +
+      (customisationRevenueTotalResult[0]?.total ?? 0),
     totalBookings,
     activeRentals,
     totalCustomers,
@@ -261,8 +392,14 @@ async function computeDashboardStats(): Promise<DashboardStats> {
     todaysReturns,
     returnedToday,
     pendingPaymentsCount,
-    monthlyRevenueTotal: monthlyRevenueTotalResult[0]?.total ?? 0,
-    previousMonthRevenueTotal: previousMonthRevenueTotalResult[0]?.total ?? 0,
+    monthlyRevenueTotal:
+      (monthlyRevenueTotalResult[0]?.total ?? 0) +
+      (saleMonthlyRevenueTotalResult[0]?.total ?? 0) +
+      (customisationMonthlyRevenueTotalResult[0]?.total ?? 0),
+    previousMonthRevenueTotal:
+      (previousMonthRevenueTotalResult[0]?.total ?? 0) +
+      (salePreviousMonthRevenueTotalResult[0]?.total ?? 0) +
+      (customisationPreviousMonthRevenueTotalResult[0]?.total ?? 0),
     lowStockCount: (() => {
       const threshold =
         (inventorySettingsDoc?.data as { lowStockThreshold: number } | undefined)
@@ -292,14 +429,7 @@ async function computeDashboardStats(): Promise<DashboardStats> {
           .filter(Boolean)
           .join(", ") || "Unknown product",
     })),
-    monthlyRevenue: monthlyRevenue.map((entry) => ({
-      label: new Date(entry._id.year, entry._id.month - 1).toLocaleDateString("en-IN", {
-        month: "short",
-        year: "2-digit",
-      }),
-      revenue: entry.revenue,
-      bookings: entry.bookings,
-    })),
+    monthlyRevenue: monthlyRevenueSeries,
   };
 }
 

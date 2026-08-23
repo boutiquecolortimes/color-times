@@ -20,8 +20,14 @@ export async function GET(request: NextRequest): Promise<Response> {
   const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize") ?? "5")));
   const view = searchParams.get("view") ?? "active";
 
+  // Auto-generated "source: booking" entries are a duplicate ledger record
+  // for a booking's own settlement (see models/Sale.ts) — they'd otherwise
+  // show up here looking like real outright sales, so they're excluded from
+  // this list the same way they're excluded from the Sale report's totals.
   const filter: Record<string, unknown> =
-    view === "trash" ? { deletedAt: { $ne: null } } : { deletedAt: null };
+    view === "trash"
+      ? { deletedAt: { $ne: null }, source: "manual" }
+      : { deletedAt: null, source: "manual" };
 
   const [sales, total] = await Promise.all([
     Sale.find(filter)
