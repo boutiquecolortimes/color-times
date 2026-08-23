@@ -369,7 +369,7 @@ function BookingItemRow({
         <p className="mt-3 text-xs font-medium text-muted-foreground">
           Measurements for this dress (in inches, optional)
         </p>
-        <div className="mt-2 grid grid-cols-2 gap-3">
+        <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
           {BOOKING_MEASUREMENT_FIELDS.map(({ key, label }) => (
             <FormField
               key={key}

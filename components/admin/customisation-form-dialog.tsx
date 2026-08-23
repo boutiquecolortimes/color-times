@@ -239,7 +239,7 @@ export function CustomisationFormDialog({
             onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
             className="max-h-[70vh] space-y-4 overflow-y-auto pr-1"
           >
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="orderDate"
@@ -298,7 +298,7 @@ export function CustomisationFormDialog({
               </div>
             </FormItem>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="customerName"
@@ -357,7 +357,7 @@ export function CustomisationFormDialog({
 
             <div>
               <p className="text-sm font-medium">Measurements (inches)</p>
-              <div className="mt-2 grid grid-cols-3 gap-3">
+              <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {MEASUREMENT_FIELDS.map(({ key, label }) => (
                   <FormField
                     key={key}
@@ -397,7 +397,7 @@ export function CustomisationFormDialog({
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <FormField
                 control={form.control}
                 name="totalAmount"

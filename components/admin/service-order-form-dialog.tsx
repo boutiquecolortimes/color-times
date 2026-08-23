@@ -189,7 +189,7 @@ export function ServiceOrderFormDialog({
             onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
             className="max-h-[70vh] space-y-4 overflow-y-auto pr-1"
           >
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="serviceType"
@@ -288,7 +288,7 @@ export function ServiceOrderFormDialog({
             )}
 
             {serviceTypeValue === "dry_clean" ? (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="dryCleanCharge"
@@ -353,7 +353,7 @@ export function ServiceOrderFormDialog({
               />
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="otherCharge"
@@ -382,7 +382,7 @@ export function ServiceOrderFormDialog({
               </FormItem>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="sentDate"
