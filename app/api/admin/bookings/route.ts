@@ -84,7 +84,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   const sortField = SORTABLE_FIELDS[sortBy] ?? "createdAt";
 
   const baseQuery = Booking.find(filter)
-    .populate("customer", "name email")
+    .populate("customer", "name email phone")
     .populate("items.product", "name images")
     .sort({ [sortField]: sortDir, createdAt: -1 });
 
@@ -264,7 +264,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     });
 
     const populated = await Booking.findById(booking._id)
-      .populate("customer", "name email")
+      .populate("customer", "name email phone")
       .populate("items.product", "name images")
       .lean();
 

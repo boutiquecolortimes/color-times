@@ -49,7 +49,7 @@ import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { DatePicker } from "@/components/ui/date-picker";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, customerContact, formatDate } from "@/lib/utils";
 import type { BookingStatus } from "@/models/Booking";
 
 interface BookingRow {
@@ -63,7 +63,7 @@ interface BookingRow {
   totalAmount: number;
   securityDeposit: number;
   advancePaid: number;
-  customer: { name: string; email: string } | null;
+  customer: { name: string; email: string; phone?: string } | null;
   items: { product: { name: string } | null }[];
 }
 
@@ -319,7 +319,7 @@ export function BookingsClient({
     "Bill #",
     "Booking Date",
     "Customer",
-    "Email",
+    "Contact",
     "Product",
     "Rental Start",
     "Rental End",
@@ -337,7 +337,7 @@ export function BookingsClient({
       booking.billNumber || "—",
       formatDate(booking.bookingDate),
       booking.customer?.name ?? "—",
-      booking.customer?.email ?? "—",
+      booking.customer ? customerContact(booking.customer) : "—",
       productSummary(booking.items),
       formatDate(booking.rentalStartDate),
       formatDate(booking.rentalEndDate),
@@ -441,7 +441,9 @@ export function BookingsClient({
             Bill #{booking.billNumber || "—"} · Booked {formatDate(booking.bookingDate)}
           </p>
           <p className="mt-2 text-sm">{booking.customer?.name ?? "—"}</p>
-          <p className="text-xs text-muted-foreground">{booking.customer?.email}</p>
+          {booking.customer && (
+            <p className="text-xs text-muted-foreground">{customerContact(booking.customer)}</p>
+          )}
           <p className="mt-2 text-sm text-muted-foreground">{productSummary(booking.items)}</p>
           <p className="mt-1 text-xs text-muted-foreground">
             {formatDate(booking.rentalStartDate)} &rarr; {formatDate(booking.rentalEndDate)}
@@ -861,9 +863,11 @@ export function BookingsClient({
                     </td>
                     <td className="px-4 py-3">
                       <p>{booking.customer?.name ?? "—"}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {booking.customer?.email}
-                      </p>
+                      {booking.customer && (
+                        <p className="text-xs text-muted-foreground">
+                          {customerContact(booking.customer)}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {productSummary(booking.items)}
