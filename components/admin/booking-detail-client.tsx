@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Bell, Loader2, Pencil, Sparkles } from "lucide-react";
+import { Bell, Loader2, Pencil, Printer, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -91,6 +91,14 @@ interface BookingDetail {
   createdAt: string;
 }
 
+interface InvoiceSummary {
+  _id: string;
+  invoiceNumber: string;
+  status: string;
+  total: number;
+  amountDue: number;
+}
+
 function formatCurrency(value: number): string {
   return `₹${value.toLocaleString("en-IN")}`;
 }
@@ -102,7 +110,13 @@ async function fetchBooking(id: string): Promise<BookingDetail> {
   return json.data.booking;
 }
 
-export function BookingDetailClient({ initialBooking }: { initialBooking: BookingDetail }) {
+export function BookingDetailClient({
+  initialBooking,
+  invoice,
+}: {
+  initialBooking: BookingDetail;
+  invoice?: InvoiceSummary | null;
+}) {
   const queryClient = useQueryClient();
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -161,6 +175,17 @@ export function BookingDetailClient({ initialBooking }: { initialBooking: Bookin
         </div>
 
         <div className="flex items-center gap-2">
+          {invoice && (
+            <ButtonLink
+              variant="outline"
+              size="sm"
+              href={`/admin/invoices/${invoice._id}`}
+              title="View and print invoice"
+            >
+              <Printer className="h-4 w-4" />
+              Invoice #{invoice.invoiceNumber}
+            </ButtonLink>
+          )}
           {booking.status !== "returned" && booking.status !== "cancelled" && (
             <ButtonLink variant="outline" size="sm" href={`/admin/bookings/${booking._id}/edit`}>
               <Pencil className="h-4 w-4" />

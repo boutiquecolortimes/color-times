@@ -11,9 +11,11 @@ import {
   CalendarDays,
   ChevronDown,
   Download,
+  Eye,
   FileDown,
   Grid3x3,
   List,
+  Pencil,
   Printer,
   RotateCcw,
   Search,
@@ -486,6 +488,26 @@ export function BookingsClient({
               </>
             ) : (
               <>
+                <ButtonLink
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0"
+                  href={`/admin/bookings/${booking._id}`}
+                  aria-label="View booking"
+                  title="View booking"
+                >
+                  <Eye className="h-4 w-4" />
+                </ButtonLink>
+                <ButtonLink
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0"
+                  href={`/admin/bookings/${booking._id}/edit`}
+                  aria-label="Edit booking"
+                  title="Edit booking"
+                >
+                  <Pencil className="h-4 w-4" />
+                </ButtonLink>
                 <Select
                   value={booking.status}
                   onValueChange={(value) => {
@@ -810,7 +832,7 @@ export function BookingsClient({
                   </th>
                   <th className="px-4 py-3 text-right">Update</th>
                   <th className="px-4 py-3 text-right">
-                    <span className="sr-only">Delete</span>
+                    <span className="sr-only">Actions</span>
                   </th>
                 </tr>
               </thead>
@@ -930,17 +952,37 @@ export function BookingsClient({
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       ) : (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:text-destructive"
-                          aria-label="Delete booking"
-                          title="Move to trash"
-                          onClick={() => setDeleteTarget(booking)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <ButtonLink
+                            variant="ghost"
+                            size="icon"
+                            href={`/admin/bookings/${booking._id}`}
+                            aria-label="View booking"
+                            title="View booking"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </ButtonLink>
+                          <ButtonLink
+                            variant="ghost"
+                            size="icon"
+                            href={`/admin/bookings/${booking._id}/edit`}
+                            aria-label="Edit booking"
+                            title="Edit booking"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </ButtonLink>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive"
+                            aria-label="Delete booking"
+                            title="Move to trash"
+                            onClick={() => setDeleteTarget(booking)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       )}
                     </td>
                   </tr>

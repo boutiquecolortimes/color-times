@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Booking } from "@/models/Booking";
+import { Invoice } from "@/models/Invoice";
 import "@/models/User";
 import "@/models/Product";
 import { BookingDetailClient } from "@/components/admin/booking-detail-client";
@@ -18,10 +19,15 @@ export default async function BookingDetailPage({
   const { id } = await params;
   await connectToDatabase();
 
-  const booking = await Booking.findById(id)
-    .populate("customer", "name email phone")
-    .populate("items.product", "name images sku")
-    .lean();
+  const [booking, invoice] = await Promise.all([
+    Booking.findById(id)
+      .populate("customer", "name email phone")
+      .populate("items.product", "name images sku")
+      .lean(),
+    Invoice.findOne({ booking: id, deletedAt: null })
+      .select("_id invoiceNumber status total amountDue")
+      .lean(),
+  ]);
 
   if (!booking) {
     notFound();
@@ -89,6 +95,17 @@ export default async function BookingDetailPage({
           finalSettlementAmount: booking.finalSettlementAmount,
           createdAt: booking.createdAt.toISOString(),
         }}
+        invoice={
+          invoice
+            ? {
+                _id: String(invoice._id),
+                invoiceNumber: invoice.invoiceNumber,
+                status: invoice.status,
+                total: invoice.total,
+                amountDue: invoice.amountDue,
+              }
+            : null
+        }
       />
     </div>
   );
