@@ -71,6 +71,32 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       return apiError("Booking not found", 404);
     }
 
+    // Availability is only checked when a booking is first created or its
+    // dates are edited afterward — an "inquiry" is deliberately excluded
+    // from that check (see ACTIVE_BOOKING_STATUSES) so it doesn't reserve
+    // inventory just by existing. That means two unpaid inquiries for the
+    // same dress and dates can sit side by side untouched, so re-verify
+    // here, at the moment one of them actually becomes a real reservation,
+    // instead of only ever checking at creation time.
+    if (input.status === "confirmed") {
+      for (const item of before.items) {
+        const conflicts = await findBookingConflicts(
+          String(item.product),
+          before.rentalStartDate,
+          before.rentalEndDate,
+          id
+        );
+        if (conflicts.length > 0) {
+          const conflict = conflicts[0];
+          const conflictingProduct = await Product.findById(item.product).select("name").lean();
+          return apiError(
+            `${conflictingProduct?.name ?? "This dress"} is already booked (${conflict.bookingNumber}) from ${conflict.rentalStartDate.toDateString()} to ${conflict.rentalEndDate.toDateString()} — confirm or cancel that booking first`,
+            409
+          );
+        }
+      }
+    }
+
     const update: Record<string, unknown> = { status: input.status };
     if (input.status === "returned") {
       update.returnedAt = new Date();
