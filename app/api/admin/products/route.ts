@@ -118,8 +118,9 @@ export async function POST(request: NextRequest): Promise<Response> {
     const securityDeposit = input.securityDeposit ?? Math.round(input.rentalPricePerDay * 2);
 
     // Images/sizes can be filled in later — don't block Save if the admin
-    // hasn't visited those tabs yet.
-    const images = input.images.length > 0 ? input.images : ["/images/placeholder/dresses/dress-1.png"];
+    // hasn't visited those tabs yet. No uploaded photo shows the store logo
+    // (not a stock dress photo) everywhere this product's image is used.
+    const images = input.images.length > 0 ? input.images : ["/logo.png"];
     const variants =
       input.variants.length > 0 ? input.variants : [{ size: "M" as const, quantityInStock: 0 }];
 

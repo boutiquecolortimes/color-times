@@ -12,7 +12,8 @@ export type ProductStatus =
   | "under_dry_cleaning"
   | "under_repair"
   | "damaged"
-  | "returned";
+  | "returned"
+  | "sold";
 
 export const PRODUCT_STATUSES: ProductStatus[] = [
   "available",
@@ -23,6 +24,7 @@ export const PRODUCT_STATUSES: ProductStatus[] = [
   "under_repair",
   "damaged",
   "returned",
+  "sold",
 ];
 
 export interface IProductVariant {
@@ -37,6 +39,7 @@ export interface IProduct extends Document {
   sku: string;
   category: Types.ObjectId;
   designer?: string;
+  dealerName?: string;
   description: string;
   color: string;
   fabric: string;
@@ -50,6 +53,7 @@ export interface IProduct extends Document {
   purchasePrice?: number;
   stitchingCost?: number;
   transportCost?: number;
+  otherCost?: number;
   securityDeposit: number;
   isFeatured: boolean;
   isNewArrival: boolean;
@@ -66,7 +70,9 @@ export interface IProduct extends Document {
 
 const variantSchema = new Schema<IProductVariant>(
   {
-    size: { type: String, required: true, trim: true },
+    // Validation removed on purpose — the admin can save a variant row
+    // without filling in a size.
+    size: { type: String, trim: true, default: "" },
     quantityInStock: { type: Number, required: true, min: 0, default: 0 },
   },
   { _id: false }
@@ -79,6 +85,7 @@ const productSchema = new Schema<IProduct>(
     sku: { type: String, required: true, unique: true, uppercase: true },
     category: { type: Schema.Types.ObjectId, ref: "Category", required: true, index: true },
     designer: { type: String, trim: true },
+    dealerName: { type: String, trim: true },
     description: { type: String, trim: true, default: "" },
     color: { type: String, trim: true, default: "" },
     fabric: { type: String, trim: true, default: "" },
@@ -97,6 +104,7 @@ const productSchema = new Schema<IProduct>(
     purchasePrice: { type: Number, min: 0 },
     stitchingCost: { type: Number, min: 0 },
     transportCost: { type: Number, min: 0 },
+    otherCost: { type: Number, min: 0 },
     securityDeposit: { type: Number, required: true, min: 0 },
     isFeatured: { type: Boolean, default: false, index: true },
     isNewArrival: { type: Boolean, default: false, index: true },

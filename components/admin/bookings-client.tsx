@@ -42,6 +42,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BookingCalendar } from "@/components/admin/booking-calendar";
 import { ReturnBookingDialog } from "@/components/admin/return-booking-dialog";
 import { ConfirmBookingDialog } from "@/components/admin/confirm-booking-dialog";
+import { PickupBookingDialog } from "@/components/admin/pickup-booking-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -199,6 +200,7 @@ export function BookingsClient({
   const [trashView, setTrashView] = useState<"active" | "trash">("active");
   const [returnDialogBookingId, setReturnDialogBookingId] = useState<string | null>(null);
   const [confirmDialogBooking, setConfirmDialogBooking] = useState<BookingRow | null>(null);
+  const [pickupDialogBooking, setPickupDialogBooking] = useState<BookingRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BookingRow | null>(null);
   const [permanentDeleteTarget, setPermanentDeleteTarget] = useState<BookingRow | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -494,6 +496,10 @@ export function BookingsClient({
                     }
                     if (value === "confirmed") {
                       setConfirmDialogBooking(booking);
+                      return;
+                    }
+                    if (value === "in_use") {
+                      setPickupDialogBooking(booking);
                       return;
                     }
                     updateStatusMutation.mutate({
@@ -885,6 +891,10 @@ export function BookingsClient({
                               setConfirmDialogBooking(booking);
                               return;
                             }
+                            if (value === "in_use") {
+                              setPickupDialogBooking(booking);
+                              return;
+                            }
                             updateStatusMutation.mutate({
                               id: booking._id,
                               status: value as BookingStatus,
@@ -975,6 +985,18 @@ export function BookingsClient({
           }}
           open={confirmDialogBooking !== null}
           onOpenChange={(open) => !open && setConfirmDialogBooking(null)}
+        />
+      )}
+
+      {pickupDialogBooking && (
+        <PickupBookingDialog
+          bookingId={pickupDialogBooking._id}
+          summary={{
+            totalAmount: pickupDialogBooking.totalAmount,
+            advancePaid: pickupDialogBooking.advancePaid,
+          }}
+          open={pickupDialogBooking !== null}
+          onOpenChange={(open) => !open && setPickupDialogBooking(null)}
         />
       )}
 

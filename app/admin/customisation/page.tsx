@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { connectToDatabase } from "@/lib/db/connect";
 import { CustomisationOrder } from "@/models/CustomisationOrder";
+import { User } from "@/models/User";
 import { CustomisationClient } from "@/components/admin/customisation-client";
 
 export const metadata: Metadata = { title: "Customisation" };
@@ -12,12 +13,17 @@ export default async function AdminCustomisationPage() {
 
   const activeFilter = { deletedAt: null };
 
-  const [orders, total] = await Promise.all([
+  const [orders, total, customers] = await Promise.all([
     CustomisationOrder.find(activeFilter)
       .sort({ createdAt: -1 })
       .limit(PAGE_SIZE)
       .lean(),
     CustomisationOrder.countDocuments(activeFilter),
+    User.find({ role: "customer", deletedAt: null })
+      .select("name email phone addresses")
+      .sort({ name: 1 })
+      .limit(500)
+      .lean(),
   ]);
 
   const initialOrders = orders.map((order) => ({
@@ -46,6 +52,19 @@ export default async function AdminCustomisationPage() {
         total,
         totalPages: Math.ceil(total / PAGE_SIZE),
       }}
+      customers={customers.map((customer) => {
+        const address =
+          customer.addresses?.find((a) => a.isDefault) ?? customer.addresses?.[0] ?? null;
+        return {
+          _id: String(customer._id),
+          name: customer.name,
+          email: customer.email,
+          phone: customer.phone,
+          address: address
+            ? `${address.line1}, ${address.city}, ${address.state} ${address.postalCode}`
+            : undefined,
+        };
+      })}
     />
   );
 }

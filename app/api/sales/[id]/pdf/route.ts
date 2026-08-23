@@ -24,9 +24,6 @@ export async function GET(
     }
 
     const product = sale.product as unknown as { name: string; sku: string } | null;
-    if (!product) {
-      return new Response("This sale's product record is missing.", { status: 422 });
-    }
 
     const buffer = await generateSalePdfBuffer({
       billNumber: sale.billNumber,
@@ -34,8 +31,8 @@ export async function GET(
       customerName: sale.customerName,
       customerPhone: sale.customerPhone,
       customerAddress: sale.customerAddress,
-      productName: product.name,
-      productSku: product.sku,
+      productName: product?.name ?? "—",
+      productSku: product?.sku ?? "",
       details: sale.details,
       totalAmount: sale.totalAmount,
     });

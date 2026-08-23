@@ -4,11 +4,15 @@ import { Booking } from "@/models/Booking";
 import { Product } from "@/models/Product";
 import { ServiceOrder } from "@/models/ServiceOrder";
 import "@/models/User";
-import { bookingStatusSchema, computeBookingSettlement } from "@/lib/validations/booking";
-import { ACTIVE_BOOKING_STATUSES } from "@/lib/admin/booking-availability";
+import {
+  bookingStatusSchema,
+  bookingUpdateSchema,
+  computeBookingSettlement,
+} from "@/lib/validations/booking";
+import { ACTIVE_BOOKING_STATUSES, findBookingConflicts } from "@/lib/admin/booking-availability";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES, MANAGER_ROLES } from "@/lib/auth/roles";
-import { recordAuditLog } from "@/lib/audit/log";
+import { recordAuditLog, diffObjects } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 import {
   notifyBookingConfirmed,
@@ -17,6 +21,7 @@ import {
 } from "@/lib/notifications/whatsapp-events";
 import { notifyAccounts } from "@/lib/notifications/in-app";
 import { formatDate } from "@/lib/utils";
+import type { AccessTokenPayload } from "@/lib/auth/tokens";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -48,6 +53,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
   try {
     const { id } = await params;
     const body = await request.json();
+
+    // Two different kinds of update share this endpoint: a lifecycle status
+    // change (Confirm/Pickup/Return/Cancel, sent by BookingDetailClient)
+    // always includes a "status" key; editing the booking's own details
+    // (from the Edit page) sends the full field set without one.
+    if (!body || typeof body !== "object" || !("status" in body)) {
+      return updateBookingDetails(id, body, auth.user);
+    }
+
     const input = bookingStatusSchema.parse(body);
 
     await connectToDatabase();
@@ -81,6 +95,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       update.depositRefundAmount = depositRefundAmount;
       update.finalSettlementAmount = finalSettlementAmount;
       update.settledAt = new Date();
+    } else if (input.status === "in_use" && input.pickupPaymentAmount) {
+      // Payment collected when handing over the dress — treated as
+      // additional advance paid, on top of whatever's already recorded.
+      // The pickup flow now collects the full outstanding due, so this
+      // typically brings advancePaid up to totalAmount.
+      update.advancePaid = (before.advancePaid ?? 0) + input.pickupPaymentAmount;
     }
 
     const booking = await Booking.findByIdAndUpdate(id, update, { returnDocument: "after" })
@@ -207,6 +227,170 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
         link: `/admin/bookings/${id}`,
         relatedEntityType: "Booking",
         relatedEntityId: id,
+      });
+    }
+
+    return apiSuccess({ booking });
+  } catch (error) {
+    return apiErrorFromUnknown(error);
+  }
+}
+
+// Editing the booking's own details (customer, dates, items, pricing,
+// notes, ...) — separate from the lifecycle status transitions above,
+// which have their own settlement math and side effects that a plain field
+// edit shouldn't touch. Mirrors the create flow's conflict checks and total
+// calculation so an edited booking stays internally consistent.
+async function updateBookingDetails(
+  id: string,
+  body: unknown,
+  actor: AccessTokenPayload
+): Promise<Response> {
+  try {
+    const input = bookingUpdateSchema.parse(body);
+
+    await connectToDatabase();
+
+    const before = await Booking.findById(id).lean();
+    if (!before) {
+      return apiError("Booking not found", 404);
+    }
+
+    // Once a booking is returned or cancelled its totals feed into a
+    // settlement that's already been computed and (often) paid out —
+    // rewriting items/pricing after that would leave the settlement
+    // pointing at numbers that no longer match the booking.
+    if (before.status === "returned" || before.status === "cancelled") {
+      return apiError(
+        "This booking has already been returned or cancelled and can no longer be edited.",
+        409
+      );
+    }
+
+    // Bill numbers are required and must be unique — same bulk-import
+    // concern as on create (see the POST route below).
+    const duplicateBill = await Booking.findOne({
+      billNumber: input.billNumber,
+      deletedAt: null,
+      _id: { $ne: id },
+    })
+      .select("bookingNumber")
+      .lean();
+    if (duplicateBill) {
+      return apiError(
+        `Bill number ${input.billNumber} is already used by booking ${duplicateBill.bookingNumber}`,
+        409
+      );
+    }
+
+    const rentalStartDate = new Date(input.rentalStartDate);
+    const rentalEndDate = new Date(input.rentalEndDate);
+
+    const items = [];
+    for (const inputItem of input.items) {
+      const product = await Product.findById(inputItem.product).lean();
+      if (!product) {
+        return apiError("One of the selected dresses could not be found", 404);
+      }
+
+      const conflicts = await findBookingConflicts(
+        inputItem.product,
+        rentalStartDate,
+        rentalEndDate,
+        id
+      );
+      if (conflicts.length > 0) {
+        const conflict = conflicts[0];
+        return apiError(
+          `${product.name} is already booked (${conflict.bookingNumber}) from ${conflict.rentalStartDate.toDateString()} to ${conflict.rentalEndDate.toDateString()}`,
+          409
+        );
+      }
+
+      const quantity = 1;
+      const size = product.variants[0]?.size ?? "Custom";
+      const color = inputItem.color || product.color;
+      const pricePerDay = inputItem.pricePerDay ?? product.rentalPricePerDay;
+      const rentalFee = pricePerDay * quantity;
+
+      items.push({
+        product: inputItem.product,
+        color,
+        size,
+        quantity,
+        pricePerDay,
+        rentalFee,
+        wearerName: inputItem.wearerName || undefined,
+        measurements: inputItem.measurements,
+      });
+    }
+
+    const securityDeposit = input.securityDeposit ?? before.securityDeposit;
+    const totalAmount = items.reduce((sum, item) => sum + item.rentalFee, 0) + securityDeposit;
+
+    const update = {
+      billNumber: input.billNumber,
+      bookingDate: new Date(input.bookingDate),
+      customer: input.customer,
+      items,
+      rentalStartDate,
+      rentalEndDate,
+      eventDate: input.eventDate ? new Date(input.eventDate) : rentalStartDate,
+      securityDeposit,
+      totalAmount,
+      advancePaid: input.advancePaid ?? before.advancePaid,
+      advancePaymentMethod: input.advancePaymentMethod || undefined,
+      measurements: input.measurements,
+      deliveryAddress: input.deliveryAddress,
+      notes: input.notes || undefined,
+    };
+
+    const booking = await Booking.findByIdAndUpdate(id, update, { returnDocument: "after" })
+      .populate("customer", "name email phone")
+      .populate("items.product", "name images sku");
+
+    if (!booking) {
+      return apiError("Booking not found", 404);
+    }
+
+    // Keep dress inventory in sync when items changed on a booking that
+    // already has dresses reserved (confirmed) or picked up (in_use) —
+    // otherwise a swapped-out dress would stay stuck as unavailable, and a
+    // swapped-in one wouldn't show as held.
+    const inventoryStatus =
+      before.status === "confirmed" ? "reserved" : before.status === "in_use" ? "picked_up" : null;
+    if (inventoryStatus) {
+      const beforeProductIds = before.items.map((item) => String(item.product));
+      const afterProductIds = items.map((item) => String(item.product));
+      const added = afterProductIds.filter((pid) => !beforeProductIds.includes(pid));
+      const removed = beforeProductIds.filter((pid) => !afterProductIds.includes(pid));
+
+      if (added.length > 0) {
+        await Product.updateMany({ _id: { $in: added } }, { status: inventoryStatus });
+      }
+      for (const productId of removed) {
+        const stillActive = await Booking.exists({
+          "items.product": productId,
+          status: { $in: ACTIVE_BOOKING_STATUSES },
+          _id: { $ne: booking._id },
+        });
+        if (!stillActive) {
+          await Product.findByIdAndUpdate(productId, { status: "available" });
+        }
+      }
+    }
+
+    const changes = diffObjects(
+      before as unknown as Record<string, unknown>,
+      booking.toObject() as unknown as Record<string, unknown>
+    );
+    if (changes.length > 0) {
+      await recordAuditLog({
+        entityType: "Booking",
+        entityId: id,
+        action: "update",
+        actor,
+        changes,
       });
     }
 

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Sale } from "@/models/Sale";
-import "@/models/Product";
+import { Product } from "@/models/Product";
 import { saleUpdateSchema } from "@/lib/validations/sale";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
@@ -10,6 +10,21 @@ import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
+}
+
+// Puts a dress back into rental circulation once nothing else still marks
+// it sold — used when a manual sale is re-pointed at a different product or
+// removed entirely.
+async function releaseIfUnsold(productId: string, excludeSaleId: string): Promise<void> {
+  const stillSold = await Sale.exists({
+    product: productId,
+    source: "manual",
+    deletedAt: null,
+    _id: { $ne: excludeSaleId },
+  });
+  if (!stillSold) {
+    await Product.findByIdAndUpdate(productId, { status: "available" });
+  }
 }
 
 export async function GET(request: NextRequest, { params }: RouteParams): Promise<Response> {
@@ -57,6 +72,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       return apiError("Sale not found", 404);
     }
 
+    // Keep dress inventory status in sync if the product on this sale
+    // changed — only for manual sales; booking-sourced Sale records are
+    // just a revenue ledger entry and don't drive product status.
+    if (
+      before.source !== "booking" &&
+      input.product !== undefined &&
+      String(input.product) !== String(before.product)
+    ) {
+      await Product.findByIdAndUpdate(input.product, { status: "sold" });
+      await releaseIfUnsold(String(before.product), id);
+    }
+
     const changes = diffObjects(
       before as unknown as Record<string, unknown>,
       sale.toObject() as unknown as Record<string, unknown>
@@ -85,6 +112,11 @@ export async function DELETE(request: NextRequest, { params }: RouteParams): Pro
   const { id } = await params;
   await connectToDatabase();
 
+  const before = await Sale.findById(id).lean();
+  if (!before) {
+    return apiError("Sale not found", 404);
+  }
+
   const sale = await Sale.findByIdAndUpdate(
     id,
     { deletedAt: new Date() },
@@ -93,6 +125,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams): Pro
 
   if (!sale) {
     return apiError("Sale not found", 404);
+  }
+
+  if (before.source !== "booking") {
+    await releaseIfUnsold(String(before.product), id);
   }
 
   await recordAuditLog({

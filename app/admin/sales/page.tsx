@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Sale } from "@/models/Sale";
 import { Product } from "@/models/Product";
+import { User } from "@/models/User";
 import { SalesClient } from "@/components/admin/sales-client";
 
 export const metadata: Metadata = { title: "Sale" };
@@ -13,16 +14,22 @@ export default async function AdminSalesPage() {
 
   const activeFilter = { deletedAt: null };
 
-  const [sales, total, products] = await Promise.all([
+  const [sales, total, products, customers] = await Promise.all([
     Sale.find(activeFilter)
       .populate("product", "name images sku")
       .sort({ createdAt: -1 })
       .limit(PAGE_SIZE)
       .lean(),
     Sale.countDocuments(activeFilter),
-    Product.find({ deletedAt: null })
+    // A dress that's been sold outright is no longer available to sell again.
+    Product.find({ deletedAt: null, status: { $ne: "sold" } })
       .sort({ name: 1 })
       .select("name sku")
+      .limit(500)
+      .lean(),
+    User.find({ role: "customer", deletedAt: null })
+      .select("name email phone addresses")
+      .sort({ name: 1 })
       .limit(500)
       .lean(),
   ]);
@@ -59,6 +66,19 @@ export default async function AdminSalesPage() {
         name: product.name,
         sku: product.sku,
       }))}
+      customers={customers.map((customer) => {
+        const address =
+          customer.addresses?.find((a) => a.isDefault) ?? customer.addresses?.[0] ?? null;
+        return {
+          _id: String(customer._id),
+          name: customer.name,
+          email: customer.email,
+          phone: customer.phone,
+          address: address
+            ? `${address.line1}, ${address.city}, ${address.state} ${address.postalCode}`
+            : undefined,
+        };
+      })}
     />
   );
 }

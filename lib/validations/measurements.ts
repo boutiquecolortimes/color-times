@@ -12,6 +12,9 @@ export const measurementsZodSchema = z.object({
   neckBack: z.number().min(0).optional(),
   upperChest: z.number().min(0).optional(),
   lowerChest: z.number().min(0).optional(),
+  armLength: z.number().min(0).optional(),
+  length: z.number().min(0).optional(),
+  thigh: z.number().min(0).optional(),
   other: z.string().trim().optional(),
 });
 

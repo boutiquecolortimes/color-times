@@ -35,7 +35,7 @@ export interface BookingItem {
 export interface IBooking extends Document {
   _id: Types.ObjectId;
   bookingNumber: string;
-  billNumber?: string;
+  billNumber: string;
   bookingDate: Date;
   customer: Types.ObjectId;
   items: BookingItem[];
@@ -87,8 +87,12 @@ const bookingSchema = new Schema<IBooking>(
   {
     bookingNumber: { type: String, required: true, unique: true, index: true },
     // Manual/physical bill reference number, kept separate from the
-    // system-generated bookingNumber above.
-    billNumber: { type: String, trim: true },
+    // system-generated bookingNumber above. Required + unique — staff enter
+    // it (pre-filled with a suggested sequential number, see
+    // suggestNextBillNumber()) and duplicates are rejected. Sparse so the
+    // unique index doesn't choke on any legacy bookings saved before this
+    // field became mandatory.
+    billNumber: { type: String, required: true, trim: true, unique: true, sparse: true },
     bookingDate: { type: Date, required: true, default: Date.now, index: true },
     customer: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     items: {

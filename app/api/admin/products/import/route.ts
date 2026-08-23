@@ -131,7 +131,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         description: row.description?.trim() || `${name} — imported product, description pending.`,
         color: row.color?.trim() || "Not specified",
         fabric: row.fabric?.trim() || "Not specified",
-        images: row.image?.trim() ? [row.image.trim()] : ["/images/placeholder/dresses/dress-1.png"],
+        images: row.image?.trim() ? [row.image.trim()] : ["/logo.png"],
         variants,
         rentalPricePerDay: Number(row.rentalPricePerDay) || 0,
         retailValue: Number(row.retailValue) || 0,

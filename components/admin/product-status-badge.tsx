@@ -11,6 +11,7 @@ const STATUS_STYLES: Record<ProductStatus, string> = {
   under_repair: "bg-orange-100 text-orange-800",
   damaged: "bg-red-100 text-red-800",
   returned: "bg-slate-200 text-slate-700",
+  sold: "bg-purple-100 text-purple-800",
 };
 
 const STATUS_LABELS: Record<ProductStatus, string> = {
@@ -22,6 +23,7 @@ const STATUS_LABELS: Record<ProductStatus, string> = {
   under_repair: "Repair",
   damaged: "Damaged",
   returned: "Returned",
+  sold: "Sold",
 };
 
 export function ProductStatusBadge({ status }: { status: ProductStatus }) {

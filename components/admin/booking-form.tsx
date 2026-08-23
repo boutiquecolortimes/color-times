@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/form";
 import { bookingCreateSchema, type BookingCreateInput } from "@/lib/validations/booking";
 import type { CustomerCreateInput } from "@/lib/validations/customer";
-import { daysBetween } from "@/lib/utils";
+import { customerContact, daysBetween } from "@/lib/utils";
 
 function todayIso(): string {
   const now = new Date();
@@ -61,6 +61,7 @@ interface CustomerOption {
   _id: string;
   name: string;
   email: string;
+  phone?: string;
 }
 
 const RELATION_OPTIONS = ["S/O", "D/O", "W/O"] as const;
@@ -125,9 +126,11 @@ function findStockViolation(
 async function fetchAvailability(
   productId: string,
   from: string,
-  to: string
+  to: string,
+  excludeBookingId?: string
 ): Promise<{ available: boolean; conflicts: { bookingNumber: string }[] }> {
   const params = new URLSearchParams({ from, to });
+  if (excludeBookingId) params.set("excludeBooking", excludeBookingId);
   const res = await fetch(`/api/admin/products/${productId}/availability?${params.toString()}`);
   const json = await res.json();
   if (!res.ok) throw new Error(json.error);
@@ -136,8 +139,13 @@ async function fetchAvailability(
 
 // Bulk check so the dress dropdown can flag already-booked items upfront,
 // before the user picks one — not just warn after the fact.
-async function fetchBookedProductIds(from: string, to: string): Promise<string[]> {
+async function fetchBookedProductIds(
+  from: string,
+  to: string,
+  excludeBookingId?: string
+): Promise<string[]> {
   const params = new URLSearchParams({ from, to });
+  if (excludeBookingId) params.set("excludeBooking", excludeBookingId);
   const res = await fetch(`/api/admin/bookings/booked-products?${params.toString()}`);
   const json = await res.json();
   if (!res.ok) throw new Error(json.error);
@@ -165,6 +173,7 @@ function BookingItemRow({
   onRemove,
   onProductChange,
   onConflictChange,
+  excludeBookingId,
 }: {
   index: number;
   control: Control<BookingCreateInput>;
@@ -181,6 +190,9 @@ function BookingItemRow({
   onRemove: () => void;
   onProductChange: (index: number) => void;
   onConflictChange: (index: number, hasConflict: boolean) => void;
+  // When editing an existing booking, its own dates/items shouldn't read as
+  // conflicting with themselves.
+  excludeBookingId?: string;
 }) {
   const productValue = useWatch({ control, name: `items.${index}.product` });
   const pricePerDayValue = useWatch({ control, name: `items.${index}.pricePerDay` }) || 0;
@@ -191,8 +203,15 @@ function BookingItemRow({
   const fee = pricePerDayValue;
 
   const availabilityQuery = useQuery({
-    queryKey: ["admin", "product-availability", productValue, rentalStartDate, rentalEndDate],
-    queryFn: () => fetchAvailability(productValue, rentalStartDate, rentalEndDate),
+    queryKey: [
+      "admin",
+      "product-availability",
+      productValue,
+      rentalStartDate,
+      rentalEndDate,
+      excludeBookingId,
+    ],
+    queryFn: () => fetchAvailability(productValue, rentalStartDate, rentalEndDate, excludeBookingId),
     enabled: Boolean(productValue && rentalStartDate && rentalEndDate),
   });
 
@@ -401,18 +420,28 @@ function BookingItemRow({
 export function BookingForm({
   customers,
   products,
+  bookingId,
+  defaultValues,
 }: {
   customers: CustomerOption[];
   products: ProductOption[];
+  // Present only when editing an existing booking (from the Edit page).
+  bookingId?: string;
+  defaultValues?: BookingCreateInput;
 }) {
   const router = useRouter();
+  const isEditing = Boolean(bookingId);
   const [customerList, setCustomerList] = useState<CustomerOption[]>(customers);
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
-  const [securityTouched, setSecurityTouched] = useState(false);
+  // Editing an existing booking loads its already-set security deposit —
+  // starting this "touched" so the 30%-of-rent auto-suggestion below
+  // doesn't silently overwrite it the moment the form mounts. Creating a
+  // new booking still starts untouched so the suggestion applies as usual.
+  const [securityTouched, setSecurityTouched] = useState(isEditing);
 
   const form = useForm<BookingCreateInput>({
     resolver: zodResolver(bookingCreateSchema),
-    defaultValues: {
+    defaultValues: defaultValues ?? {
       customer: "",
       billNumber: "",
       bookingDate: todayIso(),
@@ -470,8 +499,8 @@ export function BookingForm({
   // Flags dresses already held by another active booking for these dates so
   // the picker can show that upfront, before the user selects one.
   const bookedProductsQuery = useQuery({
-    queryKey: ["admin", "booked-products", rentalStartDate, rentalEndDate],
-    queryFn: () => fetchBookedProductIds(rentalStartDate, rentalEndDate),
+    queryKey: ["admin", "booked-products", rentalStartDate, rentalEndDate, bookingId],
+    queryFn: () => fetchBookedProductIds(rentalStartDate, rentalEndDate, bookingId),
     enabled: Boolean(rentalStartDate && rentalEndDate),
   });
   const bookedProductIds = new Set(bookedProductsQuery.data ?? []);
@@ -501,18 +530,22 @@ export function BookingForm({
 
   const mutation = useMutation({
     mutationFn: async (values: BookingCreateInput) => {
-      const res = await fetch("/api/admin/bookings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      });
+      const res = await fetch(
+        isEditing ? `/api/admin/bookings/${bookingId}` : "/api/admin/bookings",
+        {
+          method: isEditing ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(values),
+        }
+      );
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
       return json.data.booking;
     },
     onSuccess: () => {
-      toast.success("Booking created");
-      router.push("/admin/bookings");
+      toast.success(isEditing ? "Booking updated" : "Booking created");
+      router.push(isEditing ? `/admin/bookings/${bookingId}` : "/admin/bookings");
+      router.refresh();
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -546,9 +579,12 @@ export function BookingForm({
       if (!res.ok) throw new Error(json.error);
       return json.data.customer as { _id: string; name: string; email: string };
     },
-    onSuccess: (customer) => {
+    onSuccess: (customer, values) => {
       toast.success("Customer created");
-      setCustomerList((prev) => [...prev, { _id: customer._id, name: customer.name, email: customer.email }]);
+      setCustomerList((prev) => [
+        ...prev,
+        { _id: customer._id, name: customer.name, email: customer.email, phone: values.phone },
+      ]);
       form.setValue("customer", customer._id);
       quickCustomerForm.reset();
       setNewCustomerOpen(false);
@@ -579,7 +615,7 @@ export function BookingForm({
               name="billNumber"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Bill Number (optional)</FormLabel>
+                  <FormLabel>Bill Number</FormLabel>
                   <FormControl>
                     <Input placeholder="Manual bill/register no." {...field} />
                   </FormControl>
@@ -618,7 +654,7 @@ export function BookingForm({
                     options={customerList.map((customer) => ({
                       value: customer._id,
                       label: customer.name,
-                      sublabel: customer.email,
+                      sublabel: customerContact(customer),
                     }))}
                   />
                   <Button
@@ -693,6 +729,7 @@ export function BookingForm({
               onRemove={() => remove(index)}
               onProductChange={handleProductChange}
               onConflictChange={handleConflictChange}
+              excludeBookingId={bookingId}
             />
           ))}
         </section>
@@ -804,7 +841,7 @@ export function BookingForm({
         <div className="flex justify-end">
           <Button type="submit" disabled={mutation.isPending || hasAnyConflict}>
             {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            Create Booking
+            {isEditing ? "Save Changes" : "Create Booking"}
           </Button>
         </div>
       </form>

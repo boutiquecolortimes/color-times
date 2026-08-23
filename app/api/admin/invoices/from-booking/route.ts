@@ -89,9 +89,13 @@ export async function POST(request: NextRequest): Promise<Response> {
     const depositRefundAmount = isReturned ? (booking.depositRefundAmount ?? 0) : 0;
     const depositApplied = isReturned ? Math.max(0, booking.securityDeposit - depositRefundAmount) : 0;
     const total = isReturned ? subtotal : subtotal + booking.securityDeposit;
+    // Not-yet-returned invoices (generated at Confirm or Pickup time) used
+    // to hardcode this to 0, which ignored any advance/pickup payment
+    // already recorded on the booking — an invoice generated right after
+    // collecting full payment at pickup would still show as fully unpaid.
     const amountPaid = isReturned
       ? Math.min(total, Math.max(0, advancePaid + depositApplied))
-      : 0;
+      : Math.min(total, advancePaid);
     const amountDue = Math.max(0, total - amountPaid);
 
     const invoiceNumber = await generateInvoiceNumber();
@@ -150,6 +154,10 @@ export async function POST(request: NextRequest): Promise<Response> {
           product: primaryProduct._id,
           details: `Rental invoice ${invoiceNumber} — ${productNames} (Booking ${booking.bookingNumber})`,
           totalAmount: total,
+          // Just a revenue-ledger entry for this rental settlement — not an
+          // outright sale, so it must never mark the dress "sold" or get
+          // double-counted alongside the booking's own earnings.
+          source: "booking",
         });
       }
     } catch (saleError) {

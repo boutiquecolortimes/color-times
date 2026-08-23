@@ -51,8 +51,10 @@ import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { ProductImportDialog } from "@/components/admin/product-import-dialog";
 import { ProductDetailDrawer } from "@/components/admin/product-detail-drawer";
 import { ImagePreviewDialog } from "@/components/admin/image-preview-dialog";
+import { ProductStatusBadge } from "@/components/admin/product-status-badge";
 import { downloadPdf, downloadExcel } from "@/lib/admin/export";
 import { cn } from "@/lib/utils";
+import type { ProductStatus } from "@/models/Product";
 
 interface ProductRow {
   _id: string;
@@ -62,6 +64,7 @@ interface ProductRow {
   images: string[];
   category: { _id: string; name: string } | null;
   rentalPricePerDay: number;
+  status: ProductStatus;
   isActive: boolean;
   isFeatured: boolean;
   isFavorited?: boolean;
@@ -124,6 +127,14 @@ async function fetchProducts(params: {
 
 function totalStock(variants: ProductRow["variants"]): number {
   return variants.reduce((sum, variant) => sum + variant.quantityInStock, 0);
+}
+
+// Products created without an uploaded photo fall back to a generic
+// placeholder path (old dress stock photos or the current logo default) —
+// treat any of those as "no real image" so the store logo shows instead.
+function hasRealImage(images: string[]): boolean {
+  const first = images[0];
+  return Boolean(first) && !first.startsWith("/images/placeholder/");
 }
 
 function SortIcon({
@@ -478,7 +489,7 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Stock", "St
       {products.map((product) => (
         <div key={product._id} className="overflow-hidden rounded-lg border border-border bg-card">
           <div className="relative aspect-square bg-secondary">
-            {product.images[0] && (
+            {hasRealImage(product.images) ? (
               <button
                 type="button"
                 onClick={() => openPreview(product, 0)}
@@ -493,6 +504,14 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Stock", "St
                   className="object-cover"
                 />
               </button>
+            ) : (
+              <Image
+                src="/logo.png"
+                alt={product.name}
+                fill
+                sizes="(min-width: 1024px) 25vw, 50vw"
+                className="object-contain p-6 opacity-60"
+              />
             )}
             <button
               type="button"
@@ -507,6 +526,11 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Stock", "St
                 className={cn("h-3.5 w-3.5", product.isFavorited && "fill-accent text-accent")}
               />
             </button>
+            {product.status === "sold" && (
+              <div className="absolute left-2 top-2">
+                <ProductStatusBadge status="sold" />
+              </div>
+            )}
           </div>
           <div className="p-3">
             <p className="truncate text-sm font-medium">{product.name}</p>
@@ -515,6 +539,19 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Stock", "St
               &#8377;{product.rentalPricePerDay.toLocaleString("en-IN")}
               <span className="text-muted-foreground"> rent</span>
             </p>
+            {(() => {
+              const stock = totalStock(product.variants);
+              const isLow = stock <= lowStockThreshold;
+              return (
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Stock:{" "}
+                  <span className={isLow ? "font-medium text-destructive" : undefined}>
+                    {stock}
+                    {isLow && " ⚠"}
+                  </span>
+                </p>
+              );
+            })()}
             <div className="mt-2 flex gap-1">
               <ButtonLink
                 variant="outline"
@@ -753,7 +790,7 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Stock", "St
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-secondary">
-                        {product.images[0] && (
+                        {hasRealImage(product.images) ? (
                           <button
                             type="button"
                             onClick={() => openPreview(product, 0)}
@@ -768,6 +805,14 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Stock", "St
                               className="object-cover"
                             />
                           </button>
+                        ) : (
+                          <Image
+                            src="/logo.png"
+                            alt={product.name}
+                            fill
+                            sizes="40px"
+                            className="object-contain p-1.5 opacity-60"
+                          />
                         )}
                       </div>
                       <div className="min-w-0">
@@ -841,12 +886,15 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Stock", "St
                   )}
                   {columnVisibility.status && (
                     <td className="px-4 py-3">
-                      <Badge
-                        variant={product.isActive ? "default" : "secondary"}
-                        className="rounded-full"
-                      >
-                        {status === "trash" ? "Trashed" : status === "archived" ? "Archived" : product.isActive ? "Active" : "Inactive"}
-                      </Badge>
+                      <div className="flex flex-wrap gap-1">
+                        <Badge
+                          variant={product.isActive ? "default" : "secondary"}
+                          className="rounded-full"
+                        >
+                          {status === "trash" ? "Trashed" : status === "archived" ? "Archived" : product.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                        {product.status === "sold" && <ProductStatusBadge status="sold" />}
+                      </div>
                     </td>
                   )}
                   <td className="px-4 py-3">

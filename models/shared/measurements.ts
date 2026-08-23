@@ -12,6 +12,9 @@ export interface MeasurementValues {
   neckBack?: number;
   upperChest?: number;
   lowerChest?: number;
+  armLength?: number;
+  length?: number;
+  thigh?: number;
   other?: string;
 }
 
@@ -28,6 +31,9 @@ export const measurementsSchema = new Schema<MeasurementValues>(
     neckBack: { type: Number, min: 0 },
     upperChest: { type: Number, min: 0 },
     lowerChest: { type: Number, min: 0 },
+    armLength: { type: Number, min: 0 },
+    length: { type: Number, min: 0 },
+    thigh: { type: Number, min: 0 },
     other: { type: String, trim: true },
   },
   { _id: false }

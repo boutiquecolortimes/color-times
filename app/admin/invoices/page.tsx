@@ -16,7 +16,7 @@ export default async function AdminInvoicesPage() {
 
   const [invoices, total] = await Promise.all([
     Invoice.find(activeFilter)
-      .populate("customer", "name email")
+      .populate("customer", "name email phone")
       .populate("booking", "bookingNumber")
       .sort({ createdAt: -1 })
       .limit(PAGE_SIZE)
@@ -37,6 +37,7 @@ export default async function AdminInvoicesPage() {
       ? {
           name: (invoice.customer as unknown as { name: string }).name,
           email: (invoice.customer as unknown as { email: string }).email,
+          phone: (invoice.customer as unknown as { phone?: string }).phone,
         }
       : null,
     booking: invoice.booking

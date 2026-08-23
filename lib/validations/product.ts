@@ -2,7 +2,8 @@ import { z } from "zod";
 
 export const productVariantSchema = z.object({
   // Free text — the form has a plain input instead of a fixed size dropdown.
-  size: z.string().trim().min(1, "Size is required"),
+  // No minimum length on purpose — a size row can be saved blank.
+  size: z.string().trim(),
   quantityInStock: z.number().int().min(0),
 });
 
@@ -12,6 +13,7 @@ export const productSchema = z.object({
   sku: z.string().trim().toUpperCase().min(1, "Code is required"),
   category: z.string().trim().min(1, "Category is required"),
   designer: z.string().trim().max(100).optional().or(z.literal("")),
+  dealerName: z.string().trim().max(100).optional().or(z.literal("")),
   description: z.string().trim().max(2000).optional().or(z.literal("")),
   color: z.string().trim().optional().or(z.literal("")),
   fabric: z.string().trim().optional().or(z.literal("")),
@@ -32,6 +34,7 @@ export const productSchema = z.object({
       "under_repair",
       "damaged",
       "returned",
+      "sold",
     ])
     .optional(),
   rentalPricePerDay: z.number().min(0),
@@ -42,6 +45,7 @@ export const productSchema = z.object({
   purchasePrice: z.number().min(0).optional(),
   stitchingCost: z.number().min(0).optional(),
   transportCost: z.number().min(0).optional(),
+  otherCost: z.number().min(0).optional(),
   isFeatured: z.boolean(),
   isNewArrival: z.boolean(),
   isActive: z.boolean(),

@@ -21,7 +21,7 @@ import {
   customerUpdateSchema,
   type CustomerUpdateInput,
 } from "@/lib/validations/customer";
-import { formatDate } from "@/lib/utils";
+import { formatDate, isWalkinEmail } from "@/lib/utils";
 
 interface CustomerDetail {
   _id: string;
@@ -253,7 +253,7 @@ export function CustomerDetailClient({ initialCustomer }: { initialCustomer: Cus
       <div className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
         <div>
           <p className="text-xs uppercase text-muted-foreground">Email</p>
-          <p className="mt-1">{customer.email}</p>
+          <p className="mt-1">{isWalkinEmail(customer.email) ? "—" : customer.email}</p>
         </div>
         <div>
           <p className="text-xs uppercase text-muted-foreground">Mobile</p>

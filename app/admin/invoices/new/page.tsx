@@ -14,7 +14,7 @@ export default async function NewInvoicePage() {
 
   const [customers, bookings] = await Promise.all([
     User.find({ role: "customer", deletedAt: null })
-      .select("name email")
+      .select("name email phone")
       .sort({ name: 1 })
       .limit(200)
       .lean(),
@@ -47,6 +47,7 @@ export default async function NewInvoicePage() {
           _id: String(customer._id),
           name: customer.name,
           email: customer.email,
+          phone: customer.phone,
         }))}
         bookings={bookings.map((booking) => ({
           _id: String(booking._id),

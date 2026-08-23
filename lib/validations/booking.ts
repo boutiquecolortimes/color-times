@@ -10,6 +10,11 @@ export const bookingStatusSchema = z.object({
   damageCharges: z.number().min(0).optional(),
   pendingRentAmount: z.number().min(0).optional(),
   depositRefunded: z.boolean().optional(),
+  // Amount collected from the customer at pickup — added on top of whatever
+  // advance is already paid, not a replacement for it. Pickup now collects
+  // the full outstanding due (not just a security top-up), so an invoice is
+  // generated right after this status change goes through.
+  pickupPaymentAmount: z.number().min(0).optional(),
 });
 
 export type BookingStatusInput = z.infer<typeof bookingStatusSchema>;
@@ -46,30 +51,51 @@ export const bookingItemSchema = z.object({
 
 export type BookingItemInput = z.infer<typeof bookingItemSchema>;
 
-export const bookingCreateSchema = z
-  .object({
-    customer: z.string().trim().min(1, "Customer is required"),
-    billNumber: z.string().trim().max(50).optional().or(z.literal("")),
-    bookingDate: z.string().trim().min(1, "Booking date is required"),
-    items: z.array(bookingItemSchema).min(1, "Add at least one item"),
-    rentalStartDate: z.string().trim().min(1, "Rental start date is required"),
-    rentalEndDate: z.string().trim().min(1, "Rental end date is required"),
-    // No longer collected in the form — the API defaults it to the pickup date.
-    eventDate: z.string().trim().optional().or(z.literal("")),
-    deliveryAddress: z.string().trim().optional().or(z.literal("")),
-    // Editable override; the API sums the selected dresses' deposits as the
-    // suggested default when this isn't sent.
-    securityDeposit: z.number().min(0).optional(),
-    advancePaid: z.number().min(0).optional(),
-    // Free text (validated against the admin-editable list client-side, not
-    // a fixed enum here) so new payment methods don't need a schema change.
-    advancePaymentMethod: z.string().trim().max(40).optional().or(z.literal("")),
-    measurements: measurementsZodSchema.optional(),
-    notes: z.string().trim().optional().or(z.literal("")),
-  })
-  .refine((data) => new Date(data.rentalEndDate) >= new Date(data.rentalStartDate), {
+const bookingFieldsSchema = z.object({
+  customer: z.string().trim().min(1, "Customer is required"),
+  // Required + duplicate-checked server-side (see the bookings POST/PATCH
+  // routes) — pre-filled on the New Booking form with the next sequential
+  // number (see suggestNextBillNumber()), but staff can override it, e.g.
+  // while bulk-entering the client's historical records.
+  billNumber: z.string().trim().min(1, "Bill number is required").max(50),
+  bookingDate: z.string().trim().min(1, "Booking date is required"),
+  items: z.array(bookingItemSchema).min(1, "Add at least one item"),
+  rentalStartDate: z.string().trim().min(1, "Rental start date is required"),
+  rentalEndDate: z.string().trim().min(1, "Rental end date is required"),
+  // No longer collected in the form — the API defaults it to the pickup date.
+  eventDate: z.string().trim().optional().or(z.literal("")),
+  deliveryAddress: z.string().trim().optional().or(z.literal("")),
+  // Editable override; the API sums the selected dresses' deposits as the
+  // suggested default when this isn't sent.
+  securityDeposit: z.number().min(0).optional(),
+  advancePaid: z.number().min(0).optional(),
+  // Free text (validated against the admin-editable list client-side, not
+  // a fixed enum here) so new payment methods don't need a schema change.
+  advancePaymentMethod: z.string().trim().max(40).optional().or(z.literal("")),
+  measurements: measurementsZodSchema.optional(),
+  notes: z.string().trim().optional().or(z.literal("")),
+});
+
+export const bookingCreateSchema = bookingFieldsSchema.refine(
+  (data) => new Date(data.rentalEndDate) >= new Date(data.rentalStartDate),
+  {
     message: "Rental end date must be on or after the start date",
     path: ["rentalEndDate"],
-  });
+  }
+);
 
 export type BookingCreateInput = z.infer<typeof bookingCreateSchema>;
+
+// Same fields as create, but used to edit an existing booking — the form
+// always resubmits every field (it's the same controlled form as Create),
+// so this stays a full object rather than .partial(); it's a separate
+// schema only so the date-order check can share the base fields cleanly.
+export const bookingUpdateSchema = bookingFieldsSchema.refine(
+  (data) => new Date(data.rentalEndDate) >= new Date(data.rentalStartDate),
+  {
+    message: "Rental end date must be on or after the start date",
+    path: ["rentalEndDate"],
+  }
+);
+
+export type BookingUpdateInput = z.infer<typeof bookingUpdateSchema>;

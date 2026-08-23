@@ -1,0 +1,168 @@
+"use client";
+
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+
+interface BookingSummary {
+  totalAmount: number;
+  advancePaid: number;
+}
+
+function formatCurrency(value: number): string {
+  return `₹${Math.round(value).toLocaleString("en-IN")}`;
+}
+
+export function PickupBookingDialog({
+  bookingId,
+  summary,
+  open,
+  onOpenChange,
+}: {
+  bookingId: string;
+  summary: BookingSummary;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  // Pickup now collects the full outstanding due — not just a security
+  // top-up — computed directly from props (a lazy useState initializer, not
+  // an effect) so opening the dialog never silently changes what's about to
+  // be submitted.
+  const dueAmount = Math.max(0, summary.totalAmount - summary.advancePaid);
+  const [paymentAmount, setPaymentAmount] = useState(() => dueAmount);
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const statusRes = await fetch(`/api/admin/bookings/${bookingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "in_use", pickupPaymentAmount: paymentAmount }),
+      });
+      const statusJson = await statusRes.json();
+      if (!statusRes.ok) throw new Error(statusJson.error);
+
+      // Same as Confirm — generate the invoice right along with the status
+      // change so pickup always leaves behind a bill, not just a payment.
+      const invoiceRes = await fetch("/api/admin/invoices/from-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId }),
+      });
+      const invoiceJson = await invoiceRes.json();
+      if (!invoiceRes.ok) {
+        // Booking is already marked picked-up at this point — an existing
+        // invoice (e.g. generated earlier at Confirm) shouldn't block that.
+        if (invoiceRes.status === 409) return { invoice: null };
+        throw new Error(invoiceJson.error);
+      }
+      return { invoice: invoiceJson.data.invoice as { _id: string } };
+    },
+    onSuccess: ({ invoice }) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "booking", bookingId] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      setPaymentAmount(dueAmount);
+      onOpenChange(false);
+      if (invoice) {
+        toast.success("Booking picked up and invoice generated");
+        router.push(`/admin/invoices/${invoice._id}`);
+      } else {
+        toast.success("Booking marked as picked up");
+      }
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const advanceAfter = summary.advancePaid + paymentAmount;
+  const remainingAfter = Math.max(0, summary.totalAmount - advanceAfter);
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => !mutation.isPending && onOpenChange(next)}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Mark as picked up</DialogTitle>
+          <DialogDescription>
+            Collect the full outstanding payment when handing over the dress — this also
+            generates the invoice automatically.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Amount collected (&#8377;)</label>
+              {paymentAmount !== dueAmount && (
+                <button
+                  type="button"
+                  className="text-xs text-accent hover:underline"
+                  onClick={() => setPaymentAmount(dueAmount)}
+                >
+                  Use full due {formatCurrency(dueAmount)}
+                </button>
+              )}
+            </div>
+            <Input
+              className="mt-2"
+              type="number"
+              min={0}
+              value={paymentAmount === 0 ? "" : paymentAmount}
+              onChange={(event) => setPaymentAmount(Math.max(0, Number(event.target.value) || 0))}
+            />
+          </div>
+
+          <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Total amount</span>
+              <span>{formatCurrency(summary.totalAmount)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Paid so far</span>
+              <span>{formatCurrency(summary.advancePaid)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Paid after pickup</span>
+              <span>{formatCurrency(advanceAfter)}</span>
+            </div>
+            <div className="mt-2 flex justify-between border-t border-border pt-2 font-medium">
+              <span>Remaining due</span>
+              <span className="text-accent">{formatCurrency(remainingAfter)}</span>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setPaymentAmount(dueAmount);
+              onOpenChange(false);
+            }}
+            disabled={mutation.isPending}
+          >
+            Cancel
+          </Button>
+          <Button disabled={mutation.isPending} onClick={() => mutation.mutate()}>
+            {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Confirm Pickup &amp; Generate Invoice
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

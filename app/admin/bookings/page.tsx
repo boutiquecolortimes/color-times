@@ -19,7 +19,7 @@ export default async function AdminBookingsPage() {
 
   const [bookings, total, summaryAgg, statusAgg] = await Promise.all([
     Booking.find({ deletedAt: null })
-      .populate("customer", "name email")
+      .populate("customer", "name email phone")
       .populate("items.product", "name images")
       .sort({ createdAt: -1 })
       .limit(PAGE_SIZE)
@@ -60,6 +60,7 @@ export default async function AdminBookingsPage() {
       ? {
           name: (booking.customer as unknown as { name: string }).name,
           email: (booking.customer as unknown as { email: string }).email,
+          phone: (booking.customer as unknown as { phone?: string }).phone,
         }
       : null,
     items: booking.items.map((item) => ({

@@ -28,11 +28,13 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { invoiceSchema, computeInvoiceTotals, type InvoiceInput } from "@/lib/validations/invoice";
+import { customerContact } from "@/lib/utils";
 
 interface CustomerOption {
   _id: string;
   name: string;
   email: string;
+  phone?: string;
 }
 
 interface BookingOption {
@@ -214,7 +216,9 @@ function ManualTab({
                       <SelectValue placeholder="Select customer">
                         {(value: string) => {
                           const customer = customers.find((c) => c._id === value);
-                          return customer ? `${customer.name} (${customer.email})` : "Select customer";
+                          return customer
+                            ? `${customer.name} (${customerContact(customer)})`
+                            : "Select customer";
                         }}
                       </SelectValue>
                     </SelectTrigger>
@@ -222,7 +226,7 @@ function ManualTab({
                   <SelectContent>
                     {customers.map((customer) => (
                       <SelectItem key={customer._id} value={customer._id}>
-                        {customer.name} ({customer.email})
+                        {customer.name} ({customerContact(customer)})
                       </SelectItem>
                     ))}
                   </SelectContent>

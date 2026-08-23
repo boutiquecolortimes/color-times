@@ -107,8 +107,10 @@ const FIELD_TABS: Record<string, string> = {
   purchasePrice: "pricing",
   transportCost: "pricing",
   stitchingCost: "pricing",
+  otherCost: "pricing",
   variants: "other",
   designer: "other",
+  dealerName: "other",
   status: "other",
   isFeatured: "other",
   isNewArrival: "other",
@@ -151,6 +153,7 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
       sku: "",
       category: categories[0]?._id ?? "",
       designer: "",
+      dealerName: "",
       description: "",
       color: "",
       fabric: "",
@@ -162,6 +165,7 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
       purchasePrice: 0,
       stitchingCost: 0,
       transportCost: 0,
+      otherCost: 0,
       isFeatured: false,
       isNewArrival: false,
       isActive: true,
@@ -469,6 +473,25 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
                 />
                 <FormField
                   control={form.control}
+                  name="otherCost"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Other Cost (&#8377;)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          value={field.value ? field.value : ""}
+                          onChange={(event) =>
+                            field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
                   name="rentalPricePerDay"
                   render={({ field }) => (
                     <FormItem>
@@ -570,6 +593,24 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
               </div>
             </section>
 
+            <section className="rounded-lg border border-border bg-card p-6">
+              <h2 className="font-heading text-lg">Dealer Name</h2>
+              <div className="mt-4 max-w-sm">
+                <FormField
+                  control={form.control}
+                  name="dealerName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input placeholder="Dealer name (optional)" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </section>
+
             {isEditing && (
               <section className="rounded-lg border border-border bg-card p-6">
                 <h2 className="font-heading text-lg">Status</h2>
@@ -602,6 +643,7 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
                             <SelectItem value="under_repair">Repair</SelectItem>
                             <SelectItem value="damaged">Damaged</SelectItem>
                             <SelectItem value="returned">Returned</SelectItem>
+                            <SelectItem value="sold">Sold</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
@@ -18,6 +19,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   Form,
   FormControl,
@@ -32,7 +41,9 @@ import {
   type CustomisationOrderInput,
 } from "@/lib/validations/customisation-order";
 import type { CustomisationMeasurements } from "@/models/CustomisationOrder";
+import type { CustomerCreateInput } from "@/lib/validations/customer";
 import { MEASUREMENT_FIELD_DEFS } from "@/lib/config/measurement-fields";
+import { customerContact } from "@/lib/utils";
 
 export interface CustomisationOrderRow {
   _id: string;
@@ -50,6 +61,29 @@ export interface CustomisationOrderRow {
   status: string;
   notes?: string;
 }
+
+export interface CustomerOption {
+  _id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  address?: string;
+}
+
+const RELATION_OPTIONS = ["S/O", "D/O", "W/O"] as const;
+
+const quickCustomerSchema = z.object({
+  name: z.string().trim().min(1, "Name is required"),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^[0-9+\-\s()]{7,20}$/, "Enter a valid mobile number"),
+  relation: z.enum(RELATION_OPTIONS),
+  relationName: z.string().trim().optional().or(z.literal("")),
+  addressLine1: z.string().trim().optional().or(z.literal("")),
+});
+
+type QuickCustomerInput = z.infer<typeof quickCustomerSchema>;
 
 function toDateInputValue(iso: string): string {
   return iso.slice(0, 10);
@@ -74,13 +108,17 @@ const EMPTY_VALUES: CustomisationOrderInput = {
 export function CustomisationFormDialog({
   open,
   onOpenChange,
+  customers,
   editingOrder,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  customers: CustomerOption[];
   editingOrder: CustomisationOrderRow | null;
 }) {
   const queryClient = useQueryClient();
+  const [customerList, setCustomerList] = useState<CustomerOption[]>(customers);
+  const [newCustomerOpen, setNewCustomerOpen] = useState(false);
 
   const form = useForm<CustomisationOrderInput>({
     resolver: zodResolver(customisationOrderSchema),
@@ -107,6 +145,58 @@ export function CustomisationFormDialog({
       }
     }
   }, [open, editingOrder, form]);
+
+  function applyCustomer(customer: CustomerOption) {
+    form.setValue("customerName", customer.name);
+    if (customer.phone) form.setValue("customerPhone", customer.phone);
+    if (customer.address) form.setValue("customerAddress", customer.address);
+  }
+
+  const quickCustomerForm = useForm<QuickCustomerInput>({
+    resolver: zodResolver(quickCustomerSchema),
+    defaultValues: { name: "", phone: "", relation: "S/O", relationName: "", addressLine1: "" },
+  });
+
+  const createCustomerMutation = useMutation({
+    mutationFn: async (values: QuickCustomerInput) => {
+      const digits = values.phone.replace(/[^0-9]/g, "") || "customer";
+      const payload: CustomerCreateInput = {
+        name: values.name,
+        // Walk-in orders usually don't come with an email — generate a
+        // unique placeholder so account creation isn't blocked on one.
+        email: `${digits}.${Date.now()}@walkin.vchuki.local`,
+        phone: values.phone,
+        fatherName: values.relationName ? `${values.relation} ${values.relationName}` : "",
+        addressLine1: values.addressLine1 || "",
+        addressCity: "",
+        addressState: "",
+        addressPostalCode: "",
+      };
+      const res = await fetch("/api/admin/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data.customer as { _id: string; name: string; email: string };
+    },
+    onSuccess: (customer, values) => {
+      toast.success("Customer created");
+      const option: CustomerOption = {
+        _id: customer._id,
+        name: customer.name,
+        email: customer.email,
+        phone: values.phone,
+        address: values.addressLine1 || undefined,
+      };
+      setCustomerList((prev) => [...prev, option]);
+      applyCustomer(option);
+      quickCustomerForm.reset();
+      setNewCustomerOpen(false);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
 
   const totalAmount = form.watch("totalAmount");
   const advancePayment = form.watch("advancePayment");
@@ -138,6 +228,7 @@ export function CustomisationFormDialog({
   });
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
@@ -176,6 +267,36 @@ export function CustomisationFormDialog({
                 )}
               />
             </div>
+
+            <FormItem>
+              <FormLabel>Customer</FormLabel>
+              <div className="flex gap-2">
+                <SearchableSelect
+                  value=""
+                  onChange={(value) => {
+                    const customer = customerList.find((c) => c._id === value);
+                    if (customer) applyCustomer(customer);
+                  }}
+                  placeholder="Search customers to fill in the fields below"
+                  searchPlaceholder="Search by name or email..."
+                  emptyText="No customers found."
+                  options={customerList.map((customer) => ({
+                    value: customer._id,
+                    label: customer.name,
+                    sublabel: customerContact(customer),
+                  }))}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0"
+                  onClick={() => setNewCustomerOpen(true)}
+                >
+                  <UserPlus className="h-4 w-4" />
+                  New
+                </Button>
+              </div>
+            </FormItem>
 
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -349,5 +470,104 @@ export function CustomisationFormDialog({
         </Form>
       </DialogContent>
     </Dialog>
+
+    <Dialog open={newCustomerOpen} onOpenChange={setNewCustomerOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>New Customer</DialogTitle>
+        </DialogHeader>
+        <Form {...quickCustomerForm}>
+          <form
+            onSubmit={quickCustomerForm.handleSubmit((values) => createCustomerMutation.mutate(values))}
+            className="space-y-4"
+          >
+            <FormField
+              control={quickCustomerForm.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Customer name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={quickCustomerForm.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Mobile</FormLabel>
+                  <FormControl>
+                    <PhoneInput {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-[auto_1fr] gap-3">
+              <FormField
+                control={quickCustomerForm.control}
+                name="relation"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Relation</FormLabel>
+                    <Select value={field.value} onValueChange={(value) => field.onChange(value ?? "S/O")}>
+                      <FormControl>
+                        <SelectTrigger className="w-24">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {RELATION_OPTIONS.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={quickCustomerForm.control}
+                name="relationName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name (optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Husband's / Father's name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={quickCustomerForm.control}
+              name="addressLine1"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Address (optional)</FormLabel>
+                  <FormControl>
+                    <Textarea rows={2} placeholder="Address" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <DialogFooter>
+              <Button type="submit" disabled={createCustomerMutation.isPending}>
+                {createCustomerMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Create Customer
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

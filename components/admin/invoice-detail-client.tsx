@@ -11,7 +11,7 @@ import { InvoicePaymentDialog } from "@/components/admin/invoice-payment-dialog"
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AuditLogList } from "@/components/admin/audit-log-list";
 import { downloadInvoicePdf } from "@/lib/admin/invoice-pdf";
-import { formatDate } from "@/lib/utils";
+import { formatDate, isWalkinEmail } from "@/lib/utils";
 import type { InvoiceLineItem, InvoiceStatus, PaymentMethod } from "@/models/Invoice";
 
 interface PaymentRow {
@@ -264,9 +264,11 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
             <div className="rounded-lg border border-border bg-card p-6">
               <h2 className="font-heading text-lg">Bill To</h2>
               <p className="mt-2 text-sm">{invoice.customer.name}</p>
-              <p className="text-sm text-muted-foreground">{invoice.customer.email}</p>
               {invoice.customer.phone && (
                 <p className="text-sm text-muted-foreground">{invoice.customer.phone}</p>
+              )}
+              {invoice.customer.email && !isWalkinEmail(invoice.customer.email) && (
+                <p className="text-sm text-muted-foreground">{invoice.customer.email}</p>
               )}
             </div>
             <div className="rounded-lg border border-border bg-secondary/40 p-6">

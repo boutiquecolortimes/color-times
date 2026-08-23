@@ -167,6 +167,19 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     await connectToDatabase();
 
+    // Bill numbers are required and must be unique — the client is bulk-
+    // importing ~880 historical bookings, so this guards against a manually
+    // typed number colliding with an existing record.
+    const duplicateBill = await Booking.findOne({ billNumber: input.billNumber, deletedAt: null })
+      .select("bookingNumber")
+      .lean();
+    if (duplicateBill) {
+      return apiError(
+        `Bill number ${input.billNumber} is already used by booking ${duplicateBill.bookingNumber}`,
+        409
+      );
+    }
+
     const rentalStartDate = new Date(input.rentalStartDate);
     const rentalEndDate = new Date(input.rentalEndDate);
 
@@ -221,7 +234,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     const booking = await Booking.create({
       bookingNumber,
-      billNumber: input.billNumber || undefined,
+      billNumber: input.billNumber,
       bookingDate: new Date(input.bookingDate),
       customer: input.customer,
       items,

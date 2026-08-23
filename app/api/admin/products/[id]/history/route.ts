@@ -4,6 +4,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { Booking } from "@/models/Booking";
 import { Product } from "@/models/Product";
 import { ServiceOrder } from "@/models/ServiceOrder";
+import { Sale } from "@/models/Sale";
 import "@/models/User";
 import { ACTIVE_BOOKING_STATUSES } from "@/lib/admin/booking-availability";
 import { requireApiRole } from "@/lib/api/require-role";
@@ -26,8 +27,8 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
 
   await connectToDatabase();
 
-  const [product, bookings, serviceOrders, revenueAgg, serviceExpenseAgg] = await Promise.all([
-    Product.findById(id).select("purchasePrice stitchingCost transportCost").lean(),
+  const [product, bookings, serviceOrders, revenueAgg, serviceExpenseAgg, saleRevenueAgg] = await Promise.all([
+    Product.findById(id).select("purchasePrice stitchingCost transportCost otherCost").lean(),
     Booking.find({ "items.product": id })
       .populate("customer", "name")
       .select("bookingNumber customer status rentalStartDate rentalEndDate totalAmount items createdAt")
@@ -61,6 +62,14 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
     ServiceOrder.aggregate([
       { $match: { product: productObjectId, deletedAt: null } },
       { $group: { _id: null, totalServiceExpense: { $sum: "$totalAmount" } } },
+    ]),
+    // Outright dress sales, on top of rental revenue. Sale records created
+    // as a side effect of a booking settlement (source: "booking") are
+    // excluded — that revenue is already counted via the Booking aggregate
+    // above, so including it here would double it.
+    Sale.aggregate([
+      { $match: { product: productObjectId, deletedAt: null, source: { $ne: "booking" } } },
+      { $group: { _id: null, saleEarned: { $sum: "$totalAmount" } } },
     ]),
   ]);
 
@@ -99,13 +108,18 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
   }));
 
   const timesRented = revenueAgg[0]?.timesRented ?? 0;
-  const totalEarned = revenueAgg[0]?.totalEarned ?? 0;
+  const rentalEarned = revenueAgg[0]?.totalEarned ?? 0;
+  const saleEarned = saleRevenueAgg[0]?.saleEarned ?? 0;
+  const totalEarned = rentalEarned + saleEarned;
   const totalServiceExpense = serviceExpenseAgg[0]?.totalServiceExpense ?? 0;
   // One-time cost of getting this dress into the store — set on the product
-  // itself (purchase, stitching, transport), on top of ongoing dry-clean/
-  // repair costs above.
+  // itself (purchase, stitching, transport, other), on top of ongoing
+  // dry-clean/repair costs above.
   const acquisitionCost =
-    (product?.purchasePrice ?? 0) + (product?.stitchingCost ?? 0) + (product?.transportCost ?? 0);
+    (product?.purchasePrice ?? 0) +
+    (product?.stitchingCost ?? 0) +
+    (product?.transportCost ?? 0) +
+    (product?.otherCost ?? 0);
   const totalExpense = totalServiceExpense + acquisitionCost;
   const netAmount = totalEarned - totalExpense;
 
@@ -118,6 +132,7 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
       totalServiceOrders: mappedServiceOrders.length,
       timesRented,
       totalEarned,
+      saleEarned,
       acquisitionCost,
       totalServiceExpense,
       totalExpense,

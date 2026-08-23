@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Sale } from "@/models/Sale";
-import "@/models/Product";
+import { Product } from "@/models/Product";
 import { saleSchema } from "@/lib/validations/sale";
 import { generateSaleBillNumber } from "@/lib/admin/sale-number";
 import { requireApiRole } from "@/lib/api/require-role";
@@ -60,7 +60,13 @@ export async function POST(request: NextRequest): Promise<Response> {
       product: input.product,
       details: input.details,
       totalAmount: input.totalAmount,
+      source: "manual",
     });
+
+    // This dress has been sold outright — take it out of rental circulation.
+    // It stays in the normal Products list (not archived) but shows as Sold
+    // and drops out of the booking/new-sale pickers.
+    await Product.findByIdAndUpdate(input.product, { status: "sold" });
 
     await recordAuditLog({
       entityType: "Sale",

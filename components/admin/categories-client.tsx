@@ -374,13 +374,21 @@ export function CategoriesClient({
       {categories.map((category) => (
         <div key={category._id} className="overflow-hidden rounded-lg border border-border bg-card">
           <div className="relative aspect-square bg-secondary">
-            {category.heroImage && (
+            {category.heroImage ? (
               <Image
                 src={category.heroImage}
                 alt={category.name}
                 fill
                 sizes="(min-width: 1280px) 25vw, (min-width: 640px) 33vw, 50vw"
                 className="object-cover"
+              />
+            ) : (
+              <Image
+                src="/logo.png"
+                alt={category.name}
+                fill
+                sizes="(min-width: 1280px) 25vw, (min-width: 640px) 33vw, 50vw"
+                className="object-contain p-6 opacity-60"
               />
             )}
             <div className="absolute left-2 top-2 rounded bg-background/80 p-0.5">
@@ -598,8 +606,16 @@ export function CategoriesClient({
                 </td>
                 <td className="px-4 py-3">
                   <div className="relative h-10 w-10 overflow-hidden rounded-md bg-secondary">
-                    {category.heroImage && (
+                    {category.heroImage ? (
                       <Image src={category.heroImage} alt={category.name} fill sizes="40px" className="object-cover" />
+                    ) : (
+                      <Image
+                        src="/logo.png"
+                        alt={category.name}
+                        fill
+                        sizes="40px"
+                        className="object-contain p-1.5 opacity-60"
+                      />
                     )}
                   </div>
                 </td>

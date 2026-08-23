@@ -1,15 +1,18 @@
 import type { MeasurementValues } from "@/models/shared/measurements";
 
 export const MEASUREMENT_FIELD_DEFS: { key: keyof MeasurementValues; label: string }[] = [
-  { key: "bust", label: "Bust" },
-  { key: "waist", label: "Waist" },
-  { key: "hip", label: "Hip" },
+  { key: "upperChest", label: "UC" },
+  { key: "lowerChest", label: "LC" },
+  { key: "sleeveLength", label: "Sleeves" },
+  { key: "armhole", label: "Armhole" },
   { key: "shoulder", label: "Shoulder" },
-  { key: "sleeveLength", label: "Sleeve Length (SL)" },
+  { key: "armLength", label: "Arm Length" },
   { key: "blouseLength", label: "Blouse Length" },
-  { key: "armhole", label: "Armhole (AH)" },
-  { key: "neckFront", label: "Neck (Front)" },
-  { key: "neckBack", label: "Neck (Back)" },
-  { key: "upperChest", label: "Upper Chest (UC)" },
-  { key: "lowerChest", label: "Lower Chest (LC)" },
+  { key: "neckFront", label: "Neck Front" },
+  { key: "neckBack", label: "Neck Back" },
+  { key: "waist", label: "Waist" },
+  { key: "hip", label: "Hips" },
+  { key: "length", label: "Length" },
+  { key: "thigh", label: "Thighs" },
+  { key: "bust", label: "Bust" },
 ];

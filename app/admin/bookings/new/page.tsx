@@ -5,23 +5,26 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { User } from "@/models/User";
 import { Product } from "@/models/Product";
 import { BookingForm } from "@/components/admin/booking-form";
+import { suggestNextBillNumber } from "@/lib/admin/booking-number";
 
 export const metadata: Metadata = { title: "New Booking" };
 
 export default async function NewBookingPage() {
   await connectToDatabase();
 
-  const [customers, products] = await Promise.all([
+  const [customers, products, suggestedBillNumber] = await Promise.all([
     User.find({ role: "customer", deletedAt: null })
-      .select("name email")
+      .select("name email phone")
       .sort({ name: 1 })
       .limit(200)
       .lean(),
-    Product.find({ isActive: true, deletedAt: null, archivedAt: null })
+    // A dress that's been sold outright is no longer available to rent.
+    Product.find({ isActive: true, deletedAt: null, archivedAt: null, status: { $ne: "sold" } })
       .select("name sku color rentalPricePerDay securityDeposit variants")
       .sort({ name: 1 })
       .limit(200)
       .lean(),
+    suggestNextBillNumber(),
   ]);
 
   return (
@@ -45,6 +48,7 @@ export default async function NewBookingPage() {
           _id: String(customer._id),
           name: customer.name,
           email: customer.email,
+          phone: customer.phone,
         }))}
         products={products.map((product) => ({
           _id: String(product._id),
@@ -58,6 +62,18 @@ export default async function NewBookingPage() {
             quantityInStock: variant.quantityInStock,
           })),
         }))}
+        defaultValues={{
+          customer: "",
+          billNumber: suggestedBillNumber,
+          bookingDate: new Date().toISOString().slice(0, 10),
+          items: [{ product: "", color: "", pricePerDay: 0, wearerName: "" }],
+          rentalStartDate: "",
+          rentalEndDate: "",
+          securityDeposit: 0,
+          advancePaid: 0,
+          advancePaymentMethod: "",
+          notes: "",
+        }}
       />
     </div>
   );

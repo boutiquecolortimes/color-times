@@ -41,6 +41,7 @@ export default async function AdminProductsPage() {
         }
       : null,
     rentalPricePerDay: product.rentalPricePerDay,
+    status: product.status,
     isActive: product.isActive,
     isFeatured: product.isFeatured,
     isFavorited: product.isFavorited,

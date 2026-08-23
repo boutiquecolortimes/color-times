@@ -26,6 +26,27 @@ export function formatDateTime(value: string | number | Date): string {
   return `${formatDate(date)}, ${time}`
 }
 
+// Walk-in bookings don't collect a real email, so a quick-add customer gets
+// a generated placeholder like "9876543210.1712345678901@walkin.vchuki.local"
+// just to satisfy the unique/required email field — never something to show
+// an admin as if it were a real contact address.
+const WALKIN_EMAIL_PATTERN = /@walkin\.[a-z0-9.-]+$/i
+
+/** True for the auto-generated placeholder email walk-in customers get instead of a real one. */
+export function isWalkinEmail(email?: string | null): boolean {
+  return Boolean(email) && WALKIN_EMAIL_PATTERN.test(email as string)
+}
+
+/**
+ * The best contact detail to show under a customer's name: their real email,
+ * or their phone number when the "email" on file is just the walk-in
+ * placeholder, or a plain label when neither is available.
+ */
+export function customerContact(customer: { email?: string | null; phone?: string | null }): string {
+  if (customer.email && !isWalkinEmail(customer.email)) return customer.email
+  return customer.phone || "Walk-in customer"
+}
+
 /** Inclusive day count between two dates (same-day rentals count as 1 day). */
 export function daysBetween(from: string | Date, to: string | Date): number {
   if (!from || !to) return 0

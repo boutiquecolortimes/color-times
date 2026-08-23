@@ -39,7 +39,7 @@ import { CustomerImportDialog } from "@/components/admin/customer-import-dialog"
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
-import { formatDate } from "@/lib/utils";
+import { formatDate, isWalkinEmail } from "@/lib/utils";
 
 interface CustomerRow {
   _id: string;
@@ -146,7 +146,7 @@ export function CustomersClient({
     return rows.map((customer, index) => [
       index + 1,
       customer.name,
-      customer.email,
+      isWalkinEmail(customer.email) ? "—" : customer.email,
       customer.phone ?? "—",
       formatDate(customer.createdAt),
     ]);
@@ -309,7 +309,9 @@ export function CustomersClient({
             />
           </div>
           <p className="mt-2 font-medium">{customer.name}</p>
-          <p className="text-sm text-muted-foreground">{customer.email}</p>
+          <p className="text-sm text-muted-foreground">
+            {isWalkinEmail(customer.email) ? "—" : customer.email}
+          </p>
           <p className="text-sm text-muted-foreground">{customer.phone ?? "—"}</p>
           <p className="mt-1 text-xs text-muted-foreground">
             Joined {formatDate(customer.createdAt)}
@@ -540,7 +542,9 @@ export function CustomersClient({
                   />
                 </td>
                 <td className="px-4 py-3 font-medium">{customer.name}</td>
-                <td className="px-4 py-3 text-muted-foreground">{customer.email}</td>
+                <td className="px-4 py-3 text-muted-foreground">
+                  {isWalkinEmail(customer.email) ? "—" : customer.email}
+                </td>
                 <td className="px-4 py-3 text-muted-foreground">{customer.phone ?? "—"}</td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {formatDate(customer.createdAt)}

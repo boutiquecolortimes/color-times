@@ -39,6 +39,7 @@ import { AdminPagination } from "@/components/admin/admin-pagination";
 import {
   CustomisationFormDialog,
   type CustomisationOrderRow,
+  type CustomerOption,
 } from "@/components/admin/customisation-form-dialog";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 import { formatDate } from "@/lib/utils";
@@ -99,9 +100,11 @@ function SortIcon({
 export function CustomisationClient({
   initialOrders,
   initialPagination,
+  customers,
 }: {
   initialOrders: CustomisationOrderRow[];
   initialPagination: Pagination;
+  customers: CustomerOption[];
 }) {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
@@ -564,7 +567,12 @@ export function CustomisationClient({
         onPageChange={setPage}
       />
 
-      <CustomisationFormDialog open={formOpen} onOpenChange={setFormOpen} editingOrder={editingOrder} />
+      <CustomisationFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        customers={customers}
+        editingOrder={editingOrder}
+      />
 
       <ConfirmDialog
         open={deleteId !== null}

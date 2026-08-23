@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Send, Grid3x3, List } from "lucide-react";
+import { Plus, Pencil, Trash2, Send, Grid3x3, List, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button-link";
 import {
   Select,
   SelectContent,
@@ -13,7 +14,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
-import { SaleFormDialog, type SaleRow } from "@/components/admin/sale-form-dialog";
+import {
+  SaleFormDialog,
+  type SaleRow,
+  type CustomerOption,
+} from "@/components/admin/sale-form-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { formatDate } from "@/lib/utils";
 
@@ -50,10 +55,12 @@ export function SalesClient({
   initialSales,
   initialPagination,
   products,
+  customers,
 }: {
   initialSales: SaleRow[];
   initialPagination: Pagination;
   products: ProductOption[];
+  customers: CustomerOption[];
 }) {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
@@ -121,6 +128,14 @@ export function SalesClient({
           <p className="mt-2 text-xs text-muted-foreground">Sale date {formatDate(sale.saleDate)}</p>
           {view === "active" && (
             <div className="mt-3 flex justify-end gap-1">
+              <ButtonLink
+                variant="ghost"
+                size="icon"
+                href={`/admin/sales/${sale._id}`}
+                title="View details"
+              >
+                <Eye className="h-4 w-4" />
+              </ButtonLink>
               <Button
                 variant="ghost"
                 size="icon"
@@ -246,6 +261,14 @@ export function SalesClient({
                 <td className="px-4 py-3">
                   {view === "active" && (
                     <div className="flex justify-end gap-1">
+                      <ButtonLink
+                        variant="ghost"
+                        size="icon"
+                        href={`/admin/sales/${sale._id}`}
+                        title="View details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </ButtonLink>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -301,6 +324,7 @@ export function SalesClient({
         open={formOpen}
         onOpenChange={setFormOpen}
         products={products}
+        customers={customers}
         editingSale={editingSale}
       />
 

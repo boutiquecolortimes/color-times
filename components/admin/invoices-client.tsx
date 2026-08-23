@@ -41,7 +41,7 @@ import { InvoiceStatusBadge } from "@/components/admin/invoice-status-badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { downloadPdf, downloadExcel } from "@/lib/admin/export";
-import { formatDate } from "@/lib/utils";
+import { customerContact, formatDate } from "@/lib/utils";
 import type { InvoiceStatus } from "@/models/Invoice";
 
 interface InvoiceRow {
@@ -53,7 +53,7 @@ interface InvoiceRow {
   amountDue: number;
   dueDate: string;
   createdAt: string;
-  customer: { name: string; email: string } | null;
+  customer: { name: string; email: string; phone?: string } | null;
   booking: { bookingNumber: string } | null;
 }
 
@@ -363,7 +363,9 @@ export function InvoicesClient({
             <InvoiceStatusBadge status={invoice.status} />
           </div>
           <p className="mt-2 text-sm">{invoice.customer?.name ?? "—"}</p>
-          <p className="text-xs text-muted-foreground">{invoice.customer?.email}</p>
+          <p className="text-xs text-muted-foreground">
+            {invoice.customer ? customerContact(invoice.customer) : "—"}
+          </p>
           {invoice.booking && (
             <p className="mt-1 text-xs text-muted-foreground">Booking {invoice.booking.bookingNumber}</p>
           )}
@@ -678,7 +680,9 @@ export function InvoicesClient({
                 </td>
                 <td className="px-4 py-3">
                   <p>{invoice.customer?.name ?? "—"}</p>
-                  <p className="text-xs text-muted-foreground">{invoice.customer?.email}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {invoice.customer ? customerContact(invoice.customer) : "—"}
+                  </p>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">
                   {invoice.booking?.bookingNumber ?? "—"}

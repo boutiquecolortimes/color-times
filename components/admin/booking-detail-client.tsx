@@ -4,8 +4,9 @@ import { useState } from "react";
 import Image from "next/image";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Bell, Loader2, Sparkles } from "lucide-react";
+import { Bell, Loader2, Pencil, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button-link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -17,12 +18,13 @@ import {
 import { BookingStatusBadge, STATUS_LABELS } from "@/components/admin/booking-status-badge";
 import { ReturnBookingDialog } from "@/components/admin/return-booking-dialog";
 import { ConfirmBookingDialog } from "@/components/admin/confirm-booking-dialog";
+import { PickupBookingDialog } from "@/components/admin/pickup-booking-dialog";
 import { AuditLogList } from "@/components/admin/audit-log-list";
 import {
   ServiceOrderFormDialog,
   type ServiceOrderInitialValues,
 } from "@/components/admin/service-order-form-dialog";
-import { formatDate } from "@/lib/utils";
+import { formatDate, isWalkinEmail } from "@/lib/utils";
 import type { BookingStatus, ReturnCondition } from "@/models/Booking";
 
 const REMINDABLE_STATUSES: BookingStatus[] = ["inquiry", "pending_payment", "confirmed", "in_use"];
@@ -104,6 +106,7 @@ export function BookingDetailClient({ initialBooking }: { initialBooking: Bookin
   const queryClient = useQueryClient();
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [pickupDialogOpen, setPickupDialogOpen] = useState(false);
   const [dryCleanValues, setDryCleanValues] = useState<ServiceOrderInitialValues | null>(null);
   const [dryCleanDialogOpen, setDryCleanDialogOpen] = useState(false);
 
@@ -158,6 +161,12 @@ export function BookingDetailClient({ initialBooking }: { initialBooking: Bookin
         </div>
 
         <div className="flex items-center gap-2">
+          {booking.status !== "returned" && booking.status !== "cancelled" && (
+            <ButtonLink variant="outline" size="sm" href={`/admin/bookings/${booking._id}/edit`}>
+              <Pencil className="h-4 w-4" />
+              Edit
+            </ButtonLink>
+          )}
           {REMINDABLE_STATUSES.includes(booking.status) && (
             <Button
               variant="outline"
@@ -183,6 +192,10 @@ export function BookingDetailClient({ initialBooking }: { initialBooking: Bookin
               }
               if (value === "confirmed") {
                 setConfirmDialogOpen(true);
+                return;
+              }
+              if (value === "in_use") {
+                setPickupDialogOpen(true);
                 return;
               }
               updateStatusMutation.mutate(value as BookingStatus);
@@ -213,9 +226,14 @@ export function BookingDetailClient({ initialBooking }: { initialBooking: Bookin
             <div className="rounded-lg border border-border bg-card p-6">
               <h2 className="font-heading text-lg">Customer</h2>
               <p className="mt-2 text-sm">{booking.customer?.name ?? "—"}</p>
-              <p className="text-sm text-muted-foreground">{booking.customer?.email}</p>
               {booking.customer?.phone && (
                 <p className="text-sm text-muted-foreground">{booking.customer.phone}</p>
+              )}
+              {/* Walk-in bookings get a generated placeholder email just to
+                  satisfy the unique/required field — never show that as if
+                  it were a real contact address. */}
+              {booking.customer?.email && !isWalkinEmail(booking.customer.email) && (
+                <p className="text-sm text-muted-foreground">{booking.customer.email}</p>
               )}
             </div>
 
@@ -454,6 +472,16 @@ export function BookingDetailClient({ initialBooking }: { initialBooking: Bookin
         summary={{ totalAmount: booking.totalAmount, advancePaid: booking.advancePaid ?? 0 }}
         open={confirmDialogOpen}
         onOpenChange={setConfirmDialogOpen}
+      />
+
+      <PickupBookingDialog
+        bookingId={booking._id}
+        summary={{
+          totalAmount: booking.totalAmount,
+          advancePaid: booking.advancePaid ?? 0,
+        }}
+        open={pickupDialogOpen}
+        onOpenChange={setPickupDialogOpen}
       />
 
       <ServiceOrderFormDialog

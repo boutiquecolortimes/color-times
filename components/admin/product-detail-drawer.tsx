@@ -18,11 +18,13 @@ import { SheetDetailSkeleton } from "@/components/admin/page-skeletons";
 import { AuditLogList } from "@/components/admin/audit-log-list";
 import { BookingStatusBadge } from "@/components/admin/booking-status-badge";
 import { ServiceOrderStatusBadge } from "@/components/admin/service-order-status-badge";
+import { ProductStatusBadge } from "@/components/admin/product-status-badge";
 import { ProductAvailabilityCalendar } from "@/components/admin/product-availability-calendar";
 import { ImagePreviewDialog } from "@/components/admin/image-preview-dialog";
 import { cn, formatDate } from "@/lib/utils";
 import type { BookingStatus } from "@/models/Booking";
 import type { ServiceOrderStatus } from "@/models/ServiceOrder";
+import type { ProductStatus } from "@/models/Product";
 
 interface ProductDetail {
   _id: string;
@@ -30,6 +32,7 @@ interface ProductDetail {
   sku: string;
   description: string;
   designer?: string;
+  dealerName?: string;
   color: string;
   fabric: string;
   dressType?: string;
@@ -41,8 +44,10 @@ interface ProductDetail {
   purchasePrice?: number;
   transportCost?: number;
   stitchingCost?: number;
+  otherCost?: number;
   retailValue: number;
   securityDeposit: number;
+  status: ProductStatus;
   isActive: boolean;
   tags: string[];
 }
@@ -72,6 +77,7 @@ interface ProductHistorySummary {
   totalServiceOrders: number;
   timesRented: number;
   totalEarned: number;
+  saleEarned: number;
   acquisitionCost: number;
   totalServiceExpense: number;
   totalExpense: number;
@@ -164,9 +170,12 @@ export function ProductDetailDrawer({
                   <SheetTitle className="font-heading text-xl">{product.name}</SheetTitle>
                   <p className="text-xs text-muted-foreground">{product.sku}</p>
                 </div>
-                <Badge variant={product.isActive ? "default" : "secondary"} className="rounded-full">
-                  {product.isActive ? "Active" : "Inactive"}
-                </Badge>
+                <div className="flex flex-wrap justify-end gap-1.5">
+                  <Badge variant={product.isActive ? "default" : "secondary"} className="rounded-full">
+                    {product.isActive ? "Active" : "Inactive"}
+                  </Badge>
+                  {product.status === "sold" && <ProductStatusBadge status="sold" />}
+                </div>
               </div>
             </SheetHeader>
 
@@ -232,6 +241,10 @@ export function ProductDetailDrawer({
                       <p className="mt-0.5">{product.designer || "—"}</p>
                     </div>
                     <div>
+                      <p className="text-xs uppercase text-muted-foreground">Dealer Name</p>
+                      <p className="mt-0.5">{product.dealerName || "—"}</p>
+                    </div>
+                    <div>
                       <p className="text-xs uppercase text-muted-foreground">Color</p>
                       <p className="mt-0.5">{product.color}</p>
                     </div>
@@ -261,7 +274,7 @@ export function ProductDetailDrawer({
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3 rounded-lg border border-border p-3 text-sm">
+                  <div className="grid grid-cols-2 gap-3 rounded-lg border border-border p-3 text-sm sm:grid-cols-4">
                     <div>
                       <p className="text-xs uppercase text-muted-foreground">Purchase Price</p>
                       <p className="mt-0.5 font-medium">
@@ -278,6 +291,12 @@ export function ProductDetailDrawer({
                       <p className="text-xs uppercase text-muted-foreground">Transport Cost</p>
                       <p className="mt-0.5 font-medium">
                         &#8377;{(product.transportCost ?? 0).toLocaleString("en-IN")}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-muted-foreground">Other Cost</p>
+                      <p className="mt-0.5 font-medium">
+                        &#8377;{(product.otherCost ?? 0).toLocaleString("en-IN")}
                       </p>
                     </div>
                   </div>
@@ -322,6 +341,11 @@ export function ProductDetailDrawer({
                         <div>
                           <p className="text-xs uppercase text-muted-foreground">Earned</p>
                           <p className="mt-0.5 font-medium">{formatINR(history.summary.totalEarned)}</p>
+                          {history.summary.saleEarned > 0 && (
+                            <p className="text-[10px] text-muted-foreground">
+                              incl. {formatINR(history.summary.saleEarned)} from sale
+                            </p>
+                          )}
                         </div>
                         <div>
                           <p className="text-xs uppercase text-muted-foreground">Expenses</p>
@@ -413,7 +437,12 @@ export function ProductDetailDrawer({
                   </div>
                 </TabsContent>
 
-                <TabsContent value="availability">
+                <TabsContent value="availability" className="space-y-3">
+                  {product.status === "sold" && (
+                    <div className="rounded-lg border border-purple-200 bg-purple-50 p-3 text-sm text-purple-800 dark:border-purple-900 dark:bg-purple-950 dark:text-purple-300">
+                      This dress has been sold outright and is no longer available for rental.
+                    </div>
+                  )}
                   <ProductAvailabilityCalendar activeRanges={history?.activeRanges ?? []} />
                 </TabsContent>
 
