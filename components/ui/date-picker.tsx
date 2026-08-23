@@ -148,7 +148,7 @@ function DatePicker({ value, onChange, placeholder = "Select date", className }:
                   }}
                 >
                   <SelectTrigger size="sm" className="w-[76px]">
-                    <SelectValue />
+                    <SelectValue>{(value: string) => MONTH_LABELS[Number(value)]}</SelectValue>
                   </SelectTrigger>
                   <SelectContent align="center">
                     {MONTH_LABELS.map((label, index) => (
