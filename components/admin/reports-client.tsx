@@ -37,7 +37,8 @@ type ReportType =
   | "services"
   | "customisation"
   | "sale"
-  | "pending-returns";
+  | "pending-returns"
+  | "profit-loss";
 type Row = Record<string, string | number | boolean>;
 
 const REPORT_TYPE_OPTIONS: { value: ReportType; label: string }[] = [
@@ -49,6 +50,7 @@ const REPORT_TYPE_OPTIONS: { value: ReportType; label: string }[] = [
   { value: "customisation", label: "Customisation" },
   { value: "sale", label: "Sale" },
   { value: "pending-returns", label: "Pending Returns" },
+  { value: "profit-loss", label: "Profit & Loss" },
 ];
 
 const STATUS_OPTIONS: Record<ReportType, { value: string; label: string }[]> = {
@@ -95,6 +97,7 @@ const STATUS_OPTIONS: Record<ReportType, { value: string; label: string }[]> = {
   ],
   sale: [],
   "pending-returns": [],
+  "profit-loss": [],
 };
 
 const SERVICE_TYPE_OPTIONS = [
@@ -289,6 +292,10 @@ const TABLE_CONFIGS: Record<ReportType, ColumnConfig[]> = {
       render: (r) => <RemindButton bookingId={String(r._id)} />,
     },
   ],
+  "profit-loss": [
+    { key: "label", label: "Category" },
+    { key: "amount", label: "Amount", format: (r) => CURRENCY(r.amount), isTotal: true },
+  ],
 };
 
 interface SummaryCardConfig {
@@ -341,6 +348,12 @@ const SUMMARY_CONFIGS: Record<ReportType, SummaryCardConfig[]> = {
   "pending-returns": [
     { key: "totalPending", label: "Total Pending" },
     { key: "overdueCount", label: "Overdue" },
+  ],
+  "profit-loss": [
+    { key: "totalRevenue", label: "Total Revenue", format: CURRENCY },
+    { key: "totalCosts", label: "Total Costs", format: CURRENCY },
+    { key: "netProfit", label: "Net Profit", format: CURRENCY },
+    { key: "profitMargin", label: "Profit Margin", format: (v) => `${Number(v ?? 0).toFixed(1)}%` },
   ],
 };
 

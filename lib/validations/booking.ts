@@ -3,6 +3,12 @@ import { measurementsZodSchema } from "@/lib/validations/measurements";
 
 export const bookingStatusSchema = z.object({
   status: z.enum(["inquiry", "pending_payment", "confirmed", "in_use", "returned", "cancelled"]),
+  // Lets staff correct the security deposit actually held (e.g. it was
+  // topped up, or only partially collected at booking time) at the moment a
+  // booking is marked returned. When sent, the refund/settlement math below
+  // is computed against this value instead of always trusting whatever was
+  // recorded back when the booking was first created.
+  securityDeposit: z.number().min(0).optional(),
   returnCondition: z.enum(["good", "minor_damage", "major_damage", "missing_items"]).optional(),
   returnNotes: z.string().trim().max(2000).optional().or(z.literal("")),
   dryCleaningRequired: z.boolean().optional(),

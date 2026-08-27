@@ -12,6 +12,9 @@ import {
   UserCog,
   Ruler,
   ShoppingBag,
+  IdCard,
+  Receipt,
+  PackagePlus,
 } from "lucide-react";
 import { MANAGER_ROLES, SETTINGS_ROLES } from "@/lib/auth/roles";
 import type { UserRole } from "@/models/User";
@@ -61,6 +64,14 @@ const NAV_GROUPS_BY_ROLE: { label: string; items: AdminNavItem[] }[] = [
     items: [
       { label: "Customers", href: "/admin/customers", icon: Users },
       { label: "Team", href: "/admin/users", icon: UserCog, roles: MANAGER_ROLES },
+    ],
+  },
+  {
+    label: "Finance",
+    items: [
+      { label: "Staff", href: "/admin/staff", icon: IdCard, roles: MANAGER_ROLES },
+      { label: "Expenses", href: "/admin/expenses", icon: Receipt, roles: MANAGER_ROLES },
+      { label: "Purchases", href: "/admin/purchases", icon: PackagePlus, roles: MANAGER_ROLES },
     ],
   },
   {

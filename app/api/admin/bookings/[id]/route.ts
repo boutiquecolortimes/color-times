@@ -103,16 +103,23 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       if (input.returnCondition) update.returnCondition = input.returnCondition;
       if (input.returnNotes) update.returnNotes = input.returnNotes;
 
+      // The rental-fee portion never changes here — only the security
+      // deposit itself can be corrected at return time (e.g. it was topped
+      // up, or only partially collected at booking). Total is recomputed so
+      // Billing keeps showing rentalFees + securityDeposit consistently.
       const rentalFeesTotal = before.totalAmount - before.securityDeposit;
+      const securityDeposit = input.securityDeposit ?? before.securityDeposit;
       const damageCharges = input.damageCharges ?? 0;
       const pendingRentAmount =
         input.pendingRentAmount ?? Math.max(0, rentalFeesTotal - (before.advancePaid ?? 0));
       const { depositRefundAmount, finalSettlementAmount } = computeBookingSettlement({
-        securityDeposit: before.securityDeposit,
+        securityDeposit,
         damageCharges,
         pendingRentAmount,
       });
 
+      update.securityDeposit = securityDeposit;
+      update.totalAmount = rentalFeesTotal + securityDeposit;
       update.dryCleaningRequired = input.dryCleaningRequired ?? false;
       update.stitchingRequired = input.stitchingRequired ?? false;
       update.damageCharges = damageCharges;
@@ -137,13 +144,28 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       return apiError("Booking not found", 404);
     }
 
+    const statusChanges: { field: string; from: unknown; to: unknown }[] = [];
     if (input.status !== before.status) {
+      statusChanges.push({ field: "status", from: before.status, to: input.status });
+    }
+    if (
+      input.status === "returned" &&
+      typeof update.securityDeposit === "number" &&
+      update.securityDeposit !== before.securityDeposit
+    ) {
+      statusChanges.push({
+        field: "securityDeposit",
+        from: before.securityDeposit,
+        to: update.securityDeposit,
+      });
+    }
+    if (statusChanges.length > 0) {
       await recordAuditLog({
         entityType: "Booking",
         entityId: id,
         action: "status_change",
         actor: auth.user,
-        changes: [{ field: "status", from: before.status, to: input.status }],
+        changes: statusChanges,
       });
     }
 

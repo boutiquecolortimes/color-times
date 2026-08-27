@@ -26,8 +26,9 @@ export default async function TrashPage() {
       <div>
         <h1 className="font-heading text-2xl">Trash</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Restore or permanently delete items across Products, Categories, Bookings, Customers, and
-          Invoices. Permanently deleting frees up codes, slugs, and names so they can be reused.
+          Restore or permanently delete items across Products, Categories, Bookings, Customers,
+          Invoices, Staff, Salary Payments, Purchases, and Expenses. Permanently deleting frees up
+          codes, slugs, and names so they can be reused.
         </p>
       </div>
 

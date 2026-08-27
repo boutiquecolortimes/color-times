@@ -64,6 +64,7 @@ export function ReturnBookingDialog({
   const [stitchingRequired, setStitchingRequired] = useState(false);
   const [damageCharges, setDamageCharges] = useState(0);
   const [pendingRentOverride, setPendingRentOverride] = useState<number | null>(null);
+  const [securityDepositOverride, setSecurityDepositOverride] = useState<number | null>(null);
   const [depositRefunded, setDepositRefunded] = useState(true);
   const [showInvoicePrompt, setShowInvoicePrompt] = useState(false);
 
@@ -83,7 +84,7 @@ export function ReturnBookingDialog({
     enabled: open && Boolean(bookingId),
   });
 
-  const securityDeposit = financials?.securityDeposit ?? 0;
+  const securityDeposit = securityDepositOverride ?? (financials?.securityDeposit ?? 0);
   const pendingRentDefault = financials
     ? Math.max(0, financials.totalAmount - financials.securityDeposit - financials.advancePaid)
     : 0;
@@ -100,6 +101,7 @@ export function ReturnBookingDialog({
     setStitchingRequired(false);
     setDamageCharges(0);
     setPendingRentOverride(null);
+    setSecurityDepositOverride(null);
     setDepositRefunded(true);
     setShowInvoicePrompt(false);
   }
@@ -115,6 +117,7 @@ export function ReturnBookingDialog({
           returnNotes: notes,
           dryCleaningRequired,
           stitchingRequired,
+          securityDeposit,
           damageCharges,
           pendingRentAmount,
           depositRefunded,
@@ -261,6 +264,25 @@ export function ReturnBookingDialog({
               />
               Stitching / repair required — sends the dress to Services automatically
             </label>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Security deposit (&#8377;)</label>
+            <Input
+              className="mt-2"
+              type="number"
+              min={0}
+              value={securityDeposit === 0 ? "" : securityDeposit}
+              onChange={(event) =>
+                setSecurityDepositOverride(Math.max(0, Number(event.target.value) || 0))
+              }
+              disabled={isLoadingFinancials}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Defaults to the deposit recorded on the booking &mdash; correct it here if a different
+              amount was actually collected or topped up. The refund/settlement below always uses
+              this value.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

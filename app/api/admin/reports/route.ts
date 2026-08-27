@@ -7,6 +7,9 @@ import { User } from "@/models/User";
 import { ServiceOrder } from "@/models/ServiceOrder";
 import { CustomisationOrder } from "@/models/CustomisationOrder";
 import { Sale } from "@/models/Sale";
+import { Expense } from "@/models/Expense";
+import { SalaryPayment } from "@/models/SalaryPayment";
+import { Purchase } from "@/models/Purchase";
 import "@/models/Category";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
@@ -420,6 +423,69 @@ async function buildSaleReport(
   };
 }
 
+// Company-wide profit & loss: rental + outright-sale revenue (the same
+// figures the Bookings and Sale reports already compute) minus everything
+// spent running the shop — staff salary, dress/material purchases, and
+// other day-to-day expenses. Uses the same createdAt-based dateFilter as
+// every other report here for consistency, rather than each record's own
+// transaction date.
+async function buildProfitLossReport(dateFilter: Record<string, unknown>) {
+  const [bookingRevenueAgg, saleRevenueAgg, expenseAgg, salaryAgg, purchaseAgg] = await Promise.all([
+    Booking.aggregate([
+      { $match: { ...dateFilter, deletedAt: null, status: { $in: REVENUE_STATUSES } } },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+    ]),
+    Sale.aggregate([
+      { $match: { ...dateFilter, deletedAt: null, source: "manual" } },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+    ]),
+    Expense.aggregate([
+      { $match: { ...dateFilter, deletedAt: null } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]),
+    SalaryPayment.aggregate([
+      { $match: { ...dateFilter, deletedAt: null } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]),
+    Purchase.aggregate([
+      { $match: { ...dateFilter, deletedAt: null } },
+      { $group: { _id: null, total: { $sum: "$totalCost" } } },
+    ]),
+  ]);
+
+  const bookingRevenue = bookingRevenueAgg[0]?.total ?? 0;
+  const saleRevenue = saleRevenueAgg[0]?.total ?? 0;
+  const totalExpenses = expenseAgg[0]?.total ?? 0;
+  const totalSalaryPaid = salaryAgg[0]?.total ?? 0;
+  const totalPurchaseCost = purchaseAgg[0]?.total ?? 0;
+
+  const totalRevenue = bookingRevenue + saleRevenue;
+  const totalCosts = totalExpenses + totalSalaryPaid + totalPurchaseCost;
+  const netProfit = totalRevenue - totalCosts;
+
+  // Net Profit is deliberately left out of this breakdown — it's already
+  // shown in the summary tiles, and including it here would make the
+  // exported "TOTAL" row (which sums every item) double-count it.
+  const items = [
+    { label: "Booking Revenue", amount: bookingRevenue },
+    { label: "Sale Revenue", amount: saleRevenue },
+    { label: "Staff Salary", amount: -totalSalaryPaid },
+    { label: "Dress / Material Purchases", amount: -totalPurchaseCost },
+    { label: "Other Expenses", amount: -totalExpenses },
+  ];
+
+  return {
+    summary: {
+      totalRevenue,
+      totalCosts,
+      netProfit,
+      profitMargin: totalRevenue ? (netProfit / totalRevenue) * 100 : 0,
+    },
+    items,
+    pagination: { page: 1, pageSize: items.length, total: items.length, totalPages: 1 },
+  };
+}
+
 async function buildPendingReturnsReport(page: number, pageSize: number, all: boolean) {
   const filter: Record<string, unknown> = { status: { $in: ["confirmed", "in_use"] } };
   const now = new Date();
@@ -516,6 +582,9 @@ export async function GET(request: NextRequest): Promise<Response> {
         break;
       case "pending-returns":
         report = await buildPendingReturnsReport(page, pageSize, all);
+        break;
+      case "profit-loss":
+        report = await buildProfitLossReport(dateFilter);
         break;
       default:
         return apiError("Invalid report type", 400);

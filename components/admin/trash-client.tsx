@@ -7,11 +7,15 @@ import {
   CalendarCheck,
   FileText,
   FolderTree,
+  IdCard,
+  PackagePlus,
+  Receipt,
   RotateCcw,
   Search,
   Shirt,
   Trash2,
   Users,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +27,16 @@ import { AdminPagination } from "@/components/admin/admin-pagination";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { cn } from "@/lib/utils";
 
-type EntityKey = "products" | "categories" | "bookings" | "customers" | "invoices";
+type EntityKey =
+  | "products"
+  | "categories"
+  | "bookings"
+  | "customers"
+  | "invoices"
+  | "staff"
+  | "salaryPayments"
+  | "purchases"
+  | "expenses";
 
 interface Pagination {
   page: number;
@@ -61,6 +74,22 @@ function customerName(raw: Record<string, unknown>): string | undefined {
   const customer = raw.customer as Record<string, unknown> | null | undefined;
   return customer ? asString(customer.name) : undefined;
 }
+
+function staffName(raw: Record<string, unknown>): string | undefined {
+  const staff = raw.staff as Record<string, unknown> | null | undefined;
+  return staff ? asString(staff.name) : undefined;
+}
+
+const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
+  rent: "Rent",
+  electricity: "Electricity",
+  water: "Water",
+  maintenance: "Maintenance",
+  transport: "Transport",
+  marketing: "Marketing",
+  office_supplies: "Office Supplies",
+  miscellaneous: "Miscellaneous",
+};
 
 const ENTITIES: EntityConfig[] = [
   {
@@ -149,6 +178,78 @@ const ENTITIES: EntityConfig[] = [
       id: String(raw._id),
       primary: asString(raw.invoiceNumber) ?? "Untitled invoice",
       secondary: customerName(raw),
+      deletedAt: asString(raw.deletedAt) ?? null,
+    }),
+  },
+  {
+    key: "staff",
+    label: "Staff",
+    itemLabel: "staff",
+    icon: IdCard,
+    listPath: "/api/admin/staff",
+    listParam: "status",
+    dataKey: "staff",
+    bulkPath: "/api/admin/staff/bulk",
+    permanentPath: (id) => `/api/admin/staff/${id}/permanent`,
+    restorePath: (id) => `/api/admin/staff/${id}/restore`,
+    mapRow: (raw) => ({
+      id: String(raw._id),
+      primary: asString(raw.name) ?? "Untitled staff member",
+      secondary: asString(raw.designation),
+      deletedAt: asString(raw.deletedAt) ?? null,
+    }),
+  },
+  {
+    key: "salaryPayments",
+    label: "Salary Payments",
+    itemLabel: "salary payments",
+    icon: Wallet,
+    listPath: "/api/admin/salary-payments",
+    listParam: "status",
+    dataKey: "payments",
+    bulkPath: "/api/admin/salary-payments/bulk",
+    permanentPath: (id) => `/api/admin/salary-payments/${id}/permanent`,
+    restorePath: (id) => `/api/admin/salary-payments/${id}/restore`,
+    mapRow: (raw) => ({
+      id: String(raw._id),
+      primary: staffName(raw) ?? "Untitled staff member",
+      secondary: `₹${Number(raw.amount ?? 0).toLocaleString("en-IN")} for ${asString(raw.forMonth) ?? "—"}`,
+      deletedAt: asString(raw.deletedAt) ?? null,
+    }),
+  },
+  {
+    key: "purchases",
+    label: "Purchases",
+    itemLabel: "purchases",
+    icon: PackagePlus,
+    listPath: "/api/admin/purchases",
+    listParam: "status",
+    dataKey: "purchases",
+    bulkPath: "/api/admin/purchases/bulk",
+    permanentPath: (id) => `/api/admin/purchases/${id}/permanent`,
+    restorePath: (id) => `/api/admin/purchases/${id}/restore`,
+    mapRow: (raw) => ({
+      id: String(raw._id),
+      primary: asString(raw.itemName) ?? "Untitled purchase",
+      secondary: asString(raw.vendorName),
+      deletedAt: asString(raw.deletedAt) ?? null,
+    }),
+  },
+  {
+    key: "expenses",
+    label: "Expenses",
+    itemLabel: "expenses",
+    icon: Receipt,
+    listPath: "/api/admin/expenses",
+    listParam: "status",
+    dataKey: "expenses",
+    bulkPath: "/api/admin/expenses/bulk",
+    permanentPath: (id) => `/api/admin/expenses/${id}/permanent`,
+    restorePath: (id) => `/api/admin/expenses/${id}/restore`,
+    mapRow: (raw) => ({
+      id: String(raw._id),
+      primary: asString(raw.description) ?? "Untitled expense",
+      secondary: EXPENSE_CATEGORY_LABELS[asString(raw.category) ?? ""] ?? asString(raw.category),
       deletedAt: asString(raw.deletedAt) ?? null,
     }),
   },
