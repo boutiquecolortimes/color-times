@@ -109,7 +109,7 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData): Promise<void>
     .finalY;
 
   const summaryLines = [
-    ["Subtotal", formatCurrency(invoice.subtotal)],
+    ["Rent", formatCurrency(invoice.subtotal)],
     ["Discount", `-${formatCurrency(invoice.discountAmount)}`],
     [`Tax (${invoice.taxRate}%)`, formatCurrency(invoice.taxAmount)],
     ["Security Deposit", formatCurrency(invoice.securityDeposit)],

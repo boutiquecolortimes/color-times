@@ -128,12 +128,28 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       update.depositRefundAmount = depositRefundAmount;
       update.finalSettlementAmount = finalSettlementAmount;
       update.settledAt = new Date();
-    } else if (input.status === "in_use" && input.pickupPaymentAmount) {
+    } else if (input.status === "in_use") {
       // Payment collected when handing over the dress — treated as
       // additional advance paid, on top of whatever's already recorded.
       // The pickup flow now collects the full outstanding due, so this
       // typically brings advancePaid up to totalAmount.
-      update.advancePaid = (before.advancePaid ?? 0) + input.pickupPaymentAmount;
+      if (input.pickupPaymentAmount) {
+        update.advancePaid = (before.advancePaid ?? 0) + input.pickupPaymentAmount;
+      }
+
+      // Security deposit can also be corrected right here at handover (e.g.
+      // more was actually collected than what was recorded at booking time)
+      // — same principle as the correction allowed at Return. The
+      // rental-fee portion of the total never changes; only the deposit,
+      // and in turn the total.
+      if (
+        typeof input.securityDeposit === "number" &&
+        input.securityDeposit !== before.securityDeposit
+      ) {
+        const rentalFeesTotal = before.totalAmount - before.securityDeposit;
+        update.securityDeposit = input.securityDeposit;
+        update.totalAmount = rentalFeesTotal + input.securityDeposit;
+      }
     }
 
     const booking = await Booking.findByIdAndUpdate(id, update, { returnDocument: "after" })
@@ -149,7 +165,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       statusChanges.push({ field: "status", from: before.status, to: input.status });
     }
     if (
-      input.status === "returned" &&
+      (input.status === "returned" || input.status === "in_use") &&
       typeof update.securityDeposit === "number" &&
       update.securityDeposit !== before.securityDeposit
     ) {

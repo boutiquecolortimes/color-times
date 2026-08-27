@@ -1040,6 +1040,7 @@ export function BookingsClient({
           summary={{
             totalAmount: pickupDialogBooking.totalAmount,
             advancePaid: pickupDialogBooking.advancePaid,
+            securityDeposit: pickupDialogBooking.securityDeposit,
           }}
           open={pickupDialogBooking !== null}
           onOpenChange={(open) => !open && setPickupDialogBooking(null)}

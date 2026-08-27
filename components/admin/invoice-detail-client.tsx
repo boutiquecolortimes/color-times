@@ -275,7 +275,7 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
               <h2 className="font-heading text-lg">Summary</h2>
               <div className="mt-2 space-y-1 text-sm">
                 <p className="flex justify-between">
-                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="text-muted-foreground">Rent</span>
                   <span>{formatCurrency(invoice.subtotal)}</span>
                 </p>
                 <p className="flex justify-between">

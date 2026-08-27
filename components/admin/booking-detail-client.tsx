@@ -504,6 +504,7 @@ export function BookingDetailClient({
         summary={{
           totalAmount: booking.totalAmount,
           advancePaid: booking.advancePaid ?? 0,
+          securityDeposit: booking.securityDeposit,
         }}
         open={pickupDialogOpen}
         onOpenChange={setPickupDialogOpen}

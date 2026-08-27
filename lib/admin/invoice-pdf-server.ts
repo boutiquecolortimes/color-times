@@ -97,7 +97,7 @@ export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise
     .finalY;
 
   const summaryLines = [
-    ["Subtotal", formatCurrency(invoice.subtotal)],
+    ["Rent", formatCurrency(invoice.subtotal)],
     ["Discount", `-${formatCurrency(invoice.discountAmount)}`],
     [`Tax (${invoice.taxRate}%)`, formatCurrency(invoice.taxAmount)],
     ["Security Deposit", formatCurrency(invoice.securityDeposit)],
