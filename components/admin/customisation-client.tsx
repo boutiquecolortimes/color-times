@@ -20,6 +20,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button-link";
 import {
   Select,
   SelectContent,
@@ -347,14 +348,9 @@ export function CustomisationClient({
             Custom stitching and design orders.
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setEditingOrder(null);
-            setFormOpen(true);
-          }}
-        >
+        <ButtonLink href="/admin/customisation/new">
           <Plus className="h-4 w-4" /> New Customisation Order
-        </Button>
+        </ButtonLink>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

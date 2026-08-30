@@ -8,6 +8,12 @@ export interface IServiceOrder extends Document {
   serviceType: ServiceType;
   product: Types.ObjectId;
   booking?: Types.ObjectId | null;
+  // Free-text reference to a booking's manual bill number, for when a
+  // service order is created directly from the Services page rather than
+  // from a specific booking's detail page — there's no formal Booking link
+  // in that case (see `booking` above), but staff can still note which
+  // bill this dress's cleaning/alteration belongs to.
+  bookingBillNumberRef?: string;
   description: string;
   status: ServiceOrderStatus;
   dryCleanCharge?: number;
@@ -31,6 +37,7 @@ const serviceOrderSchema = new Schema<IServiceOrder>(
     serviceType: { type: String, enum: ["dry_clean", "tailor"], required: true, index: true },
     product: { type: Schema.Types.ObjectId, ref: "Product", required: true, index: true },
     booking: { type: Schema.Types.ObjectId, ref: "Booking", default: null },
+    bookingBillNumberRef: { type: String, trim: true },
     description: { type: String, required: true, trim: true },
     status: {
       type: String,

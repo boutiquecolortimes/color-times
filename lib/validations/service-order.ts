@@ -4,6 +4,9 @@ const serviceOrderBaseSchema = z.object({
   serviceType: z.enum(["dry_clean", "tailor"]),
   product: z.string().min(1, "Select a product"),
   booking: z.string().optional().nullable(),
+  // Free-text booking bill number reference, for direct-creation orders
+  // that have no formal Booking link (see models/ServiceOrder.ts).
+  bookingBillNumberRef: z.string().trim().max(50).optional(),
   description: z.string().trim().min(1, "Description is required").max(500),
   dryCleanCharge: z.number().min(0).optional(),
   ironCharge: z.number().min(0).optional(),

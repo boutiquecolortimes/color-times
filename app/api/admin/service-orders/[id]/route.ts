@@ -53,6 +53,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
     if (input.serviceType !== undefined) update.serviceType = input.serviceType;
     if (input.product !== undefined) update.product = input.product;
     if (input.booking !== undefined) update.booking = input.booking || null;
+    if (input.bookingBillNumberRef !== undefined) {
+      update.bookingBillNumberRef = input.bookingBillNumberRef;
+    }
     if (input.description !== undefined) update.description = input.description;
     if (input.dryCleanCharge !== undefined) update.dryCleanCharge = input.dryCleanCharge;
     if (input.ironCharge !== undefined) update.ironCharge = input.ironCharge;

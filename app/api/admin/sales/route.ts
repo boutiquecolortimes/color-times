@@ -3,7 +3,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { Sale } from "@/models/Sale";
 import { Product } from "@/models/Product";
 import { saleSchema } from "@/lib/validations/sale";
-import { generateSaleBillNumber } from "@/lib/admin/sale-number";
+import { nextSharedBillNumber } from "@/lib/admin/bill-number";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     await connectToDatabase();
 
-    const billNumber = await generateSaleBillNumber();
+    const billNumber = await nextSharedBillNumber();
 
     const sale = await Sale.create({
       billNumber,

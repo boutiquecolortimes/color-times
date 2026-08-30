@@ -5,7 +5,7 @@ import {
   customisationOrderSchema,
   computeCustomisationDue,
 } from "@/lib/validations/customisation-order";
-import { generateCustomisationBillNumber } from "@/lib/admin/customisation-number";
+import { nextSharedBillNumber } from "@/lib/admin/bill-number";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     await connectToDatabase();
 
-    const billNumber = await generateCustomisationBillNumber();
+    const billNumber = await nextSharedBillNumber();
     const dueAmount = computeCustomisationDue(input);
 
     const order = await CustomisationOrder.create({

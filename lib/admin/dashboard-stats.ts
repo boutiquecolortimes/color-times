@@ -46,11 +46,15 @@ export interface DashboardStats {
   todaysReturns: number;
   returnedToday: number;
   pendingPaymentsCount: number;
+  overdueInvoicesCount: number;
+  overdueInvoicesTotal: number;
   monthlyRevenueTotal: number;
   previousMonthRevenueTotal: number;
   lowStockCount: number;
   newCustomersThisMonth: number;
   newCustomersPreviousMonth: number;
+  bookingsThisMonth: number;
+  bookingsPreviousMonth: number;
   categoryBookingBreakdown: { category: string; bookings: number }[];
   recentBookings: {
     _id: string;
@@ -118,6 +122,7 @@ async function computeDashboardStats(): Promise<DashboardStats> {
     customisationMonthlyRevenueTotalResult,
     customisationPreviousMonthRevenueTotalResult,
     customisationMonthlyRevenueBreakdown,
+    overdueInvoicesResult,
   ] = await Promise.all([
     Booking.aggregate([
       { $match: { status: { $in: REVENUE_STATUSES }, deletedAt: null } },
@@ -329,6 +334,20 @@ async function computeDashboardStats(): Promise<DashboardStats> {
         },
       },
     ]),
+    // Computed straight from dueDate rather than trusting a stored "overdue"
+    // status, so this stays accurate even if nothing has flipped the status
+    // field yet — an invoice is overdue the moment its due date passes,
+    // regardless of when a background job (if any) catches up to it.
+    Invoice.aggregate([
+      {
+        $match: {
+          deletedAt: null,
+          status: { $in: ["sent", "partially_paid"] },
+          dueDate: { $lt: new Date() },
+        },
+      },
+      { $group: { _id: null, total: { $sum: "$amountDue" }, count: { $sum: 1 } } },
+    ]),
   ]);
 
   const saleRevenueByMonthKey = new Map<string, number>(
@@ -392,6 +411,10 @@ async function computeDashboardStats(): Promise<DashboardStats> {
     todaysReturns,
     returnedToday,
     pendingPaymentsCount,
+    overdueInvoicesCount: overdueInvoicesResult[0]?.count ?? 0,
+    overdueInvoicesTotal: overdueInvoicesResult[0]?.total ?? 0,
+    bookingsThisMonth: monthlyRevenueSeries[5]?.bookings ?? 0,
+    bookingsPreviousMonth: monthlyRevenueSeries[4]?.bookings ?? 0,
     monthlyRevenueTotal:
       (monthlyRevenueTotalResult[0]?.total ?? 0) +
       (saleMonthlyRevenueTotalResult[0]?.total ?? 0) +

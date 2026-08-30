@@ -42,6 +42,7 @@ export interface ServiceOrderRow {
   _id: string;
   serviceType: "dry_clean" | "tailor";
   product: { _id: string; name: string; sku: string } | null;
+  bookingBillNumberRef?: string;
   description: string;
   status: string;
   dryCleanCharge?: number;
@@ -70,6 +71,7 @@ const EMPTY_VALUES: ServiceOrderInput = {
   serviceType: "dry_clean",
   product: "",
   booking: "",
+  bookingBillNumberRef: "",
   description: "",
   dryCleanCharge: 0,
   ironCharge: 0,
@@ -114,6 +116,7 @@ export function ServiceOrderFormDialog({
         form.reset({
           serviceType: editingOrder.serviceType,
           product: editingOrder.product?._id ?? "",
+          bookingBillNumberRef: editingOrder.bookingBillNumberRef ?? "",
           description: editingOrder.description,
           dryCleanCharge: editingOrder.dryCleanCharge ?? 0,
           ironCharge: editingOrder.ironCharge ?? 0,
@@ -139,6 +142,11 @@ export function ServiceOrderFormDialog({
   }, [open, editingOrder, initialValues, form]);
 
   const isProductLocked = !editingOrder && Boolean(initialValues);
+  // Only relevant for a service order created directly from this page —
+  // one launched from a booking's own detail page already carries a real
+  // Booking link (see ServiceOrderInitialValues), so the free-text
+  // reference would just be redundant there.
+  const showBookingBillNumberRef = Boolean(editingOrder) || !initialValues;
 
   const productValue = form.watch("product");
   const serviceTypeValue = form.watch("serviceType");
@@ -270,6 +278,22 @@ export function ServiceOrderFormDialog({
                 </FormItem>
               )}
             />
+
+            {showBookingBillNumberRef && (
+              <FormField
+                control={form.control}
+                name="bookingBillNumberRef"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Booking Bill Number (optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. 00881 — the related booking's bill no." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {serviceTypeValue === "tailor" && (
               <FormField

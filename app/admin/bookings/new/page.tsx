@@ -5,7 +5,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { User } from "@/models/User";
 import { Product } from "@/models/Product";
 import { BookingForm } from "@/components/admin/booking-form";
-import { suggestNextBillNumber } from "@/lib/admin/booking-number";
+import { nextSharedBillNumber } from "@/lib/admin/bill-number";
 
 export const metadata: Metadata = { title: "New Booking" };
 
@@ -24,7 +24,7 @@ export default async function NewBookingPage() {
       .sort({ name: 1 })
       .limit(200)
       .lean(),
-    suggestNextBillNumber(),
+    nextSharedBillNumber(),
   ]);
 
   return (

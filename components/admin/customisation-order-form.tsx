@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -44,31 +45,7 @@ import type { CustomisationMeasurements } from "@/models/CustomisationOrder";
 import type { CustomerCreateInput } from "@/lib/validations/customer";
 import { MEASUREMENT_FIELD_DEFS } from "@/lib/config/measurement-fields";
 import { customerContact } from "@/lib/utils";
-
-export interface CustomisationOrderRow {
-  _id: string;
-  billNumber: string;
-  orderDate: string;
-  customerName: string;
-  customerPhone: string;
-  customerAddress: string;
-  stitchingType: string;
-  detail: string;
-  measurements?: CustomisationMeasurements;
-  totalAmount: number;
-  advancePayment: number;
-  dueAmount: number;
-  status: string;
-  notes?: string;
-}
-
-export interface CustomerOption {
-  _id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  address?: string;
-}
+import type { CustomerOption } from "@/components/admin/customisation-form-dialog";
 
 const RELATION_OPTIONS = ["S/O", "D/O", "W/O"] as const;
 
@@ -84,10 +61,6 @@ const quickCustomerSchema = z.object({
 });
 
 type QuickCustomerInput = z.infer<typeof quickCustomerSchema>;
-
-function toDateInputValue(iso: string): string {
-  return iso.slice(0, 10);
-}
 
 const MEASUREMENT_FIELDS: { key: keyof CustomisationMeasurements; label: string }[] =
   MEASUREMENT_FIELD_DEFS;
@@ -105,22 +78,8 @@ const EMPTY_VALUES: CustomisationOrderInput = {
   notes: "",
 };
 
-// Edit-only: creating a new customisation order now happens on its own
-// page (/admin/customisation/new, see CustomisationOrderForm) so it's not
-// a popup — but editing an existing order stays a dialog, matching how
-// Products/Sales/Customers edit in this admin panel.
-export function CustomisationFormDialog({
-  open,
-  onOpenChange,
-  customers,
-  editingOrder,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  customers: CustomerOption[];
-  editingOrder: CustomisationOrderRow | null;
-}) {
-  const queryClient = useQueryClient();
+export function CustomisationOrderForm({ customers }: { customers: CustomerOption[] }) {
+  const router = useRouter();
   const [customerList, setCustomerList] = useState<CustomerOption[]>(customers);
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
 
@@ -128,23 +87,6 @@ export function CustomisationFormDialog({
     resolver: zodResolver(customisationOrderSchema),
     defaultValues: EMPTY_VALUES,
   });
-
-  useEffect(() => {
-    if (open && editingOrder) {
-      form.reset({
-        orderDate: toDateInputValue(editingOrder.orderDate),
-        customerName: editingOrder.customerName,
-        customerPhone: editingOrder.customerPhone,
-        customerAddress: editingOrder.customerAddress,
-        stitchingType: editingOrder.stitchingType,
-        detail: editingOrder.detail,
-        measurements: editingOrder.measurements ?? {},
-        totalAmount: editingOrder.totalAmount,
-        advancePayment: editingOrder.advancePayment,
-        notes: editingOrder.notes ?? "",
-      });
-    }
-  }, [open, editingOrder, form]);
 
   function applyCustomer(customer: CustomerOption) {
     form.setValue("customerName", customer.name);
@@ -207,9 +149,8 @@ export function CustomisationFormDialog({
 
   const mutation = useMutation({
     mutationFn: async (values: CustomisationOrderInput) => {
-      if (!editingOrder) throw new Error("No order selected to edit");
-      const res = await fetch(`/api/admin/customisation-orders/${editingOrder._id}`, {
-        method: "PATCH",
+      const res = await fetch("/api/admin/customisation-orders", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
       });
@@ -218,25 +159,23 @@ export function CustomisationFormDialog({
       return json.data.order;
     },
     onSuccess: () => {
-      toast.success("Order updated");
-      queryClient.invalidateQueries({ queryKey: ["admin", "customisation-orders"] });
-      onOpenChange(false);
+      toast.success("Order created");
+      router.push("/admin/customisation");
+      router.refresh();
     },
     onError: (error: Error) => toast.error(error.message),
   });
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Edit Customisation Order</DialogTitle>
-        </DialogHeader>
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
-            className="max-h-[70vh] space-y-4 overflow-y-auto pr-1"
-          >
+      <Form {...form}>
+        <form
+          onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
+          className="space-y-6"
+        >
+          <section className="space-y-4 rounded-lg border border-border bg-card p-6">
+            <h2 className="font-heading text-lg">Order Details</h2>
+
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
@@ -352,49 +291,52 @@ export function CustomisationFormDialog({
                 </FormItem>
               )}
             />
+          </section>
 
-            <div>
-              <p className="text-sm font-medium">Measurements (inches)</p>
-              <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {MEASUREMENT_FIELDS.map(({ key, label }) => (
-                  <FormField
-                    key={key}
-                    control={form.control}
-                    name={`measurements.${key}` as const}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs">{label}</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.1"
-                            value={(field.value as number | undefined) ?? ""}
-                            onChange={(event) =>
-                              field.onChange(
-                                event.target.value === "" ? undefined : Number(event.target.value)
-                              )
-                            }
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                ))}
-              </div>
-              <FormField
-                control={form.control}
-                name="measurements.other"
-                render={({ field }) => (
-                  <FormItem className="mt-3">
-                    <FormLabel className="text-xs">Other Measurement Notes</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Any other measurement details" {...field} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
+          <section className="space-y-4 rounded-lg border border-border bg-card p-6">
+            <h2 className="font-heading text-lg">Measurements (inches)</h2>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {MEASUREMENT_FIELDS.map(({ key, label }) => (
+                <FormField
+                  key={key}
+                  control={form.control}
+                  name={`measurements.${key}` as const}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">{label}</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          value={(field.value as number | undefined) ?? ""}
+                          onChange={(event) =>
+                            field.onChange(
+                              event.target.value === "" ? undefined : Number(event.target.value)
+                            )
+                          }
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              ))}
             </div>
+            <FormField
+              control={form.control}
+              name="measurements.other"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs">Other Measurement Notes</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Any other measurement details" {...field} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </section>
 
+          <section className="space-y-4 rounded-lg border border-border bg-card p-6">
+            <h2 className="font-heading text-lg">Payment</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <FormField
                 control={form.control}
@@ -457,115 +399,114 @@ export function CustomisationFormDialog({
                 </FormItem>
               )}
             />
+          </section>
 
-            <DialogFooter>
-              <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Save Changes
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+          <div className="flex justify-end">
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Create Order
+            </Button>
+          </div>
+        </form>
+      </Form>
 
-    <Dialog open={newCustomerOpen} onOpenChange={setNewCustomerOpen}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>New Customer</DialogTitle>
-        </DialogHeader>
-        <Form {...quickCustomerForm}>
-          <form
-            onSubmit={quickCustomerForm.handleSubmit((values) => createCustomerMutation.mutate(values))}
-            className="space-y-4"
-          >
-            <FormField
-              control={quickCustomerForm.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Customer name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={quickCustomerForm.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Mobile</FormLabel>
-                  <FormControl>
-                    <PhoneInput {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="grid grid-cols-[auto_1fr] gap-3">
+      <Dialog open={newCustomerOpen} onOpenChange={setNewCustomerOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>New Customer</DialogTitle>
+          </DialogHeader>
+          <Form {...quickCustomerForm}>
+            <form
+              onSubmit={quickCustomerForm.handleSubmit((values) => createCustomerMutation.mutate(values))}
+              className="space-y-4"
+            >
               <FormField
                 control={quickCustomerForm.control}
-                name="relation"
+                name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Relation</FormLabel>
-                    <Select value={field.value} onValueChange={(value) => field.onChange(value ?? "S/O")}>
-                      <FormControl>
-                        <SelectTrigger className="w-24">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {RELATION_OPTIONS.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={quickCustomerForm.control}
-                name="relationName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Name (optional)</FormLabel>
+                    <FormLabel>Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Husband's / Father's name" {...field} />
+                      <Input placeholder="Customer name" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
-            <FormField
-              control={quickCustomerForm.control}
-              name="addressLine1"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Address (optional)</FormLabel>
-                  <FormControl>
-                    <Textarea rows={2} placeholder="Address" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <DialogFooter>
-              <Button type="submit" disabled={createCustomerMutation.isPending}>
-                {createCustomerMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Create Customer
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+              <FormField
+                control={quickCustomerForm.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mobile</FormLabel>
+                    <FormControl>
+                      <PhoneInput {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-[auto_1fr] gap-3">
+                <FormField
+                  control={quickCustomerForm.control}
+                  name="relation"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Relation</FormLabel>
+                      <Select value={field.value} onValueChange={(value) => field.onChange(value ?? "S/O")}>
+                        <FormControl>
+                          <SelectTrigger className="w-24">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {RELATION_OPTIONS.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={quickCustomerForm.control}
+                  name="relationName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name (optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Husband's / Father's name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={quickCustomerForm.control}
+                name="addressLine1"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Address (optional)</FormLabel>
+                    <FormControl>
+                      <Textarea rows={2} placeholder="Address" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button type="submit" disabled={createCustomerMutation.isPending}>
+                  {createCustomerMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Create Customer
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

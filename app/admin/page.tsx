@@ -1,6 +1,5 @@
 import Link from "next/link";
 import {
-  IndianRupee,
   CalendarCheck,
   Users,
   Shirt,
@@ -8,16 +7,13 @@ import {
   Receipt,
   RotateCcw,
   AlertTriangle,
-  Package,
-  CheckCircle2,
-  BookmarkCheck,
   PackageCheck,
   Undo2,
-  CheckCheck,
-  Wallet,
+  FileWarning,
 } from "lucide-react";
-import { getDashboardStats } from "@/lib/admin/dashboard-stats";
+import { getDashboardStats, getDashboardAnalytics } from "@/lib/admin/dashboard-stats";
 import { StatCard } from "@/components/admin/stat-card";
+import { AttentionCard } from "@/components/admin/attention-card";
 import { RevenueChart } from "@/components/admin/revenue-chart";
 import { CategoryDonutChart } from "@/components/admin/category-donut-chart";
 import { TabularCard, type TabularCardRow } from "@/components/admin/tabular-card";
@@ -59,58 +55,106 @@ function avatarTint(name: string): string {
 }
 
 export default async function AdminDashboardPage() {
-  const stats = await getDashboardStats();
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  // getDashboardAnalytics is the same cached function the filterable
+  // "Business Analytics" panel below calls over the API — reused directly
+  // here (server-side, no extra round trip) just to pull this month's top
+  // dresses for the Recent Activity row, without duplicating that logic.
+  const [stats, monthAnalytics] = await Promise.all([
+    getDashboardStats(),
+    getDashboardAnalytics({ from: startOfMonth, to: null }),
+  ]);
+
   const revenueDelta = periodDelta(stats.monthlyRevenueTotal, stats.previousMonthRevenueTotal, "vs last month");
+  const bookingsDelta = periodDelta(stats.bookingsThisMonth, stats.bookingsPreviousMonth, "vs last month");
   const newCustomersDelta = periodDelta(
     stats.newCustomersThisMonth,
     stats.newCustomersPreviousMonth,
     "vs last month"
   );
 
-  const todaysOpsMax = Math.max(
-    1,
-    stats.todaysBookings,
-    stats.todaysPickups,
-    stats.todaysReturns,
-    stats.returnedToday
-  );
-  const todaysOperationsRows: TabularCardRow[] = [
-    {
-      key: "new-bookings",
-      label: "New Bookings",
-      value: stats.todaysBookings.toLocaleString("en-IN"),
-      icon: CalendarCheck,
-      color: "var(--chart-2)",
-      percent: (stats.todaysBookings / todaysOpsMax) * 100,
-    },
-    {
-      key: "pickups",
-      label: "Pickups Scheduled",
-      value: stats.todaysPickups.toLocaleString("en-IN"),
-      icon: PackageCheck,
-      color: "var(--chart-1)",
-      percent: (stats.todaysPickups / todaysOpsMax) * 100,
-    },
-    {
-      key: "returns-due",
-      label: "Returns Due",
-      value: stats.todaysReturns.toLocaleString("en-IN"),
-      icon: Undo2,
-      color: "var(--chart-4)",
-      percent: (stats.todaysReturns / todaysOpsMax) * 100,
-    },
-    {
-      key: "returned",
-      label: "Returned Today",
-      value: stats.returnedToday.toLocaleString("en-IN"),
-      icon: CheckCheck,
-      color: "var(--chart-3)",
-      percent: (stats.returnedToday / todaysOpsMax) * 100,
-    },
+  const topDressMax = Math.max(1, ...monthAnalytics.topProducts.map((p) => p.bookings));
+  const topDressRows: TabularCardRow[] = monthAnalytics.topProducts.map((entry) => ({
+    key: entry.name,
+    label: entry.name,
+    value: `${entry.bookings} booking${entry.bookings === 1 ? "" : "s"}`,
+    secondaryValue: `₹${entry.revenue.toLocaleString("en-IN")}`,
+    percent: (entry.bookings / topDressMax) * 100,
+  }));
+
+  const referenceStats: { label: string; value: string }[] = [
+    { label: "Total Revenue", value: `₹${stats.totalRevenue.toLocaleString("en-IN")}` },
+    { label: "Total Bookings", value: stats.totalBookings.toLocaleString("en-IN") },
+    { label: "Total Customers", value: stats.totalCustomers.toLocaleString("en-IN") },
+    { label: "Total Dresses", value: stats.totalProducts.toLocaleString("en-IN") },
+    { label: "Available Dresses", value: stats.availableDresses.toLocaleString("en-IN") },
+    { label: "Reserved Dresses", value: stats.reservedDresses.toLocaleString("en-IN") },
+    { label: "Outstanding Balance", value: `₹${stats.outstandingBalance.toLocaleString("en-IN")}` },
+    { label: "Pending Payments", value: stats.pendingPaymentsCount.toLocaleString("en-IN") },
   ];
 
   return (
     <div className="space-y-6">
+      {/* Needs Attention — the operational cockpit: what actually needs a
+          decision or an action today, surfaced before anything else. */}
+      <div>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 className="font-heading text-lg">Needs Attention</h2>
+          <p className="text-xs text-muted-foreground">
+            Today: {stats.todaysBookings} new booking{stats.todaysBookings === 1 ? "" : "s"} ·{" "}
+            {stats.returnedToday} returned
+          </p>
+        </div>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <AttentionCard
+            label="Returns Overdue"
+            value={stats.returnsDue.toLocaleString("en-IN")}
+            icon={RotateCcw}
+            href="/admin/bookings"
+            active={stats.returnsDue > 0}
+            hint="Past their return date"
+          />
+          <AttentionCard
+            label="Pickups Today"
+            value={stats.todaysPickups.toLocaleString("en-IN")}
+            icon={PackageCheck}
+            href="/admin/bookings"
+            active={stats.todaysPickups > 0}
+          />
+          <AttentionCard
+            label="Returns Due Today"
+            value={stats.todaysReturns.toLocaleString("en-IN")}
+            icon={Undo2}
+            href="/admin/bookings"
+            active={stats.todaysReturns > 0}
+          />
+          <AttentionCard
+            label="Overdue Invoices"
+            value={stats.overdueInvoicesCount.toLocaleString("en-IN")}
+            icon={FileWarning}
+            href="/admin/invoices"
+            active={stats.overdueInvoicesCount > 0}
+            hint={
+              stats.overdueInvoicesCount > 0
+                ? `₹${stats.overdueInvoicesTotal.toLocaleString("en-IN")} outstanding`
+                : undefined
+            }
+          />
+          <AttentionCard
+            label="Low Stock Items"
+            value={stats.lowStockCount.toLocaleString("en-IN")}
+            icon={AlertTriangle}
+            href="/admin/products"
+            active={stats.lowStockCount > 0}
+            hint="At or below reorder threshold"
+          />
+        </div>
+      </div>
+
+      {/* Revenue snapshot — this month's business pulse. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Revenue (this month)"
@@ -121,34 +165,31 @@ export default async function AdminDashboardPage() {
           hint={revenueDelta ? undefined : "No revenue last month to compare"}
         />
         <StatCard
-          label="Active Bookings"
-          value={stats.activeRentals.toLocaleString("en-IN")}
+          label="Bookings (this month)"
+          value={stats.bookingsThisMonth.toLocaleString("en-IN")}
           icon={CalendarCheck}
           tint="teal"
-          delta={
-            stats.todaysBookings > 0
-              ? { label: `${stats.todaysBookings} new today`, trend: "up" }
-              : undefined
-          }
-          hint={stats.todaysBookings > 0 ? undefined : "No new bookings today"}
+          delta={bookingsDelta}
+          hint={bookingsDelta ? undefined : "No bookings last month to compare"}
         />
         <StatCard
-          label="Low Stock Items"
-          value={stats.lowStockCount.toLocaleString("en-IN")}
-          icon={AlertTriangle}
-          tint="rose"
-          hint="At or below the reorder threshold"
+          label="Active Rentals"
+          value={stats.activeRentals.toLocaleString("en-IN")}
+          icon={Shirt}
+          tint="wine"
+          hint="Dresses currently out with customers"
         />
         <StatCard
           label="New Customers"
           value={stats.newCustomersThisMonth.toLocaleString("en-IN")}
           icon={Users}
-          tint="wine"
+          tint="slate"
           delta={newCustomersDelta}
           hint={newCustomersDelta ? undefined : "No new customers last month to compare"}
         />
       </div>
 
+      {/* Trends */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         <div className="rounded-lg border border-border bg-card p-5 lg:col-span-3">
           <h2 className="font-heading text-lg">Revenue Overview</h2>
@@ -167,6 +208,7 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
+      {/* Recent activity */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         <div className="rounded-lg border border-border bg-card p-5 lg:col-span-3">
           <div className="flex items-center justify-between">
@@ -270,10 +312,18 @@ export default async function AdminDashboardPage() {
         </div>
 
         <div className="lg:col-span-2">
-          <TabularCard title="Today's Operations" subtitle="Snapshot of what's moving today" rows={todaysOperationsRows} />
+          <TabularCard
+            title="Top Dresses"
+            subtitle="This month, by bookings"
+            rows={topDressRows}
+            emptyMessage="No bookings yet this month."
+          />
         </div>
       </div>
 
+      {/* Deep-dive analytics — filterable, kept below the always-visible
+          snapshot above so someone who just wants "how are we doing right
+          now" never has to scroll past it. */}
       <div>
         <h2 className="font-heading text-lg">Business Analytics</h2>
         <p className="text-xs text-muted-foreground">
@@ -284,67 +334,21 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
-      <div>
-        <h2 className="font-heading text-lg">Inventory &amp; Business Overview</h2>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            label="Total Revenue"
-            value={`₹${stats.totalRevenue.toLocaleString("en-IN")}`}
-            icon={IndianRupee}
-            hint="Confirmed, in-use & returned bookings"
-            tint="gold"
-          />
-          <StatCard
-            label="Outstanding Balance"
-            value={`₹${stats.outstandingBalance.toLocaleString("en-IN")}`}
-            icon={Wallet}
-            hint="Unpaid on sent invoices"
-            tint="rose"
-          />
-          <StatCard
-            label="Returns Due"
-            value={stats.returnsDue.toLocaleString("en-IN")}
-            icon={RotateCcw}
-            hint="Rentals past their return date"
-            tint="wine"
-          />
-          <StatCard
-            label="Total Bookings"
-            value={stats.totalBookings.toLocaleString("en-IN")}
-            icon={Shirt}
-            tint="teal"
-          />
-          <StatCard
-            label="Total Customers"
-            value={stats.totalCustomers.toLocaleString("en-IN")}
-            icon={Users}
-            tint="slate"
-          />
-          <StatCard
-            label="Total Dresses"
-            value={stats.totalProducts.toLocaleString("en-IN")}
-            icon={Package}
-            tint="wine"
-          />
-          <StatCard
-            label="Available Dresses"
-            value={stats.availableDresses.toLocaleString("en-IN")}
-            icon={CheckCircle2}
-            tint="teal"
-          />
-          <StatCard
-            label="Reserved Dresses"
-            value={stats.reservedDresses.toLocaleString("en-IN")}
-            icon={BookmarkCheck}
-            tint="gold"
-          />
-          <StatCard
-            label="Pending Payments"
-            value={stats.pendingPaymentsCount.toLocaleString("en-IN")}
-            icon={Wallet}
-            hint="Invoices sent, partially paid or overdue"
-            tint="rose"
-          />
+      {/* Catalog & lifetime reference — cumulative counts, deliberately
+          quieter than everything above: nothing here is a queue to work
+          through, just where things stand overall. */}
+      <div className="rounded-lg border border-border bg-card p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 className="font-heading text-lg">Catalog &amp; Lifetime Totals</h2>
+          <p className="text-xs text-muted-foreground">All-time reference numbers</p>
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4 xl:grid-cols-8">
+          {referenceStats.map((item) => (
+            <div key={item.label}>
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{item.label}</p>
+              <p className="mt-1 font-heading text-xl tabular-nums">{item.value}</p>
+            </div>
+          ))}
         </div>
       </div>
     </div>

@@ -99,6 +99,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       serviceType: input.serviceType,
       product: input.product,
       booking: input.booking || null,
+      bookingBillNumberRef: input.bookingBillNumberRef,
       description: input.description,
       dryCleanCharge: input.dryCleanCharge,
       ironCharge: input.ironCharge,

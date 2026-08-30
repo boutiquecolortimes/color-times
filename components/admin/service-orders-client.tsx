@@ -183,6 +183,7 @@ export function ServiceOrdersClient({
     "Sr No",
     "Product",
     "Description",
+    "Booking Bill #",
     "Other",
     "Total",
     "Assigned To",
@@ -196,6 +197,7 @@ export function ServiceOrdersClient({
       index + 1,
       order.product?.name ?? "—",
       order.description,
+      order.bookingBillNumberRef || "—",
       formatCurrency(order.otherCharge),
       formatCurrency(order.totalAmount),
       order.assignedTo ?? "—",
@@ -299,6 +301,11 @@ export function ServiceOrdersClient({
             {serviceType === "dry_clean" ? "Dry Clean" : order.stitchingType || "Tailor / Alteration"}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">{order.description}</p>
+          {order.bookingBillNumberRef && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Booking bill #{order.bookingBillNumberRef}
+            </p>
+          )}
           <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
             {serviceType === "dry_clean" ? (
               <>
@@ -552,7 +559,7 @@ export function ServiceOrdersClient({
         <div className="hidden lg:block">{cardGrid}</div>
       ) : (
       <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
-        <table className="w-full min-w-[820px] text-sm whitespace-nowrap">
+        <table className="w-full min-w-[940px] text-sm whitespace-nowrap">
           <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-4 py-3">Sr No</th>
@@ -562,6 +569,7 @@ export function ServiceOrdersClient({
                   Description <SortIcon field="description" sortBy={sortBy} sortDir={sortDir} />
                 </button>
               </th>
+              <th className="px-4 py-3">Booking Bill #</th>
               {serviceType === "dry_clean" ? (
                 <>
                   <th className="px-4 py-3">Dry Clean</th>
@@ -605,6 +613,7 @@ export function ServiceOrdersClient({
                 </td>
                 <td className="px-4 py-3 font-medium">{order.product?.name ?? "—"}</td>
                 <td className="px-4 py-3 text-muted-foreground">{order.description}</td>
+                <td className="px-4 py-3 text-muted-foreground">{order.bookingBillNumberRef || "—"}</td>
                 {serviceType === "dry_clean" ? (
                   <>
                     <td className="px-4 py-3">{formatCurrency(order.dryCleanCharge)}</td>
@@ -679,7 +688,7 @@ export function ServiceOrdersClient({
             ))}
             {orders.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={11} className="px-4 py-10 text-center text-muted-foreground">
                   No service orders found.
                 </td>
               </tr>
