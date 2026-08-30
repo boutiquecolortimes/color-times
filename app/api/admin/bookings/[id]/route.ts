@@ -57,8 +57,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
     // Two different kinds of update share this endpoint: a lifecycle status
     // change (Confirm/Pickup/Return/Cancel, sent by BookingDetailClient)
     // always includes a "status" key; editing the booking's own details
-    // (from the Edit page) sends the full field set without one.
+    // (from the Edit page) sends the full field set without one. Staff can
+    // move a booking through its lifecycle — that's core day-to-day work —
+    // but editing the underlying details (dress, dates, price, customer)
+    // is reserved for Admin and up.
     if (!body || typeof body !== "object" || !("status" in body)) {
+      if (!MANAGER_ROLES.includes(auth.user.role)) {
+        return apiError("You do not have permission to edit booking details", 403);
+      }
       return updateBookingDetails(id, body, auth.user);
     }
 

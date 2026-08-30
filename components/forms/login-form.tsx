@@ -78,6 +78,8 @@ export function LoginForm() {
                   <Input
                     type="email"
                     placeholder="you@colortimes.com"
+                    autoComplete="email"
+                    autoFocus
                     className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
                     {...field}
                   />
@@ -98,6 +100,7 @@ export function LoginForm() {
                   <Lock className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <PasswordInput
                     placeholder="Enter your password"
+                    autoComplete="current-password"
                     className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
                     {...field}
                   />
