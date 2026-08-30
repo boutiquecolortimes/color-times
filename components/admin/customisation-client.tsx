@@ -36,6 +36,7 @@ import {
 import { CustomisationStatusBadge } from "@/components/admin/customisation-status-badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { useCanEdit } from "@/components/admin/current-user-context";
 import {
   CustomisationFormDialog,
   type CustomisationOrderRow,
@@ -107,6 +108,7 @@ export function CustomisationClient({
   customers: CustomerOption[];
 }) {
   const queryClient = useQueryClient();
+  const canEdit = useCanEdit();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("all");
   const [view, setView] = useState<"active" | "trash">("active");
@@ -298,16 +300,18 @@ export function CustomisationClient({
                 >
                   <Send className="h-4 w-4" />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    setEditingOrder(order);
-                    setFormOpen(true);
-                  }}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
+                {canEdit && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setEditingOrder(order);
+                      setFormOpen(true);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -543,16 +547,18 @@ export function CustomisationClient({
                       >
                         <Send className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setEditingOrder(order);
-                          setFormOpen(true);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      {canEdit && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setEditingOrder(order);
+                            setFormOpen(true);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"

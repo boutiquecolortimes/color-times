@@ -48,6 +48,7 @@ import { PickupBookingDialog } from "@/components/admin/pickup-booking-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { DatePicker } from "@/components/ui/date-picker";
+import { useCanEdit } from "@/components/admin/current-user-context";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 import { cn, customerContact, formatDate } from "@/lib/utils";
 import type { BookingStatus } from "@/models/Booking";
@@ -195,6 +196,7 @@ export function BookingsClient({
   canManageSettings: boolean;
 }) {
   const queryClient = useQueryClient();
+  const canEdit = useCanEdit();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("all");
   const [from, setFrom] = useState("");
@@ -483,17 +485,19 @@ export function BookingsClient({
                   <RotateCcw className="h-4 w-4" />
                   Restore
                 </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="shrink-0 text-destructive hover:text-destructive"
-                  aria-label="Delete booking permanently"
-                  title="Delete permanently"
-                  onClick={() => setPermanentDeleteTarget(booking)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {canEdit && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 text-destructive hover:text-destructive"
+                    aria-label="Delete booking permanently"
+                    title="Delete permanently"
+                    onClick={() => setPermanentDeleteTarget(booking)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </>
             ) : (
               <>
@@ -507,16 +511,18 @@ export function BookingsClient({
                 >
                   <Eye className="h-4 w-4" />
                 </ButtonLink>
-                <ButtonLink
-                  variant="outline"
-                  size="icon"
-                  className="shrink-0"
-                  href={`/admin/bookings/${booking._id}/edit`}
-                  aria-label="Edit booking"
-                  title="Edit booking"
-                >
-                  <Pencil className="h-4 w-4" />
-                </ButtonLink>
+                {canEdit && (
+                  <ButtonLink
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    href={`/admin/bookings/${booking._id}/edit`}
+                    aria-label="Edit booking"
+                    title="Edit booking"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </ButtonLink>
+                )}
                 <Select
                   value={booking.status}
                   onValueChange={(value) => {
@@ -995,17 +1001,19 @@ export function BookingsClient({
                     </td>
                     <td className="px-4 py-3 text-right">
                       {trashView === "trash" ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:text-destructive"
-                          aria-label="Delete booking permanently"
-                          title="Delete permanently"
-                          onClick={() => setPermanentDeleteTarget(booking)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        canEdit && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive"
+                            aria-label="Delete booking permanently"
+                            title="Delete permanently"
+                            onClick={() => setPermanentDeleteTarget(booking)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )
                       ) : (
                         <div className="flex justify-end gap-1">
                           <ButtonLink
@@ -1017,15 +1025,17 @@ export function BookingsClient({
                           >
                             <Eye className="h-4 w-4" />
                           </ButtonLink>
-                          <ButtonLink
-                            variant="ghost"
-                            size="icon"
-                            href={`/admin/bookings/${booking._id}/edit`}
-                            aria-label="Edit booking"
-                            title="Edit booking"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </ButtonLink>
+                          {canEdit && (
+                            <ButtonLink
+                              variant="ghost"
+                              size="icon"
+                              href={`/admin/bookings/${booking._id}/edit`}
+                              aria-label="Edit booking"
+                              title="Edit booking"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </ButtonLink>
+                          )}
                           <Button
                             type="button"
                             variant="ghost"

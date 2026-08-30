@@ -2,10 +2,15 @@ import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Product } from "@/models/Product";
 import { requireApiRole } from "@/lib/api/require-role";
-import { ADMIN_ROLES } from "@/lib/auth/roles";
+import { ADMIN_ROLES, MANAGER_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { bulkActionSchema } from "@/lib/validations/bulk-action";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
+
+// Staff can trash and restore products in bulk, but permanently deleting or
+// changing a product's active/archived state is an edit-adjacent action
+// reserved for Admin and up — same boundary as the single-item routes.
+const MANAGER_ONLY_ACTIONS = new Set(["permanent-delete", "archive", "activate", "deactivate"]);
 
 const UPDATE_BY_ACTION: Record<string, Record<string, unknown> | null> = {
   archive: { archivedAt: new Date() },
@@ -22,6 +27,10 @@ export async function POST(request: NextRequest): Promise<Response> {
   try {
     const body = await request.json();
     const input = bulkActionSchema.parse(body);
+
+    if (MANAGER_ONLY_ACTIONS.has(input.action) && !MANAGER_ROLES.includes(auth.user.role)) {
+      return apiError("You do not have permission to perform this action", 403);
+    }
 
     await connectToDatabase();
 

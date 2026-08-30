@@ -39,7 +39,9 @@ export async function POST(
       type: "sale_bill_sent",
       title: "Sale bill sent",
       message: `${sale.billNumber} sent to ${sale.customerName} — ₹${sale.totalAmount.toLocaleString("en-IN")}`,
-      link: `/admin/sales`,
+      // A dedicated Sale Detail page exists — link straight to this sale
+      // instead of dropping the recipient on the unfiltered list.
+      link: `/admin/sales/${id}`,
       relatedEntityType: "Sale",
       relatedEntityId: id,
     });

@@ -38,6 +38,7 @@ import {
 import { CustomerImportDialog } from "@/components/admin/customer-import-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { useCanEdit } from "@/components/admin/current-user-context";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 import { formatDate, isWalkinEmail } from "@/lib/utils";
 
@@ -118,6 +119,7 @@ export function CustomersClient({
   initialPagination: Pagination;
 }) {
   const queryClient = useQueryClient();
+  const canEdit = useCanEdit();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("createdAt");
@@ -351,17 +353,19 @@ export function CustomersClient({
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-destructive"
-                  aria-label="Delete customer permanently"
-                  title="Delete permanently"
-                  disabled={permanentDeleteMutation.isPending}
-                  onClick={() => setPermanentDeleteTarget(customer)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                {canEdit && (
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-destructive"
+                    aria-label="Delete customer permanently"
+                    title="Delete permanently"
+                    disabled={permanentDeleteMutation.isPending}
+                    onClick={() => setPermanentDeleteTarget(customer)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
               </>
             ) : (
               <>
@@ -486,15 +490,17 @@ export function CustomersClient({
                   <RotateCcw className="h-3.5 w-3.5" />
                   Restore
                 </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  disabled={bulkActionMutation.isPending}
-                  onClick={() => setBulkConfirmAction("permanent-delete")}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Delete Permanently
-                </Button>
+                {canEdit && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={bulkActionMutation.isPending}
+                    onClick={() => setBulkConfirmAction("permanent-delete")}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete Permanently
+                  </Button>
+                )}
               </>
             ) : (
               <Button
@@ -591,17 +597,19 @@ export function CustomersClient({
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-destructive"
-                          aria-label="Delete customer permanently"
-                          title="Delete permanently"
-                          disabled={permanentDeleteMutation.isPending}
-                          onClick={() => setPermanentDeleteTarget(customer)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        {canEdit && (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-destructive"
+                            aria-label="Delete customer permanently"
+                            title="Delete permanently"
+                            disabled={permanentDeleteMutation.isPending}
+                            onClick={() => setPermanentDeleteTarget(customer)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </>
                     ) : (
                       <>

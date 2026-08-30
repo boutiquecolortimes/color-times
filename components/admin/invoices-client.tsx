@@ -40,6 +40,7 @@ import {
 import { InvoiceStatusBadge } from "@/components/admin/invoice-status-badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { useCanEdit } from "@/components/admin/current-user-context";
 import { downloadPdf, downloadExcel } from "@/lib/admin/export";
 import { getInvoiceDueBreakdown } from "@/lib/admin/invoice-totals";
 import { customerContact, formatDate } from "@/lib/utils";
@@ -130,6 +131,7 @@ export function InvoicesClient({
 }) {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const canEdit = useCanEdit();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("all");
   const [view, setView] = useState<"active" | "trash">("active");
@@ -425,17 +427,19 @@ export function InvoicesClient({
                   <RotateCcw className="h-3.5 w-3.5" />
                   Restore
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-destructive"
-                  aria-label="Delete permanently"
-                  title="Delete permanently"
-                  disabled={permanentDeleteMutation.isPending}
-                  onClick={() => setPermanentDeleteTarget(invoice)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                {canEdit && (
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-destructive"
+                    aria-label="Delete permanently"
+                    title="Delete permanently"
+                    disabled={permanentDeleteMutation.isPending}
+                    onClick={() => setPermanentDeleteTarget(invoice)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
               </>
             ) : (
               <DropdownMenu>
@@ -616,15 +620,17 @@ export function InvoicesClient({
                   <RotateCcw className="h-3.5 w-3.5" />
                   Restore
                 </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  disabled={bulkActionMutation.isPending}
-                  onClick={() => setBulkConfirmAction("permanent-delete")}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Delete Permanently
-                </Button>
+                {canEdit && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={bulkActionMutation.isPending}
+                    onClick={() => setBulkConfirmAction("permanent-delete")}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete Permanently
+                  </Button>
+                )}
               </>
             ) : (
               <Button
@@ -757,17 +763,19 @@ export function InvoicesClient({
                         <RotateCcw className="h-3.5 w-3.5" />
                         Restore
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive"
-                        aria-label="Delete permanently"
-                        title="Delete permanently"
-                        disabled={permanentDeleteMutation.isPending}
-                        onClick={() => setPermanentDeleteTarget(invoice)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canEdit && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive"
+                          aria-label="Delete permanently"
+                          title="Delete permanently"
+                          disabled={permanentDeleteMutation.isPending}
+                          onClick={() => setPermanentDeleteTarget(invoice)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   ) : (
                     <DropdownMenu>

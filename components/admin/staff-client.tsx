@@ -56,6 +56,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { useCanEdit } from "@/components/admin/current-user-context";
 import { staffMemberSchema, type StaffMemberInput } from "@/lib/validations/staff-member";
 import { salaryPaymentSchema, type SalaryPaymentInput } from "@/lib/validations/salary-payment";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
@@ -152,6 +153,7 @@ function StaffTable({
   initialPagination: Pagination;
 }) {
   const queryClient = useQueryClient();
+  const canEdit = useCanEdit();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<StaffRow | null>(null);
   const [status, setStatus] = useState<"active" | "trash">("active");
@@ -439,15 +441,17 @@ function StaffTable({
                   <RotateCcw className="h-3.5 w-3.5" />
                   Restore
                 </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  disabled={bulkActionMutation.isPending}
-                  onClick={() => setBulkConfirmAction("permanent-delete")}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Delete Permanently
-                </Button>
+                {canEdit && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={bulkActionMutation.isPending}
+                    onClick={() => setBulkConfirmAction("permanent-delete")}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete Permanently
+                  </Button>
+                )}
               </>
             ) : (
               <Button
@@ -510,29 +514,33 @@ function StaffTable({
                       <RotateCcw className="h-3.5 w-3.5" />
                       Restore
                     </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="shrink-0 text-destructive hover:text-destructive"
-                      disabled={permanentDeleteMutation.isPending}
-                      onClick={() => setPermanentDeleteTarget(member)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {canEdit && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 text-destructive hover:text-destructive"
+                        disabled={permanentDeleteMutation.isPending}
+                        onClick={() => setPermanentDeleteTarget(member)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </>
                 ) : (
                   <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => openEditDialog(member)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                      Edit
-                    </Button>
+                    {canEdit && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => openEditDialog(member)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                    )}
                     <Button
                       type="button"
                       variant="ghost"
@@ -630,21 +638,25 @@ function StaffTable({
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-destructive"
-                          disabled={permanentDeleteMutation.isPending}
-                          onClick={() => setPermanentDeleteTarget(member)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        {canEdit && (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-destructive"
+                            disabled={permanentDeleteMutation.isPending}
+                            onClick={() => setPermanentDeleteTarget(member)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </>
                     ) : (
                       <>
-                        <Button variant="ghost" size="icon-sm" onClick={() => openEditDialog(member)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
+                        {canEdit && (
+                          <Button variant="ghost" size="icon-sm" onClick={() => openEditDialog(member)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon-sm"
@@ -905,6 +917,7 @@ function currentMonth(): string {
 
 function SalaryPaymentsTable() {
   const queryClient = useQueryClient();
+  const canEdit = useCanEdit();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<SalaryPaymentRow | null>(null);
   const [status, setStatus] = useState<"active" | "trash">("active");
@@ -1191,15 +1204,17 @@ function SalaryPaymentsTable() {
                   <RotateCcw className="h-3.5 w-3.5" />
                   Restore
                 </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  disabled={bulkActionMutation.isPending}
-                  onClick={() => setBulkConfirmAction("permanent-delete")}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Delete Permanently
-                </Button>
+                {canEdit && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={bulkActionMutation.isPending}
+                    onClick={() => setBulkConfirmAction("permanent-delete")}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete Permanently
+                  </Button>
+                )}
               </>
             ) : (
               <Button
@@ -1262,29 +1277,33 @@ function SalaryPaymentsTable() {
                       <RotateCcw className="h-3.5 w-3.5" />
                       Restore
                     </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="shrink-0 text-destructive hover:text-destructive"
-                      disabled={permanentDeleteMutation.isPending}
-                      onClick={() => setPermanentDeleteTarget(payment)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {canEdit && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 text-destructive hover:text-destructive"
+                        disabled={permanentDeleteMutation.isPending}
+                        onClick={() => setPermanentDeleteTarget(payment)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </>
                 ) : (
                   <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => openEditDialog(payment)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                      Edit
-                    </Button>
+                    {canEdit && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => openEditDialog(payment)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                    )}
                     <Button
                       type="button"
                       variant="ghost"
@@ -1376,21 +1395,25 @@ function SalaryPaymentsTable() {
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-destructive"
-                          disabled={permanentDeleteMutation.isPending}
-                          onClick={() => setPermanentDeleteTarget(payment)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        {canEdit && (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-destructive"
+                            disabled={permanentDeleteMutation.isPending}
+                            onClick={() => setPermanentDeleteTarget(payment)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </>
                     ) : (
                       <>
-                        <Button variant="ghost" size="icon-sm" onClick={() => openEditDialog(payment)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
+                        {canEdit && (
+                          <Button variant="ghost" size="icon-sm" onClick={() => openEditDialog(payment)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon-sm"

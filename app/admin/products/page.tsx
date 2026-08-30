@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { SETTINGS_ROLES } from "@/lib/auth/roles";
 import { connectToDatabase } from "@/lib/db/connect";
@@ -53,20 +54,26 @@ export default async function AdminProductsPage() {
   }));
 
   return (
-    <ProductsClient
-      initialProducts={initialProducts}
-      initialPagination={{
-        page: 1,
-        pageSize: PAGE_SIZE,
-        total,
-        totalPages: Math.ceil(total / PAGE_SIZE),
-      }}
-      categories={categories.map((category) => ({
-        _id: String(category._id),
-        name: category.name,
-        slug: category.slug,
-      }))}
-      canManageSettings={canManageSettings}
-    />
+    // ProductsClient reads the ?view= query param (for deep links from
+    // notifications) via useSearchParams, which Next.js requires a Suspense
+    // boundary for — fallback stays null since the initial products list
+    // below is already rendered server-side, so there's nothing to flash.
+    <Suspense fallback={null}>
+      <ProductsClient
+        initialProducts={initialProducts}
+        initialPagination={{
+          page: 1,
+          pageSize: PAGE_SIZE,
+          total,
+          totalPages: Math.ceil(total / PAGE_SIZE),
+        }}
+        categories={categories.map((category) => ({
+          _id: String(category._id),
+          name: category.name,
+          slug: category.slug,
+        }))}
+        canManageSettings={canManageSettings}
+      />
+    </Suspense>
   );
 }

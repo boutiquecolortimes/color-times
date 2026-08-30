@@ -3,7 +3,7 @@ import { z } from "zod";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Expense } from "@/models/Expense";
 import { requireApiRole } from "@/lib/api/require-role";
-import { ADMIN_ROLES } from "@/lib/auth/roles";
+import { ADMIN_ROLES, MANAGER_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 
@@ -21,6 +21,10 @@ export async function POST(request: NextRequest): Promise<Response> {
     const input = bulkExpenseActionSchema.parse(body);
 
     await connectToDatabase();
+
+    if (input.action === "permanent-delete" && !MANAGER_ROLES.includes(auth.user.role)) {
+      return apiError("You do not have permission to permanently delete these items", 403);
+    }
 
     if (input.action === "permanent-delete") {
       const expenses = await Expense.find({

@@ -6,7 +6,7 @@ import { Settings } from "@/models/Settings";
 import { productSchema } from "@/lib/validations/product";
 import { DEFAULT_INVENTORY_SETTINGS } from "@/lib/validations/inventory-settings";
 import { requireApiRole } from "@/lib/api/require-role";
-import { ADMIN_ROLES } from "@/lib/auth/roles";
+import { ADMIN_ROLES, MANAGER_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog, diffObjects } from "@/lib/audit/log";
 import { notifyAccounts } from "@/lib/notifications/in-app";
 import type { InventorySettingsInput } from "@/lib/validations/inventory-settings";
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams): Promise<Response> {
-  const auth = await requireApiRole(ADMIN_ROLES);
+  const auth = await requireApiRole(MANAGER_ROLES);
   if ("error" in auth) return auth.error;
 
   try {
@@ -84,7 +84,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
           type: "low_stock",
           title: "Low stock alert",
           message: `${product.name} — only ${totalStock} unit${totalStock === 1 ? "" : "s"} left`,
-          link: `/admin/products/${id}`,
+          // Not /admin/products/{id} — that route is the edit form and now
+          // redirects Staff away. ?view={id} opens the read-only detail
+          // drawer instead, which every role (including Staff) can see.
+          link: `/admin/products?view=${id}`,
           relatedEntityType: "Product",
           relatedEntityId: id,
         });

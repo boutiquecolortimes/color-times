@@ -58,6 +58,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ImageUploadField } from "@/components/admin/image-upload-field";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { useCanEdit } from "@/components/admin/current-user-context";
 import { categorySchema, type CategoryInput } from "@/lib/validations/category";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 
@@ -118,6 +119,7 @@ export function CategoriesClient({
   initialPagination: Pagination;
 }) {
   const queryClient = useQueryClient();
+  const canEdit = useCanEdit();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<CategoryRow | null>(null);
   const [view, setView] = useState<"table" | "card">("table");
@@ -413,21 +415,25 @@ export function CategoriesClient({
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="text-destructive"
-                    disabled={permanentDeleteMutation.isPending}
-                    onClick={() => setPermanentDeleteTarget(category)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                  {canEdit && (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-destructive"
+                      disabled={permanentDeleteMutation.isPending}
+                      onClick={() => setPermanentDeleteTarget(category)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </>
               ) : (
                 <>
-                  <Button variant="ghost" size="icon-sm" onClick={() => openEditDialog(category)}>
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
+                  {canEdit && (
+                    <Button variant="ghost" size="icon-sm" onClick={() => openEditDialog(category)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon-sm"
@@ -532,15 +538,17 @@ export function CategoriesClient({
                   <RotateCcw className="h-3.5 w-3.5" />
                   Restore
                 </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  disabled={bulkActionMutation.isPending}
-                  onClick={() => setBulkConfirmAction("permanent-delete")}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Delete Permanently
-                </Button>
+                {canEdit && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={bulkActionMutation.isPending}
+                    onClick={() => setBulkConfirmAction("permanent-delete")}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete Permanently
+                  </Button>
+                )}
               </>
             ) : (
               <Button
@@ -633,21 +641,25 @@ export function CategoriesClient({
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-destructive"
-                          disabled={permanentDeleteMutation.isPending}
-                          onClick={() => setPermanentDeleteTarget(category)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        {canEdit && (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-destructive"
+                            disabled={permanentDeleteMutation.isPending}
+                            onClick={() => setPermanentDeleteTarget(category)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </>
                     ) : (
                       <>
-                        <Button variant="ghost" size="icon-sm" onClick={() => openEditDialog(category)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
+                        {canEdit && (
+                          <Button variant="ghost" size="icon-sm" onClick={() => openEditDialog(category)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon-sm"

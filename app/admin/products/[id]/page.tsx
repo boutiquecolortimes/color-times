@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Category } from "@/models/Category";
 import { Product } from "@/models/Product";
 import { ProductForm } from "@/components/admin/product-form";
+import { requireRole } from "@/lib/auth/session";
+import { MANAGER_ROLES } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Edit Product" };
 
@@ -13,6 +15,16 @@ export default async function EditProductPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+
+  // Editing an existing product's fields is Admin-and-up work — Staff can
+  // still view every product, just not through this form, since this route
+  // doubles as the only place a product's data is shown in full (there's no
+  // separate read-only detail page for products).
+  const currentUser = await requireRole(MANAGER_ROLES);
+  if (!currentUser) {
+    redirect(`/admin/products`);
+  }
+
   await connectToDatabase();
 
   const [product, categories] = await Promise.all([

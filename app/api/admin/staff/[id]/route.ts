@@ -3,7 +3,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { Staff } from "@/models/Staff";
 import { staffMemberSchema } from "@/lib/validations/staff-member";
 import { requireApiRole } from "@/lib/api/require-role";
-import { ADMIN_ROLES } from "@/lib/auth/roles";
+import { ADMIN_ROLES, MANAGER_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 
@@ -12,7 +12,7 @@ interface RouteParams {
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams): Promise<Response> {
-  const auth = await requireApiRole(ADMIN_ROLES);
+  const auth = await requireApiRole(MANAGER_ROLES);
   if ("error" in auth) return auth.error;
 
   try {

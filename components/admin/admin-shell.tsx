@@ -7,6 +7,7 @@ import { AdminBottomNav } from "@/components/admin/bottom-nav";
 import { AdminFooter } from "@/components/admin/admin-footer";
 import { AdminThemeProvider, type Theme } from "@/components/admin/theme-provider";
 import { SessionRefresher } from "@/components/admin/session-refresher";
+import { CurrentUserProvider } from "@/components/admin/current-user-context";
 import { ADMIN_SIDEBAR_COOKIE_KEY } from "@/lib/admin/sidebar-cookie";
 import type { SessionUser } from "@/types/auth";
 
@@ -42,21 +43,23 @@ export function AdminShell({
   }
 
   return (
-    <AdminThemeProvider initialTheme={initialTheme}>
-      <SessionRefresher />
-      <div className="flex h-svh overflow-hidden bg-secondary/30">
-        <AdminSidebar role={user.role} expanded={sidebarExpanded} onToggle={toggleSidebar} />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <AdminTopbar user={user} />
-          <main className="flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
-            <div className="flex-1 p-4 pb-4 lg:p-8">{children}</div>
-            <div className="pb-20 lg:pb-0">
-              <AdminFooter />
-            </div>
-          </main>
+    <CurrentUserProvider user={user}>
+      <AdminThemeProvider initialTheme={initialTheme}>
+        <SessionRefresher />
+        <div className="flex h-svh overflow-hidden bg-secondary/30">
+          <AdminSidebar role={user.role} expanded={sidebarExpanded} onToggle={toggleSidebar} />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <AdminTopbar user={user} />
+            <main className="flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
+              <div className="flex-1 p-4 pb-4 lg:p-8">{children}</div>
+              <div className="pb-20 lg:pb-0">
+                <AdminFooter />
+              </div>
+            </main>
+          </div>
+          <AdminBottomNav />
         </div>
-        <AdminBottomNav />
-      </div>
-    </AdminThemeProvider>
+      </AdminThemeProvider>
+    </CurrentUserProvider>
   );
 }

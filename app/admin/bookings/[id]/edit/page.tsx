@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Booking } from "@/models/Booking";
 import { User } from "@/models/User";
 import { Product } from "@/models/Product";
 import { BookingForm } from "@/components/admin/booking-form";
+import { requireRole } from "@/lib/auth/session";
+import { MANAGER_ROLES } from "@/lib/auth/roles";
 import type { BookingCreateInput } from "@/lib/validations/booking";
 
 export const metadata: Metadata = { title: "Edit Booking" };
@@ -21,6 +23,15 @@ export default async function EditBookingPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+
+  // Editing a booking's own details (dress, dates, price, customer) is
+  // Admin-and-up work — Staff can still view the booking and move it
+  // through its lifecycle (Confirm/Pickup/Return/Cancel), just not here.
+  const currentUser = await requireRole(MANAGER_ROLES);
+  if (!currentUser) {
+    redirect(`/admin/bookings/${id}`);
+  }
+
   await connectToDatabase();
 
   const [booking, customers, activeProducts] = await Promise.all([

@@ -24,6 +24,7 @@ import {
   ServiceOrderFormDialog,
   type ServiceOrderInitialValues,
 } from "@/components/admin/service-order-form-dialog";
+import { useCanEdit } from "@/components/admin/current-user-context";
 import { formatDate, isWalkinEmail } from "@/lib/utils";
 import type { BookingStatus, ReturnCondition } from "@/models/Booking";
 
@@ -120,6 +121,7 @@ export function BookingDetailClient({
   invoice?: InvoiceSummary | null;
 }) {
   const queryClient = useQueryClient();
+  const canEdit = useCanEdit();
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [pickupDialogOpen, setPickupDialogOpen] = useState(false);
@@ -196,7 +198,7 @@ export function BookingDetailClient({
               Invoice #{invoice.invoiceNumber}
             </ButtonLink>
           )}
-          {booking.status !== "returned" && booking.status !== "cancelled" && (
+          {canEdit && booking.status !== "returned" && booking.status !== "cancelled" && (
             <ButtonLink variant="outline" size="sm" href={`/admin/bookings/${booking._id}/edit`}>
               <Pencil className="h-4 w-4" />
               Edit

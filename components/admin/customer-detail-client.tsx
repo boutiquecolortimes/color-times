@@ -21,6 +21,7 @@ import {
   customerUpdateSchema,
   type CustomerUpdateInput,
 } from "@/lib/validations/customer";
+import { useCanEdit } from "@/components/admin/current-user-context";
 import { formatDate, isWalkinEmail } from "@/lib/utils";
 
 interface CustomerDetail {
@@ -41,6 +42,7 @@ interface CustomerDetail {
 
 export function CustomerDetailClient({ initialCustomer }: { initialCustomer: CustomerDetail }) {
   const queryClient = useQueryClient();
+  const canEdit = useCanEdit();
   const [editing, setEditing] = useState(false);
   const [customer, setCustomer] = useState(initialCustomer);
   const primaryAddress = customer.addresses[0];
@@ -238,24 +240,30 @@ export function CustomerDetailClient({ initialCustomer }: { initialCustomer: Cus
           {!customer.isActive && <Badge variant="secondary">Inactive</Badge>}
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={toggleActiveMutation.isPending}
-            onClick={() => toggleActiveMutation.mutate()}
-          >
-            {toggleActiveMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : customer.isActive ? (
-              <Archive className="h-4 w-4" />
-            ) : (
-              <RotateCcw className="h-4 w-4" />
-            )}
-            {customer.isActive ? "Archive" : "Restore"}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-            <Pencil className="h-4 w-4" /> Edit
-          </Button>
+          {/* Archiving is Admin-and-up only, but Restoring (same toggle,
+              when the customer is already inactive) stays open to Staff. */}
+          {(canEdit || !customer.isActive) && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={toggleActiveMutation.isPending}
+              onClick={() => toggleActiveMutation.mutate()}
+            >
+              {toggleActiveMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : customer.isActive ? (
+                <Archive className="h-4 w-4" />
+              ) : (
+                <RotateCcw className="h-4 w-4" />
+              )}
+              {customer.isActive ? "Archive" : "Restore"}
+            </Button>
+          )}
+          {canEdit && (
+            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+              <Pencil className="h-4 w-4" /> Edit
+            </Button>
+          )}
         </div>
       </div>
       <div className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">

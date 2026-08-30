@@ -43,6 +43,7 @@ import {
   ServiceOrderFormDialog,
   type ServiceOrderRow,
 } from "@/components/admin/service-order-form-dialog";
+import { useCanEdit } from "@/components/admin/current-user-context";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 import { formatDate } from "@/lib/utils";
 import type { ServiceOrderStatus, ServiceType } from "@/models/ServiceOrder";
@@ -126,6 +127,7 @@ export function ServiceOrdersClient({
   products: ProductOption[];
 }) {
   const queryClient = useQueryClient();
+  const canEdit = useCanEdit();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("all");
   const [serviceType, setServiceType] = useState<ServiceType>("dry_clean");
@@ -353,16 +355,18 @@ export function ServiceOrdersClient({
                 </SelectContent>
               </Select>
               <div className="mt-3 flex justify-end gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    setEditingOrder(order);
-                    setFormOpen(true);
-                  }}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
+                {canEdit && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setEditingOrder(order);
+                      setFormOpen(true);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -648,16 +652,18 @@ export function ServiceOrdersClient({
                 <td className="px-4 py-3">
                   {view === "active" && (
                     <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setEditingOrder(order);
-                          setFormOpen(true);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      {canEdit && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setEditingOrder(order);
+                            setFormOpen(true);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"

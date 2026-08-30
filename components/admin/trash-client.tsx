@@ -28,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { useCanEdit } from "@/components/admin/current-user-context";
 import { cn } from "@/lib/utils";
 
 type EntityKey =
@@ -342,6 +343,7 @@ function TrashCounts({
 
 function EntityTrashPanel({ entity }: { entity: EntityConfig }) {
   const queryClient = useQueryClient();
+  const canEdit = useCanEdit();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -491,16 +493,18 @@ function EntityTrashPanel({ entity }: { entity: EntityConfig }) {
             className="pl-9"
           />
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="text-destructive hover:text-destructive"
-          disabled={rows.length === 0}
-          onClick={() => setEmptyTrashConfirm(true)}
-        >
-          <Trash2 className="h-4 w-4" />
-          Empty Trash
-        </Button>
+        {canEdit && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            disabled={rows.length === 0}
+            onClick={() => setEmptyTrashConfirm(true)}
+          >
+            <Trash2 className="h-4 w-4" />
+            Empty Trash
+          </Button>
+        )}
       </div>
 
       {selectedIds.size > 0 && (
@@ -511,15 +515,17 @@ function EntityTrashPanel({ entity }: { entity: EntityConfig }) {
               <RotateCcw className="h-3.5 w-3.5" />
               Restore
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-destructive hover:text-destructive"
-              onClick={() => setConfirmAction("permanent-delete")}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Delete Permanently
-            </Button>
+            {canEdit && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setConfirmAction("permanent-delete")}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete Permanently
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
               Clear
             </Button>
@@ -550,15 +556,17 @@ function EntityTrashPanel({ entity }: { entity: EntityConfig }) {
               >
                 <RotateCcw className="h-3.5 w-3.5" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="text-destructive"
-                aria-label="Delete permanently"
-                onClick={() => permanentOneMutation.mutate(row.id)}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+              {canEdit && (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-destructive"
+                  aria-label="Delete permanently"
+                  onClick={() => permanentOneMutation.mutate(row.id)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </div>
           </div>
         ))}
@@ -637,22 +645,24 @@ function EntityTrashPanel({ entity }: { entity: EntityConfig }) {
                       </TooltipTrigger>
                       <TooltipContent>Restore</TooltipContent>
                     </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger
-                        render={
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-destructive"
-                            aria-label="Delete permanently"
-                            onClick={() => permanentOneMutation.mutate(row.id)}
-                          />
-                        }
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </TooltipTrigger>
-                      <TooltipContent>Delete permanently</TooltipContent>
-                    </Tooltip>
+                    {canEdit && (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              className="text-destructive"
+                              aria-label="Delete permanently"
+                              onClick={() => permanentOneMutation.mutate(row.id)}
+                            />
+                          }
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </TooltipTrigger>
+                        <TooltipContent>Delete permanently</TooltipContent>
+                      </Tooltip>
+                    )}
                   </div>
                 </td>
               </tr>

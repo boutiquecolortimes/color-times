@@ -31,6 +31,7 @@ import {
   type CustomerOption,
 } from "@/components/admin/sale-form-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { useCanEdit } from "@/components/admin/current-user-context";
 import { formatDate } from "@/lib/utils";
 
 interface ProductOption {
@@ -91,6 +92,7 @@ export function SalesClient({
   customers: CustomerOption[];
 }) {
   const queryClient = useQueryClient();
+  const canEdit = useCanEdit();
   const [page, setPage] = useState(1);
   const [view, setView] = useState<"active" | "trash">("active");
   const [layout, setLayout] = useState<"table" | "card">("table");
@@ -183,16 +185,18 @@ export function SalesClient({
               >
                 <Send className="h-4 w-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  setEditingSale(sale);
-                  setFormOpen(true);
-                }}
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
+              {canEdit && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    setEditingSale(sale);
+                    setFormOpen(true);
+                  }}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -332,16 +336,18 @@ export function SalesClient({
                       >
                         <Send className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setEditingSale(sale);
-                          setFormOpen(true);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      {canEdit && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setEditingSale(sale);
+                            setFormOpen(true);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"

@@ -56,6 +56,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { useCanEdit } from "@/components/admin/current-user-context";
 import { purchaseSchema, type PurchaseInput } from "@/lib/validations/purchase";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 
@@ -153,6 +154,7 @@ export function PurchasesClient({
   initialPagination: Pagination;
 }) {
   const queryClient = useQueryClient();
+  const canEdit = useCanEdit();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<PurchaseRow | null>(null);
   const [status, setStatus] = useState<"active" | "trash">("active");
@@ -483,15 +485,17 @@ export function PurchasesClient({
                   <RotateCcw className="h-3.5 w-3.5" />
                   Restore
                 </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  disabled={bulkActionMutation.isPending}
-                  onClick={() => setBulkConfirmAction("permanent-delete")}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Delete Permanently
-                </Button>
+                {canEdit && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={bulkActionMutation.isPending}
+                    onClick={() => setBulkConfirmAction("permanent-delete")}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete Permanently
+                  </Button>
+                )}
               </>
             ) : (
               <Button
@@ -571,29 +575,33 @@ export function PurchasesClient({
                       <RotateCcw className="h-3.5 w-3.5" />
                       Restore
                     </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="shrink-0 text-destructive hover:text-destructive"
-                      disabled={permanentDeleteMutation.isPending}
-                      onClick={() => setPermanentDeleteTarget(purchase)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {canEdit && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 text-destructive hover:text-destructive"
+                        disabled={permanentDeleteMutation.isPending}
+                        onClick={() => setPermanentDeleteTarget(purchase)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </>
                 ) : (
                   <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => openEditDialog(purchase)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                      Edit
-                    </Button>
+                    {canEdit && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => openEditDialog(purchase)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                    )}
                     <Button
                       type="button"
                       variant="ghost"
@@ -718,21 +726,25 @@ export function PurchasesClient({
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-destructive"
-                          disabled={permanentDeleteMutation.isPending}
-                          onClick={() => setPermanentDeleteTarget(purchase)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        {canEdit && (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-destructive"
+                            disabled={permanentDeleteMutation.isPending}
+                            onClick={() => setPermanentDeleteTarget(purchase)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </>
                     ) : (
                       <>
-                        <Button variant="ghost" size="icon-sm" onClick={() => openEditDialog(purchase)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
+                        {canEdit && (
+                          <Button variant="ghost" size="icon-sm" onClick={() => openEditDialog(purchase)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon-sm"

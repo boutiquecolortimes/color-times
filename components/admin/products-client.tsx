@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -24,6 +25,7 @@ import {
   Star,
   Table2,
   Trash2,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
@@ -52,6 +54,7 @@ import { ProductImportDialog } from "@/components/admin/product-import-dialog";
 import { ProductDetailDrawer } from "@/components/admin/product-detail-drawer";
 import { ImagePreviewDialog } from "@/components/admin/image-preview-dialog";
 import { ProductStatusBadge } from "@/components/admin/product-status-badge";
+import { useCanEdit } from "@/components/admin/current-user-context";
 import { downloadPdf, downloadExcel } from "@/lib/admin/export";
 import { cn } from "@/lib/utils";
 import type { ProductStatus } from "@/models/Product";
@@ -161,6 +164,9 @@ export function ProductsClient({
   canManageSettings: boolean;
 }) {
   const queryClient = useQueryClient();
+  const canEdit = useCanEdit();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [view, setView] = useState<"table" | "card">("table");
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -177,6 +183,25 @@ export function ProductsClient({
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [priceDraft, setPriceDraft] = useState("");
   const [viewingId, setViewingId] = useState<string | null>(null);
+
+  // Deep link support: a low-stock notification (and anything else that
+  // wants to point someone at a specific product) links here with
+  // ?view={id} rather than straight to /admin/products/{id}, since that
+  // route is now the edit form and Staff is redirected away from it. The
+  // read-only drawer works for every role, so open it on landing and then
+  // drop the param so the URL doesn't stay "sticky" across reloads.
+  useEffect(() => {
+    const viewParam = searchParams.get("view");
+    if (viewParam) {
+      setViewingId(viewParam);
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete("view");
+      const query = next.toString();
+      router.replace(query ? `/admin/products?${query}` : "/admin/products");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [isExporting, setIsExporting] = useState(false);
   const [previewProductId, setPreviewProductId] = useState<string | null>(null);
   const [previewIndex, setPreviewIndex] = useState(-1);
@@ -550,14 +575,16 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Status"];
               );
             })()}
             <div className="mt-2 flex gap-1">
-              <ButtonLink
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                href={`/admin/products/${product._id}`}
-              >
-                Edit
-              </ButtonLink>
+              {canEdit && (
+                <ButtonLink
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  href={`/admin/products/${product._id}`}
+                >
+                  Edit
+                </ButtonLink>
+              )}
               <Checkbox
                 checked={selectedIds.has(product._id)}
                 onCheckedChange={() => toggleSelectOne(product._id)}
@@ -723,12 +750,42 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Status"];
         </div>
       </div>
 
-      <ProductsBulkToolbar
-        count={selectedIds.size}
-        status={status}
-        onAction={handleBulkAction}
-        onClear={() => setSelectedIds(new Set())}
-      />
+      {canEdit ? (
+        <ProductsBulkToolbar
+          count={selectedIds.size}
+          status={status}
+          onAction={handleBulkAction}
+          onClear={() => setSelectedIds(new Set())}
+        />
+      ) : (
+        selectedIds.size > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2.5">
+            <span className="text-sm font-medium">{selectedIds.size} selected</span>
+            <div className="ml-auto flex flex-wrap gap-2">
+              {status === "trash" ? (
+                <Button size="sm" variant="outline" onClick={() => handleBulkAction("restore")}>
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Restore
+                </Button>
+              ) : (
+                <Button size="sm" variant="destructive" onClick={() => handleBulkAction("delete")}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Move to Trash
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setSelectedIds(new Set())}
+                aria-label="Clear selection"
+                title="Clear selection"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        )
+      )}
 
       <div className="lg:hidden">{cardGrid}</div>
 
@@ -932,24 +989,26 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Status"];
                             </TooltipTrigger>
                             <TooltipContent>Restore from trash</TooltipContent>
                           </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger
-                              render={
-                                <Button
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  className="text-destructive"
-                                  aria-label="Delete permanently"
-                                  onClick={() =>
-                                    setConfirmState({ ids: [product._id], action: "permanent-delete" })
-                                  }
-                                />
-                              }
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </TooltipTrigger>
-                            <TooltipContent>Delete permanently</TooltipContent>
-                          </Tooltip>
+                          {canEdit && (
+                            <Tooltip>
+                              <TooltipTrigger
+                                render={
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    className="text-destructive"
+                                    aria-label="Delete permanently"
+                                    onClick={() =>
+                                      setConfirmState({ ids: [product._id], action: "permanent-delete" })
+                                    }
+                                  />
+                                }
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </TooltipTrigger>
+                              <TooltipContent>Delete permanently</TooltipContent>
+                            </Tooltip>
+                          )}
                         </>
                       ) : (
                         <>
@@ -968,15 +1027,17 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Status"];
                             </TooltipTrigger>
                             <TooltipContent>View details</TooltipContent>
                           </Tooltip>
-                          <ButtonLink
-                            variant="ghost"
-                            size="icon-sm"
-                            href={`/admin/products/${product._id}`}
-                            aria-label="Edit"
-                            title="Edit product"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </ButtonLink>
+                          {canEdit && (
+                            <ButtonLink
+                              variant="ghost"
+                              size="icon-sm"
+                              href={`/admin/products/${product._id}`}
+                              aria-label="Edit"
+                              title="Edit product"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </ButtonLink>
+                          )}
                           <Tooltip>
                             <TooltipTrigger
                               render={
@@ -1009,21 +1070,23 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Status"];
                               <TooltipContent>Unarchive product</TooltipContent>
                             </Tooltip>
                           ) : (
-                            <Tooltip>
-                              <TooltipTrigger
-                                render={
-                                  <Button
-                                    variant="ghost"
-                                    size="icon-sm"
-                                    aria-label="Archive"
-                                    onClick={() => archiveMutation.mutate(product._id)}
-                                  />
-                                }
-                              >
-                                <Archive className="h-3.5 w-3.5" />
-                              </TooltipTrigger>
-                              <TooltipContent>Archive product</TooltipContent>
-                            </Tooltip>
+                            canEdit && (
+                              <Tooltip>
+                                <TooltipTrigger
+                                  render={
+                                    <Button
+                                      variant="ghost"
+                                      size="icon-sm"
+                                      aria-label="Archive"
+                                      onClick={() => archiveMutation.mutate(product._id)}
+                                    />
+                                  }
+                                >
+                                  <Archive className="h-3.5 w-3.5" />
+                                </TooltipTrigger>
+                                <TooltipContent>Archive product</TooltipContent>
+                              </Tooltip>
+                            )
                           )}
                           <Tooltip>
                             <TooltipTrigger

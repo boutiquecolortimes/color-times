@@ -21,6 +21,7 @@ import { ServiceOrderStatusBadge } from "@/components/admin/service-order-status
 import { ProductStatusBadge } from "@/components/admin/product-status-badge";
 import { ProductAvailabilityCalendar } from "@/components/admin/product-availability-calendar";
 import { ImagePreviewDialog } from "@/components/admin/image-preview-dialog";
+import { useCanEdit } from "@/components/admin/current-user-context";
 import { cn, formatDate } from "@/lib/utils";
 import type { BookingStatus } from "@/models/Booking";
 import type { ServiceOrderStatus } from "@/models/ServiceOrder";
@@ -117,6 +118,7 @@ export function ProductDetailDrawer({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const canEdit = useCanEdit();
   const [previewIndex, setPreviewIndex] = useState(-1);
 
   const { data: product, isLoading } = useQuery({
@@ -334,9 +336,11 @@ export function ProductDetailDrawer({
                     </div>
                   )}
 
-                  <ButtonLink href={`/admin/products/${product._id}`} className="w-full">
-                    Edit Full Details
-                  </ButtonLink>
+                  {canEdit && (
+                    <ButtonLink href={`/admin/products/${product._id}`} className="w-full">
+                      Edit Full Details
+                    </ButtonLink>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="history" className="space-y-5">
