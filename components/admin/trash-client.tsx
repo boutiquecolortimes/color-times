@@ -527,7 +527,49 @@ function EntityTrashPanel({ entity }: { entity: EntityConfig }) {
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-border bg-card">
+      <div className="space-y-2 lg:hidden">
+        {rows.map((row) => (
+          <div key={row.id} className="flex items-start gap-2 rounded-lg border border-border bg-card p-3.5">
+            <Checkbox
+              className="mt-0.5"
+              checked={selectedIds.has(row.id)}
+              onCheckedChange={() => toggleSelectOne(row.id)}
+              aria-label={`Select ${row.primary}`}
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-medium">{row.primary}</p>
+              {row.secondary && <p className="truncate text-xs text-muted-foreground">{row.secondary}</p>}
+              <p className="mt-1 text-xs text-muted-foreground">Trashed {formatDate(row.deletedAt)}</p>
+            </div>
+            <div className="flex shrink-0 gap-1">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Restore"
+                onClick={() => restoreOneMutation.mutate(row.id)}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="text-destructive"
+                aria-label="Delete permanently"
+                onClick={() => permanentOneMutation.mutate(row.id)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        ))}
+        {rows.length === 0 && (
+          <p className="py-10 text-center text-sm text-muted-foreground">
+            {isFetching ? "Loading..." : `Trash is empty — no ${entity.itemLabel} to show.`}
+          </p>
+        )}
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
         <table className="w-full min-w-[520px] text-sm">
           <thead className="border-b border-border bg-secondary/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>

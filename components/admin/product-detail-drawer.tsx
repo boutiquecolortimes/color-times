@@ -215,17 +215,26 @@ export function ProductDetailDrawer({
               />
 
               <Tabs defaultValue="details">
+                {/*
+                  Four flex-1 tabs sharing a ~330px-wide sheet on mobile give
+                  each trigger ~80px, and "Availability" (12 chars) at
+                  text-sm + the base component's whitespace-nowrap ran past
+                  that width with nothing to clip it — the label visibly
+                  overlapped the "Activity" tab beside it. min-w-0 lets a
+                  flex-1 item shrink below its content size and truncate
+                  then actually has room to ellipsize instead of overflowing.
+                */}
                 <TabsList className="w-full">
-                  <TabsTrigger value="details" className="flex-1">
+                  <TabsTrigger value="details" className="min-w-0 flex-1 truncate text-xs sm:text-sm">
                     Details
                   </TabsTrigger>
-                  <TabsTrigger value="history" className="flex-1">
+                  <TabsTrigger value="history" className="min-w-0 flex-1 truncate text-xs sm:text-sm">
                     History
                   </TabsTrigger>
-                  <TabsTrigger value="availability" className="flex-1">
+                  <TabsTrigger value="availability" className="min-w-0 flex-1 truncate text-xs sm:text-sm">
                     Availability
                   </TabsTrigger>
-                  <TabsTrigger value="activity" className="flex-1">
+                  <TabsTrigger value="activity" className="min-w-0 flex-1 truncate text-xs sm:text-sm">
                     Activity
                   </TabsTrigger>
                 </TabsList>

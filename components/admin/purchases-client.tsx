@@ -511,7 +511,113 @@ export function PurchasesClient({
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-border bg-card">
+      <div className="lg:hidden">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {purchases.map((purchase) => (
+            <div key={purchase._id} className="rounded-lg border border-border bg-card p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={selectedIds.has(purchase._id)}
+                    onCheckedChange={() => toggleSelectOne(purchase._id)}
+                    aria-label={`Select ${purchase.itemName}`}
+                  />
+                  <div>
+                    <p className="font-medium">{purchase.itemName}</p>
+                    <p className="text-xs text-muted-foreground">Bill #{purchase.billNumber || "—"}</p>
+                  </div>
+                </div>
+                <Badge variant={purchase.paymentStatus === "paid" ? "secondary" : "outline"}>
+                  {PAYMENT_STATUS_LABELS[purchase.paymentStatus]}
+                </Badge>
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">{purchase.vendorName}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {purchase.product ? (
+                  <>
+                    {purchase.product.name}
+                    {purchase.addedToStock && (
+                      <Badge variant="secondary" className="ml-1.5">
+                        +stock
+                      </Badge>
+                    )}
+                  </>
+                ) : (
+                  "Not linked to inventory"
+                )}
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <span>Qty</span>
+                <span className="text-right text-foreground">{purchase.quantity}</span>
+                <span>Total Cost</span>
+                <span className="text-right font-medium text-foreground">
+                  {formatCurrency(purchase.totalCost)}
+                </span>
+                <span>Date</span>
+                <span className="text-right text-foreground">{formatDate(purchase.purchaseDate)}</span>
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                {status === "trash" ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      disabled={restoreMutation.isPending}
+                      onClick={() => restoreMutation.mutate(purchase._id)}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Restore
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-destructive hover:text-destructive"
+                      disabled={permanentDeleteMutation.isPending}
+                      onClick={() => setPermanentDeleteTarget(purchase)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => openEditDialog(purchase)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-destructive hover:text-destructive"
+                      disabled={deleteMutation.isPending}
+                      onClick={() => setDeleteTarget(purchase)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+          {purchases.length === 0 && (
+            <p className="col-span-full py-10 text-center text-sm text-muted-foreground">
+              {status === "trash" ? "Trash is empty." : "No purchases yet. Record your first one."}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
         <table className="w-full min-w-[880px] text-sm whitespace-nowrap">
           <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>

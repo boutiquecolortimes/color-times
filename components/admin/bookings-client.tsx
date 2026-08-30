@@ -581,23 +581,35 @@ export function BookingsClient({
           setPage(1);
         }}
       >
-        <TabsList>
-          {STATUS_TABS.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5">
-              {tab.label}
-              <span
-                className={cn(
-                  "rounded-full px-1.5 py-0.5 text-xs tabular-nums",
-                  status === tab.value
-                    ? "bg-accent/15 text-accent"
-                    : "bg-secondary text-muted-foreground"
-                )}
-              >
-                {statusCounts[tab.countKey]}
-              </span>
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        {/*
+          Six status tabs ("All" through "Cancelled") is more than a
+          375px-wide screen can show at once, and TabsList's default
+          inline-flex/w-fit sizing doesn't wrap or scroll on its own — the
+          row was simply clipped by the viewport, cutting "Picked Up" mid
+          count and hiding "Returned"/"Cancelled" entirely with no way to
+          reach them. overflow-x-auto here makes the row swipeable instead;
+          the negative margin lets it bleed to the page's own edges on
+          mobile so the scroll area isn't inset twice.
+        */}
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:overflow-visible sm:px-0">
+          <TabsList className="w-max">
+            {STATUS_TABS.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value} className="shrink-0 gap-1.5">
+                {tab.label}
+                <span
+                  className={cn(
+                    "rounded-full px-1.5 py-0.5 text-xs tabular-nums",
+                    status === tab.value
+                      ? "bg-accent/15 text-accent"
+                      : "bg-secondary text-muted-foreground"
+                  )}
+                >
+                  {statusCounts[tab.countKey]}
+                </span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
       </Tabs>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

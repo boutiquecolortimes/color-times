@@ -467,7 +467,96 @@ function StaffTable({
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-border bg-card">
+      <div className="lg:hidden">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {staff.map((member) => (
+            <div key={member._id} className="rounded-lg border border-border bg-card p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={selectedIds.has(member._id)}
+                    onCheckedChange={() => toggleSelectOne(member._id)}
+                    aria-label={`Select ${member.name}`}
+                  />
+                  <div>
+                    <p className="font-medium">{member.name}</p>
+                    <p className="text-xs text-muted-foreground">{member.designation || "—"}</p>
+                  </div>
+                </div>
+                <Badge variant={member.isActive ? "secondary" : "outline"}>
+                  {member.isActive ? "Active" : "Inactive"}
+                </Badge>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <span>Phone</span>
+                <span className="text-right text-foreground">{member.phone || "—"}</span>
+                <span>Monthly Salary</span>
+                <span className="text-right font-medium text-foreground">
+                  {formatCurrency(member.monthlySalary)}
+                </span>
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                {status === "trash" ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      disabled={restoreMutation.isPending}
+                      onClick={() => restoreMutation.mutate(member._id)}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Restore
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-destructive hover:text-destructive"
+                      disabled={permanentDeleteMutation.isPending}
+                      onClick={() => setPermanentDeleteTarget(member)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => openEditDialog(member)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-destructive hover:text-destructive"
+                      disabled={deleteMutation.isPending}
+                      onClick={() => setDeleteTarget(member)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+          {staff.length === 0 && (
+            <p className="col-span-full py-10 text-center text-sm text-muted-foreground">
+              {status === "trash" ? "Trash is empty." : "No staff yet. Add your first staff member."}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
         <table className="w-full min-w-[720px] text-sm whitespace-nowrap">
           <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
@@ -1130,7 +1219,96 @@ function SalaryPaymentsTable() {
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-border bg-card">
+      <div className="lg:hidden">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {payments.map((payment) => (
+            <div key={payment._id} className="rounded-lg border border-border bg-card p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={selectedIds.has(payment._id)}
+                    onCheckedChange={() => toggleSelectOne(payment._id)}
+                    aria-label="Select row"
+                  />
+                  <div>
+                    <p className="font-medium">{payment.staff?.name ?? "—"}</p>
+                    <p className="text-xs text-muted-foreground">{payment.forMonth}</p>
+                  </div>
+                </div>
+                <Badge variant="outline">
+                  {PAYMENT_METHOD_LABELS[payment.paymentMethod ?? "cash"] ?? payment.paymentMethod}
+                </Badge>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <span>Amount</span>
+                <span className="text-right font-medium text-foreground">
+                  {formatCurrency(payment.amount)}
+                </span>
+                <span>Payment Date</span>
+                <span className="text-right text-foreground">{formatDate(payment.paymentDate)}</span>
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                {status === "trash" ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      disabled={restoreMutation.isPending}
+                      onClick={() => restoreMutation.mutate(payment._id)}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Restore
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-destructive hover:text-destructive"
+                      disabled={permanentDeleteMutation.isPending}
+                      onClick={() => setPermanentDeleteTarget(payment)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => openEditDialog(payment)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-destructive hover:text-destructive"
+                      disabled={deleteMutation.isPending}
+                      onClick={() => setDeleteTarget(payment)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+          {payments.length === 0 && (
+            <p className="col-span-full py-10 text-center text-sm text-muted-foreground">
+              {status === "trash" ? "Trash is empty." : "No salary payments recorded yet."}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
         <table className="w-full min-w-[680px] text-sm whitespace-nowrap">
           <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>

@@ -153,7 +153,15 @@ export function GlobalSearch() {
       )}
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 max-h-96 w-80 overflow-y-auto rounded-lg border border-border bg-card p-2 shadow-lg sm:left-0 sm:right-auto sm:w-96">
+        // On mobile the trigger sits near the middle of the topbar (search
+        // icon, then notifications, theme toggle, and the user menu to its
+        // right), so anchoring the panel to the trigger's own right edge
+        // with a fixed w-80 pushed it mostly off the left edge of the
+        // screen — it wasn't a positioner with viewport collision
+        // detection like DropdownMenu/Select, just a raw absolute div. Below
+        // sm we instead pin it to the viewport itself, just under the
+        // topbar; sm and up restores the original anchored-to-input panel.
+        <div className="fixed inset-x-4 top-16 z-50 mt-2 max-h-[70dvh] overflow-y-auto rounded-lg border border-border bg-card p-2 shadow-lg sm:absolute sm:inset-x-auto sm:left-0 sm:right-auto sm:top-full sm:mt-2 sm:max-h-96 sm:w-96">
           {!hasQuery && (
             <div className="mb-1">
               <div className="flex items-center justify-between px-3 py-1">

@@ -205,7 +205,7 @@ export function WhatsAppTemplateFormDialog({
               )}
             />
 
-            <div className="grid grid-cols-[1fr_110px] gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_110px]">
               <FormField
                 control={form.control}
                 name="metaTemplateName"

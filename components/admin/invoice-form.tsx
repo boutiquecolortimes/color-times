@@ -302,9 +302,23 @@ function ManualTab({
           </div>
 
           <div className="mt-4 space-y-3">
+            {/*
+              This grid was a flat grid-cols-12 with no responsive
+              variants, so on a ~340px-wide mobile dialog the Qty (2/12 ≈
+              50px) and Unit Price (3/12 ≈ 75px) columns were too narrow
+              for their placeholder text and the number spinner, clipping
+              content. Below sm it now stacks Description on its own row
+              and gives Qty/Unit Price/Remove a roomier 3-column row of
+              their own; sm and up restores the original 12-col layout via
+              sm:contents, which drops the mobile wrapper from layout so
+              its children rejoin the parent's 12-column grid directly.
+            */}
             {fields.map((item, index) => (
-              <div key={item.id} className="grid grid-cols-12 items-start gap-2">
-                <div className="col-span-6">
+              <div
+                key={item.id}
+                className="grid grid-cols-1 gap-2 border-b border-border pb-3 last:border-0 last:pb-0 sm:grid-cols-12 sm:items-start sm:gap-2 sm:border-0 sm:pb-0"
+              >
+                <div className="sm:col-span-6">
                   <FormField
                     control={form.control}
                     name={`lineItems.${index}.description`}
@@ -317,58 +331,61 @@ function ManualTab({
                     )}
                   />
                 </div>
-                <div className="col-span-2">
-                  <FormField
-                    control={form.control}
-                    name={`lineItems.${index}.quantity`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="Qty"
-                            step="1"
-                            value={field.value ? field.value : ""}
-                            onChange={(event) =>
-                              field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
-                            }
-                          />
-                        </FormControl>
-                      </FormItem>
+                <div className="grid grid-cols-3 gap-2 sm:contents">
+                  <div className="sm:col-span-2">
+                    <FormField
+                      control={form.control}
+                      name={`lineItems.${index}.quantity`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder="Qty"
+                              step="1"
+                              value={field.value ? field.value : ""}
+                              onChange={(event) =>
+                                field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                              }
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="sm:col-span-3">
+                    <FormField
+                      control={form.control}
+                      name={`lineItems.${index}.unitPrice`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder="Unit Price"
+                              step="0.01"
+                              value={field.value ? field.value : ""}
+                              onChange={(event) =>
+                                field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                              }
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="flex items-center justify-end sm:col-span-1 sm:pt-2">
+                    {fields.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => remove(index)}
+                        aria-label="Remove line item"
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     )}
-                  />
-                </div>
-                <div className="col-span-3">
-                  <FormField
-                    control={form.control}
-                    name={`lineItems.${index}.unitPrice`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="Unit Price"
-                            step="0.01"
-                            value={field.value ? field.value : ""}
-                            onChange={(event) =>
-                              field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
-                            }
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <div className="col-span-1 flex justify-end pt-2">
-                  {fields.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => remove(index)}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
+                  </div>
                 </div>
               </div>
             ))}
