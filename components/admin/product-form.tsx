@@ -744,7 +744,13 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
           </TabsContent>
         </Tabs>
 
-        <div className="flex items-center justify-between gap-3">
+        {/*
+          Cancel + Back + a longer submit label ("Create Product"/"Save
+          Changes") can run close to the edge of a narrow phone with no
+          responsive help here; flex-wrap lets the group drop to its own
+          line under Cancel instead of clipping on smaller devices.
+        */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <Button type="button" variant="outline" onClick={() => router.push("/admin/products")}>
             Cancel
           </Button>

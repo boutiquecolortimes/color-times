@@ -224,7 +224,15 @@ export function CustomerDetailClient({ initialCustomer }: { initialCustomer: Cus
 
   return (
     <div className="rounded-lg border border-border bg-card p-6">
-      <div className="flex items-center justify-between">
+      {/*
+        Unlike the equivalent header on the invoice/sale/booking detail
+        pages, this row had no responsive stacking at all — a long
+        customer name plus the Archive/Edit buttons on one
+        `justify-between` line with nothing to wrap or stack them. Long
+        names ran the buttons off the edge of a narrow screen. Stacking
+        below sm matches how the other detail pages already handle this.
+      */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <h1 className="font-heading text-2xl">{customer.name}</h1>
           {!customer.isActive && <Badge variant="secondary">Inactive</Badge>}

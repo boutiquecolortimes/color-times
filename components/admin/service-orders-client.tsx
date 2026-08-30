@@ -384,7 +384,13 @@ export function ServiceOrdersClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/*
+        "Dry Clean & Tailor" at text-2xl plus "New Service Order" left
+        almost no slack on a 375px screen with nothing to stack them —
+        matching the flex-col-below-sm pattern used on the equivalent
+        header elsewhere in the admin (customers, products, staff).
+      */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl">Dry Clean &amp; Tailor</h1>
           <p className="mt-1 text-sm text-muted-foreground">

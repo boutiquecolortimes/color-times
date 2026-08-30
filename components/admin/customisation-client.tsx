@@ -329,7 +329,14 @@ export function CustomisationClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/*
+        "New Customisation Order" is a long label, and this header row had
+        no responsive stacking (unlike the equivalent header on
+        customers/products/staff/etc., which all use flex-col below sm) —
+        on a narrow screen it sat beside the title with nothing to wrap or
+        stack it. Matching that established pattern here too.
+      */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl">Customisation</h1>
           <p className="mt-1 text-sm text-muted-foreground">

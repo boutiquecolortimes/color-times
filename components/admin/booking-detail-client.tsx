@@ -176,7 +176,15 @@ export function BookingDetailClient({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/*
+          Invoice link + Edit + Send Reminder + a w-48 status Select is a
+          lot to fit on one line — the outer header row already wraps
+          (flex-wrap on the parent), but this row itself didn't, so once it
+          dropped to its own line below the title it still had no way to
+          give a narrow screen room for four wide controls. flex-wrap lets
+          them stack instead of clipping past the edge.
+        */}
+        <div className="flex flex-wrap items-center gap-2">
           {invoice && (
             <ButtonLink
               variant="outline"
