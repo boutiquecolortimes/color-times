@@ -19,6 +19,18 @@ export async function GET(request: NextRequest): Promise<Response> {
   const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
   const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize") ?? "5")));
   const view = searchParams.get("view") ?? "active";
+  const sortBy = searchParams.get("sortBy");
+  const sortDir = searchParams.get("sortDir") === "asc" ? 1 : -1;
+  const SORTABLE_FIELDS: Record<string, string> = {
+    billNumber: "billNumber",
+    customerName: "customerName",
+    totalAmount: "totalAmount",
+    saleDate: "saleDate",
+    createdAt: "createdAt",
+  };
+  const sort = sortBy && SORTABLE_FIELDS[sortBy]
+    ? { [SORTABLE_FIELDS[sortBy]]: sortDir as 1 | -1 }
+    : { createdAt: -1 as const };
 
   // Auto-generated "source: booking" entries are a duplicate ledger record
   // for a booking's own settlement (see models/Sale.ts) — they'd otherwise
@@ -32,7 +44,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   const [sales, total] = await Promise.all([
     Sale.find(filter)
       .populate("product", "name images sku")
-      .sort({ createdAt: -1 })
+      .sort(sort)
       .skip((page - 1) * pageSize)
       .limit(pageSize)
       .lean(),

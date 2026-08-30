@@ -28,6 +28,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     email: "email",
     phone: "phone",
     createdAt: "createdAt",
+    deletedAt: "deletedAt",
   };
   const sort = sortBy && SORTABLE_FIELDS[sortBy]
     ? { [SORTABLE_FIELDS[sortBy]]: sortDir as 1 | -1 }
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     ];
   }
 
-  const baseQuery = User.find(filter).select("name email phone createdAt").sort(sort);
+  const baseQuery = User.find(filter).select("name email phone addresses createdAt").sort(sort);
 
   const [customers, total] = await Promise.all([
     all ? baseQuery.lean() : baseQuery.skip((page - 1) * pageSize).limit(pageSize).lean(),
@@ -77,19 +78,25 @@ export async function POST(request: NextRequest): Promise<Response> {
     const temporaryPassword = generateTemporaryPassword();
     const passwordHash = await hashPassword(temporaryPassword);
 
-    const addresses =
-      input.addressLine1 && input.addressCity && input.addressState && input.addressPostalCode
-        ? [
-            {
-              label: "Primary",
-              line1: input.addressLine1,
-              city: input.addressCity,
-              state: input.addressState,
-              postalCode: input.addressPostalCode,
-              isDefault: true,
-            },
-          ]
-        : [];
+    // Save whatever address detail was given rather than requiring the full
+    // line1/city/state/postal breakdown — the quick-add customer dialogs in
+    // the Booking and Sale forms only ever collect a single address line for
+    // walk-in customers, and that shouldn't be silently discarded.
+    const hasAddressInput = Boolean(
+      input.addressLine1 || input.addressCity || input.addressState || input.addressPostalCode
+    );
+    const addresses = hasAddressInput
+      ? [
+          {
+            label: "Primary",
+            line1: input.addressLine1 || "",
+            city: input.addressCity || "",
+            state: input.addressState || "",
+            postalCode: input.addressPostalCode || "",
+            isDefault: true,
+          },
+        ]
+      : [];
 
     const customer = await User.create({
       name: input.name,

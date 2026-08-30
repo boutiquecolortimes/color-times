@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +23,7 @@ function formatCurrency(value: number): string {
 interface BookingSummary {
   totalAmount: number;
   advancePaid: number;
+  securityDeposit: number;
 }
 
 export function ConfirmBookingDialog({
@@ -37,14 +40,35 @@ export function ConfirmBookingDialog({
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const dueAmount = Math.max(0, summary.totalAmount - summary.advancePaid);
+  // The rent, security deposit, and advance entered when the booking was
+  // first noted down (often a phone inquiry) may not match what's actually
+  // being charged and collected now — let staff correct all three right
+  // here before the invoice is generated. Lazy initializers (not an effect)
+  // so opening the dialog never silently changes what's about to be sent.
+  const [rentAmount, setRentAmount] = useState(() => summary.totalAmount - summary.securityDeposit);
+  const [securityDeposit, setSecurityDeposit] = useState(() => summary.securityDeposit);
+  const [advancePaid, setAdvancePaid] = useState(() => summary.advancePaid);
+
+  const totalAmount = rentAmount + securityDeposit;
+  const dueAmount = Math.max(0, totalAmount - advancePaid);
+
+  function resetToSummary() {
+    setRentAmount(summary.totalAmount - summary.securityDeposit);
+    setSecurityDeposit(summary.securityDeposit);
+    setAdvancePaid(summary.advancePaid);
+  }
 
   const mutation = useMutation({
     mutationFn: async () => {
       const statusRes = await fetch(`/api/admin/bookings/${bookingId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "confirmed" }),
+        body: JSON.stringify({
+          status: "confirmed",
+          rentAmount,
+          securityDeposit,
+          advancePaid,
+        }),
       });
       const statusJson = await statusRes.json();
       if (!statusRes.ok) throw new Error(statusJson.error);
@@ -55,56 +79,104 @@ export function ConfirmBookingDialog({
         body: JSON.stringify({ bookingId }),
       });
       const invoiceJson = await invoiceRes.json();
-      if (!invoiceRes.ok) {
-        // Booking is already confirmed at this point — an already-existing invoice shouldn't block that.
-        if (invoiceRes.status === 409) return { invoice: null };
-        throw new Error(invoiceJson.error);
-      }
-      return { invoice: invoiceJson.data.invoice as { _id: string } };
+      if (!invoiceRes.ok) throw new Error(invoiceJson.error);
+      // 201 = a brand-new invoice; 200 = an existing one (e.g. from an
+      // earlier confirm attempt) was just resynced to the booking's
+      // current numbers instead of failing.
+      return {
+        invoice: invoiceJson.data.invoice as { _id: string },
+        created: invoiceRes.status === 201,
+      };
     },
-    onSuccess: ({ invoice }) => {
+    onSuccess: ({ invoice, created }) => {
       queryClient.invalidateQueries({ queryKey: ["admin", "booking", bookingId] });
       queryClient.invalidateQueries({ queryKey: ["admin", "bookings"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
       onOpenChange(false);
-      if (invoice) {
-        toast.success("Booking confirmed and invoice generated");
-        router.push(`/admin/invoices/${invoice._id}`);
-      } else {
-        toast.success("Booking confirmed");
-      }
+      toast.success(created ? "Booking confirmed and invoice generated" : "Booking confirmed and invoice updated");
+      router.push(`/admin/invoices/${invoice._id}`);
     },
     onError: (error: Error) => toast.error(error.message),
   });
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !mutation.isPending && onOpenChange(next)}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (mutation.isPending) return;
+        if (!next) resetToSummary();
+        onOpenChange(next);
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Confirm booking</DialogTitle>
           <DialogDescription>
-            This reserves the dress and generates the invoice automatically — no separate step needed.
+            This reserves the dress and generates the invoice automatically — correct any of the
+            amounts below first if they've changed since the booking was first noted down.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Total amount</span>
-            <span>{formatCurrency(summary.totalAmount)}</span>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Rent amount (&#8377;)</label>
+            <Input
+              className="mt-2"
+              type="number"
+              min={0}
+              value={rentAmount === 0 ? "" : rentAmount}
+              onChange={(event) => setRentAmount(Math.max(0, Number(event.target.value) || 0))}
+            />
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Advance paid</span>
-            <span>{formatCurrency(summary.advancePaid)}</span>
+
+          <div>
+            <label className="text-sm font-medium">Security deposit (&#8377;)</label>
+            <Input
+              className="mt-2"
+              type="number"
+              min={0}
+              value={securityDeposit === 0 ? "" : securityDeposit}
+              onChange={(event) => setSecurityDeposit(Math.max(0, Number(event.target.value) || 0))}
+            />
           </div>
-          <div className="mt-2 flex justify-between border-t border-border pt-2 font-medium">
-            <span>Due amount</span>
-            <span className="text-accent">{formatCurrency(dueAmount)}</span>
+
+          <div>
+            <label className="text-sm font-medium">Advance paid (&#8377;)</label>
+            <Input
+              className="mt-2"
+              type="number"
+              min={0}
+              value={advancePaid === 0 ? "" : advancePaid}
+              onChange={(event) => setAdvancePaid(Math.max(0, Number(event.target.value) || 0))}
+            />
+          </div>
+
+          <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Total amount</span>
+              <span>{formatCurrency(totalAmount)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Advance paid</span>
+              <span>{formatCurrency(advancePaid)}</span>
+            </div>
+            <div className="mt-2 flex justify-between border-t border-border pt-2 font-medium">
+              <span>Due amount</span>
+              <span className="text-accent">{formatCurrency(dueAmount)}</span>
+            </div>
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              resetToSummary();
+              onOpenChange(false);
+            }}
+            disabled={mutation.isPending}
+          >
             Cancel
           </Button>
           <Button disabled={mutation.isPending} onClick={() => mutation.mutate()}>

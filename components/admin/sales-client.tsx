@@ -3,7 +3,18 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Send, Grid3x3, List, Eye } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Send,
+  Grid3x3,
+  List,
+  Eye,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import {
@@ -39,11 +50,28 @@ function formatCurrency(value: number): string {
   return `₹${value.toLocaleString("en-IN")}`;
 }
 
+function SortIcon({
+  field,
+  sortBy,
+  sortDir,
+}: {
+  field: string;
+  sortBy: string;
+  sortDir: "asc" | "desc";
+}) {
+  if (sortBy !== field) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
+  return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+}
+
 async function fetchSales(params: {
   page: number;
   view: string;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
 }): Promise<{ sales: SaleRow[]; pagination: Pagination }> {
   const searchParams = new URLSearchParams({ page: String(params.page), view: params.view });
+  if (params.sortBy) searchParams.set("sortBy", params.sortBy);
+  if (params.sortDir) searchParams.set("sortDir", params.sortDir);
 
   const res = await fetch(`/api/admin/sales?${searchParams.toString()}`);
   const json = await res.json();
@@ -66,15 +94,26 @@ export function SalesClient({
   const [page, setPage] = useState(1);
   const [view, setView] = useState<"active" | "trash">("active");
   const [layout, setLayout] = useState<"table" | "card">("table");
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [formOpen, setFormOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<SaleRow | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const isDefaultQuery = page === 1 && view === "active";
+  const isDefaultQuery = page === 1 && view === "active" && sortBy === "createdAt" && sortDir === "desc";
+
+  function toggleSort(field: string) {
+    if (sortBy === field) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(field);
+      setSortDir("asc");
+    }
+  }
 
   const { data } = useQuery({
-    queryKey: ["admin", "sales", { page, view }],
-    queryFn: () => fetchSales({ page, view }),
+    queryKey: ["admin", "sales", { page, view, sortBy, sortDir }],
+    queryFn: () => fetchSales({ page, view, sortBy, sortDir }),
     initialData: isDefaultQuery
       ? { sales: initialSales, pagination: initialPagination }
       : undefined,
@@ -234,11 +273,27 @@ export function SalesClient({
         <table className="w-full min-w-[760px] text-sm whitespace-nowrap">
           <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
-              <th className="px-4 py-3">Bill #</th>
-              <th className="px-4 py-3">Customer</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("billNumber")}>
+                  Bill # <SortIcon field="billNumber" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("customerName")}>
+                  Customer <SortIcon field="customerName" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3">Product</th>
-              <th className="px-4 py-3">Total</th>
-              <th className="px-4 py-3">Sale Date</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("totalAmount")}>
+                  Total <SortIcon field="totalAmount" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("saleDate")}>
+                  Sale Date <SortIcon field="saleDate" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>

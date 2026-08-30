@@ -13,8 +13,11 @@ const SORTABLE_FIELDS = new Set([
   "name",
   "sku",
   "rentalPricePerDay",
+  "retailValue",
+  "status",
   "createdAt",
   "updatedAt",
+  "deletedAt",
 ]);
 
 export async function GET(request: NextRequest): Promise<Response> {

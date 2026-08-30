@@ -86,7 +86,7 @@ export default function TermsPage() {
         <section>
           <h2 className="font-heading text-xl">8. Governing Law</h2>
           <p className="mt-3">
-            These terms are governed by the laws of India, with courts in Mumbai, Maharashtra
+            These terms are governed by the laws of India, with courts in Phalodi, Rajasthan
             having exclusive jurisdiction.
           </p>
         </section>

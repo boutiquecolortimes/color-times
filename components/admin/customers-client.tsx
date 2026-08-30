@@ -41,12 +41,32 @@ import { AdminPagination } from "@/components/admin/admin-pagination";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 import { formatDate, isWalkinEmail } from "@/lib/utils";
 
+interface CustomerAddress {
+  label: string;
+  line1: string;
+  line2?: string;
+  city: string;
+  state: string;
+  postalCode: string;
+}
+
 interface CustomerRow {
   _id: string;
   name: string;
   email: string;
   phone: string | null;
+  addresses?: CustomerAddress[];
   createdAt: string;
+}
+
+function formatAddress(addresses: CustomerAddress[] | undefined): string {
+  const address = addresses?.[0];
+  if (!address) return "—";
+  return (
+    [address.line1, address.line2, address.city, address.state, address.postalCode]
+      .filter(Boolean)
+      .join(", ") || "—"
+  );
 }
 
 interface Pagination {
@@ -140,7 +160,7 @@ export function CustomersClient({
     queryClient.invalidateQueries({ queryKey: ["admin", "customers"] });
   }
 
-  const exportHeaders = ["Sr No", "Name", "Email", "Phone", "Joined"];
+  const exportHeaders = ["Sr No", "Name", "Email", "Phone", "Address", "Joined"];
 
   function customersToRows(rows: CustomerRow[]): (string | number)[][] {
     return rows.map((customer, index) => [
@@ -148,6 +168,7 @@ export function CustomersClient({
       customer.name,
       isWalkinEmail(customer.email) ? "—" : customer.email,
       customer.phone ?? "—",
+      formatAddress(customer.addresses),
       formatDate(customer.createdAt),
     ]);
   }
@@ -313,6 +334,7 @@ export function CustomersClient({
             {isWalkinEmail(customer.email) ? "—" : customer.email}
           </p>
           <p className="text-sm text-muted-foreground">{customer.phone ?? "—"}</p>
+          <p className="text-sm text-muted-foreground">{formatAddress(customer.addresses)}</p>
           <p className="mt-1 text-xs text-muted-foreground">
             Joined {formatDate(customer.createdAt)}
           </p>
@@ -519,7 +541,12 @@ export function CustomersClient({
                   Email <SortIcon field="email" sortBy={sortBy} sortDir={sortDir} />
                 </button>
               </th>
-              <th className="px-4 py-3">Phone</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("phone")}>
+                  Phone <SortIcon field="phone" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">Address</th>
               <th className="px-4 py-3">
                 <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("createdAt")}>
                   Joined <SortIcon field="createdAt" sortBy={sortBy} sortDir={sortDir} />
@@ -546,6 +573,7 @@ export function CustomersClient({
                   {isWalkinEmail(customer.email) ? "—" : customer.email}
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{customer.phone ?? "—"}</td>
+                <td className="px-4 py-3 text-muted-foreground">{formatAddress(customer.addresses)}</td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {formatDate(customer.createdAt)}
                 </td>
@@ -603,7 +631,7 @@ export function CustomersClient({
             ))}
             {customers.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
                   {trashView === "trash" ? "Trash is empty." : "No customers found."}
                 </td>
               </tr>

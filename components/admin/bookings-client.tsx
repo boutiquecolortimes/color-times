@@ -124,9 +124,9 @@ interface Pagination {
 }
 
 // The bookings list is categorized by lifecycle stage instead of a plain
-// status dropdown — "New" collapses inquiry + pending_payment (nothing's
-// confirmed yet), the rest map 1:1 to a stored status value. Cancelled
-// bookings live under "All" only, same as before.
+// status dropdown — "New" collapses inquiry + any legacy pending_payment
+// booking (nothing's confirmed yet), the rest map 1:1 to a stored status
+// value. Cancelled bookings live under "All" only, same as before.
 const STATUS_TABS: { value: string; label: string; countKey: keyof StatusCounts }[] = [
   { value: "all", label: "All", countKey: "all" },
   { value: "new", label: "New Booking", countKey: "new" },
@@ -136,9 +136,13 @@ const STATUS_TABS: { value: string; label: string; countKey: keyof StatusCounts 
   { value: "cancelled", label: "Cancelled", countKey: "cancelled" },
 ];
 
+// "pending_payment" is dropped from the picker — it was never set
+// automatically anywhere (booking creation defaults to "inquiry", and
+// confirming goes straight to "confirmed" via the Confirm dialog), so it
+// was just a confusing extra option. Still recognized by the schema/badge
+// for any pre-existing booking that has it.
 const STATUS_OPTIONS: BookingStatus[] = [
   "inquiry",
-  "pending_payment",
   "confirmed",
   "in_use",
   "returned",
@@ -196,8 +200,11 @@ export function BookingsClient({
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState("createdAt");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  // Default to soonest-upcoming rental first (not newest-created) — a
+  // handful of bookings starting tomorrow matter more at a glance than
+  // whichever was entered into the system most recently.
+  const [sortBy, setSortBy] = useState("rentalStartDate");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [view, setView] = useState<"table" | "card" | "calendar">("table");
   const [trashView, setTrashView] = useState<"active" | "trash">("active");
   const [returnDialogBookingId, setReturnDialogBookingId] = useState<string | null>(null);
@@ -213,8 +220,8 @@ export function BookingsClient({
     from === "" &&
     to === "" &&
     search === "" &&
-    sortBy === "createdAt" &&
-    sortDir === "desc" &&
+    sortBy === "rentalStartDate" &&
+    sortDir === "asc" &&
     trashView === "active";
 
   function toggleSort(field: string) {
@@ -789,8 +796,24 @@ export function BookingsClient({
               <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3">Sr No</th>
-                  <th className="px-4 py-3">Booking #</th>
-                  <th className="px-4 py-3">Bill #</th>
+                  <th className="px-4 py-3">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-foreground"
+                      onClick={() => toggleSort("bookingNumber")}
+                    >
+                      Booking # <SortIcon field="bookingNumber" sortBy={sortBy} sortDir={sortDir} />
+                    </button>
+                  </th>
+                  <th className="px-4 py-3">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-foreground"
+                      onClick={() => toggleSort("billNumber")}
+                    >
+                      Bill # <SortIcon field="billNumber" sortBy={sortBy} sortDir={sortDir} />
+                    </button>
+                  </th>
                   <th className="px-4 py-3">
                     <button
                       type="button"
@@ -802,7 +825,15 @@ export function BookingsClient({
                   </th>
                   <th className="px-4 py-3">Customer</th>
                   <th className="px-4 py-3">Product</th>
-                  <th className="px-4 py-3">Rental Dates</th>
+                  <th className="px-4 py-3">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-foreground"
+                      onClick={() => toggleSort("rentalStartDate")}
+                    >
+                      Rental Dates <SortIcon field="rentalStartDate" sortBy={sortBy} sortDir={sortDir} />
+                    </button>
+                  </th>
                   <th className="px-4 py-3">
                     <button
                       type="button"
@@ -812,7 +843,15 @@ export function BookingsClient({
                       Total <SortIcon field="totalAmount" sortBy={sortBy} sortDir={sortDir} />
                     </button>
                   </th>
-                  <th className="px-4 py-3">Security</th>
+                  <th className="px-4 py-3">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-foreground"
+                      onClick={() => toggleSort("securityDeposit")}
+                    >
+                      Security <SortIcon field="securityDeposit" sortBy={sortBy} sortDir={sortDir} />
+                    </button>
+                  </th>
                   <th className="px-4 py-3">
                     <button
                       type="button"
@@ -1028,6 +1067,7 @@ export function BookingsClient({
           summary={{
             totalAmount: confirmDialogBooking.totalAmount,
             advancePaid: confirmDialogBooking.advancePaid,
+            securityDeposit: confirmDialogBooking.securityDeposit,
           }}
           open={confirmDialogBooking !== null}
           onOpenChange={(open) => !open && setConfirmDialogBooking(null)}

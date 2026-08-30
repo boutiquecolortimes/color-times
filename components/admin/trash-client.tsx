@@ -4,6 +4,9 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   CalendarCheck,
   FileText,
   FolderTree,
@@ -64,6 +67,23 @@ interface EntityConfig {
   permanentPath: (id: string) => string;
   restorePath: (id: string) => string;
   mapRow: (raw: Record<string, unknown>) => TrashRow;
+  // Backend field the "Name" column sorts by. Undefined when the display
+  // name comes from a populated/joined document (e.g. salary payments show
+  // the linked staff member's name), which the list API can't sort on.
+  primarySortField?: string;
+}
+
+function SortIcon({
+  field,
+  sortBy,
+  sortDir,
+}: {
+  field: string;
+  sortBy: string;
+  sortDir: "asc" | "desc";
+}) {
+  if (sortBy !== field) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
+  return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
 }
 
 function asString(value: unknown): string | undefined {
@@ -103,6 +123,7 @@ const ENTITIES: EntityConfig[] = [
     bulkPath: "/api/admin/products/bulk",
     permanentPath: (id) => `/api/admin/products/${id}/permanent`,
     restorePath: (id) => `/api/admin/products/${id}/restore`,
+    primarySortField: "name",
     mapRow: (raw) => ({
       id: String(raw._id),
       primary: asString(raw.name) ?? "Untitled product",
@@ -121,6 +142,7 @@ const ENTITIES: EntityConfig[] = [
     bulkPath: "/api/admin/categories/bulk",
     permanentPath: (id) => `/api/admin/categories/${id}/permanent`,
     restorePath: (id) => `/api/admin/categories/${id}/restore`,
+    primarySortField: "name",
     mapRow: (raw) => ({
       id: String(raw._id),
       primary: asString(raw.name) ?? "Untitled category",
@@ -138,6 +160,7 @@ const ENTITIES: EntityConfig[] = [
     bulkPath: "/api/admin/bookings/bulk",
     permanentPath: (id) => `/api/admin/bookings/${id}/permanent`,
     restorePath: (id) => `/api/admin/bookings/${id}/restore`,
+    primarySortField: "bookingNumber",
     mapRow: (raw) => ({
       id: String(raw._id),
       primary: asString(raw.bookingNumber) ?? "Untitled booking",
@@ -156,6 +179,7 @@ const ENTITIES: EntityConfig[] = [
     bulkPath: "/api/admin/customers/bulk",
     permanentPath: (id) => `/api/admin/customers/${id}/permanent`,
     restorePath: (id) => `/api/admin/customers/${id}/restore`,
+    primarySortField: "name",
     mapRow: (raw) => ({
       id: String(raw._id),
       primary: asString(raw.name) ?? "Untitled customer",
@@ -174,6 +198,7 @@ const ENTITIES: EntityConfig[] = [
     bulkPath: "/api/admin/invoices/bulk",
     permanentPath: (id) => `/api/admin/invoices/${id}/permanent`,
     restorePath: (id) => `/api/admin/invoices/${id}/restore`,
+    primarySortField: "invoiceNumber",
     mapRow: (raw) => ({
       id: String(raw._id),
       primary: asString(raw.invoiceNumber) ?? "Untitled invoice",
@@ -192,6 +217,7 @@ const ENTITIES: EntityConfig[] = [
     bulkPath: "/api/admin/staff/bulk",
     permanentPath: (id) => `/api/admin/staff/${id}/permanent`,
     restorePath: (id) => `/api/admin/staff/${id}/restore`,
+    primarySortField: "name",
     mapRow: (raw) => ({
       id: String(raw._id),
       primary: asString(raw.name) ?? "Untitled staff member",
@@ -228,6 +254,7 @@ const ENTITIES: EntityConfig[] = [
     bulkPath: "/api/admin/purchases/bulk",
     permanentPath: (id) => `/api/admin/purchases/${id}/permanent`,
     restorePath: (id) => `/api/admin/purchases/${id}/restore`,
+    primarySortField: "itemName",
     mapRow: (raw) => ({
       id: String(raw._id),
       primary: asString(raw.itemName) ?? "Untitled purchase",
@@ -246,6 +273,7 @@ const ENTITIES: EntityConfig[] = [
     bulkPath: "/api/admin/expenses/bulk",
     permanentPath: (id) => `/api/admin/expenses/${id}/permanent`,
     restorePath: (id) => `/api/admin/expenses/${id}/restore`,
+    primarySortField: "description",
     mapRow: (raw) => ({
       id: String(raw._id),
       primary: asString(raw.description) ?? "Untitled expense",
@@ -257,7 +285,7 @@ const ENTITIES: EntityConfig[] = [
 
 async function fetchTrash(
   entity: EntityConfig,
-  params: { page: number; search: string }
+  params: { page: number; search: string; sortBy?: string; sortDir?: "asc" | "desc" }
 ): Promise<{ rows: TrashRow[]; pagination: Pagination }> {
   const searchParams = new URLSearchParams({
     page: String(params.page),
@@ -265,6 +293,8 @@ async function fetchTrash(
     [entity.listParam]: "trash",
   });
   if (params.search) searchParams.set("search", params.search);
+  if (params.sortBy) searchParams.set("sortBy", params.sortBy);
+  if (params.sortDir) searchParams.set("sortDir", params.sortDir);
 
   const res = await fetch(`${entity.listPath}?${searchParams.toString()}`);
   const json = await res.json();
@@ -317,10 +347,22 @@ function EntityTrashPanel({ entity }: { entity: EntityConfig }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmAction, setConfirmAction] = useState<"restore" | "permanent-delete" | null>(null);
   const [emptyTrashConfirm, setEmptyTrashConfirm] = useState(false);
+  const [sortBy, setSortBy] = useState("deletedAt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  function toggleSort(field: string) {
+    if (sortBy === field) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(field);
+      setSortDir("asc");
+    }
+    setPage(1);
+  }
 
   const { data, isFetching } = useQuery({
-    queryKey: ["admin", "trash", entity.key, { page, search }],
-    queryFn: () => fetchTrash(entity, { page, search }),
+    queryKey: ["admin", "trash", entity.key, { page, search, sortBy, sortDir }],
+    queryFn: () => fetchTrash(entity, { page, search, sortBy, sortDir }),
   });
 
   const rows = data?.rows ?? [];
@@ -497,8 +539,24 @@ function EntityTrashPanel({ entity }: { entity: EntityConfig }) {
                   aria-label="Select all"
                 />
               </th>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Trashed on</th>
+              <th className="px-4 py-3">
+                {entity.primarySortField ? (
+                  <button
+                    type="button"
+                    className="flex items-center gap-1 hover:text-foreground"
+                    onClick={() => toggleSort(entity.primarySortField as string)}
+                  >
+                    Name <SortIcon field={entity.primarySortField} sortBy={sortBy} sortDir={sortDir} />
+                  </button>
+                ) : (
+                  "Name"
+                )}
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("deletedAt")}>
+                  Trashed on <SortIcon field="deletedAt" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>

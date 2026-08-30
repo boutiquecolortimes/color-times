@@ -5,7 +5,20 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Copy, Grid3x3, KeyRound, List, Loader2, Pencil, Plus, ShieldOff, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Copy,
+  Grid3x3,
+  KeyRound,
+  List,
+  Loader2,
+  Pencil,
+  Plus,
+  ShieldOff,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
@@ -63,6 +76,19 @@ async function fetchUsers(): Promise<StaffUser[]> {
   const json = await res.json();
   if (!res.ok) throw new Error(json.error);
   return json.data.users;
+}
+
+function SortIcon({
+  field,
+  sortBy,
+  sortDir,
+}: {
+  field: string;
+  sortBy: string;
+  sortDir: "asc" | "desc";
+}) {
+  if (sortBy !== field) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
+  return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
 }
 
 function TemporaryPasswordDialog({
@@ -123,6 +149,8 @@ export function UsersClient({
   const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
   const [layout, setLayout] = useState<"table" | "card">("table");
   const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState<keyof StaffUser>("createdAt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const { data: users = initialUsers } = useQuery({
     queryKey: ["admin", "users"],
@@ -130,11 +158,31 @@ export function UsersClient({
     initialData: initialUsers,
   });
 
-  // Team rosters are small and fetched in one shot — paginate on the
-  // client instead of round-tripping to the server for each page.
-  const totalPages = Math.max(1, Math.ceil(users.length / PAGE_SIZE));
+  function toggleSort(field: keyof StaffUser) {
+    if (sortBy === field) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(field);
+      setSortDir("asc");
+    }
+  }
+
+  // Team rosters are small and fetched in one shot — sort and paginate on
+  // the client instead of round-tripping to the server for each page/sort.
+  const sortedUsers = [...users].sort((a, b) => {
+    const aValue = a[sortBy];
+    const bValue = b[sortBy];
+    let comparison = 0;
+    if (typeof aValue === "boolean" || typeof bValue === "boolean") {
+      comparison = Number(aValue) - Number(bValue);
+    } else {
+      comparison = String(aValue ?? "").localeCompare(String(bValue ?? ""));
+    }
+    return sortDir === "asc" ? comparison : -comparison;
+  });
+  const totalPages = Math.max(1, Math.ceil(sortedUsers.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const pagedUsers = users.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const pagedUsers = sortedUsers.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const canAssignPrivilegedRoles = currentUserRole === "super_admin";
   const roleOptions = canAssignPrivilegedRoles
@@ -364,12 +412,36 @@ export function UsersClient({
         <table className="w-full min-w-[640px] text-sm whitespace-nowrap">
           <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Phone</th>
-              <th className="px-4 py-3">Role</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Joined</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("name")}>
+                  Name <SortIcon field="name" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("email")}>
+                  Email <SortIcon field="email" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("phone")}>
+                  Phone <SortIcon field="phone" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("role")}>
+                  Role <SortIcon field="role" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("isActive")}>
+                  Status <SortIcon field="isActive" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("createdAt")}>
+                  Joined <SortIcon field="createdAt" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>

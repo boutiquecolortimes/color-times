@@ -27,11 +27,13 @@ import {
 import { formatDate, isWalkinEmail } from "@/lib/utils";
 import type { BookingStatus, ReturnCondition } from "@/models/Booking";
 
-const REMINDABLE_STATUSES: BookingStatus[] = ["inquiry", "pending_payment", "confirmed", "in_use"];
+const REMINDABLE_STATUSES: BookingStatus[] = ["inquiry", "confirmed", "in_use"];
 
+// "pending_payment" is dropped from the picker — it was never set
+// automatically anywhere and just added a confusing extra option. Still
+// recognized by the schema/badge for any pre-existing booking that has it.
 const STATUS_OPTIONS: BookingStatus[] = [
   "inquiry",
-  "pending_payment",
   "confirmed",
   "in_use",
   "returned",
@@ -494,7 +496,11 @@ export function BookingDetailClient({
 
       <ConfirmBookingDialog
         bookingId={booking._id}
-        summary={{ totalAmount: booking.totalAmount, advancePaid: booking.advancePaid ?? 0 }}
+        summary={{
+          totalAmount: booking.totalAmount,
+          advancePaid: booking.advancePaid ?? 0,
+          securityDeposit: booking.securityDeposit,
+        }}
         open={confirmDialogOpen}
         onOpenChange={setConfirmDialogOpen}
       />

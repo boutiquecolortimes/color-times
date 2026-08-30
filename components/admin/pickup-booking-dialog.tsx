@@ -78,15 +78,16 @@ export function PickupBookingDialog({
         body: JSON.stringify({ bookingId }),
       });
       const invoiceJson = await invoiceRes.json();
-      if (!invoiceRes.ok) {
-        // Booking is already marked picked-up at this point — an existing
-        // invoice (e.g. generated earlier at Confirm) shouldn't block that.
-        if (invoiceRes.status === 409) return { invoice: null };
-        throw new Error(invoiceJson.error);
-      }
-      return { invoice: invoiceJson.data.invoice as { _id: string } };
+      if (!invoiceRes.ok) throw new Error(invoiceJson.error);
+      // 201 = a brand-new invoice; 200 = an existing one (e.g. generated
+      // earlier at Confirm, when nothing had been paid yet) was just
+      // resynced to include the payment just collected here.
+      return {
+        invoice: invoiceJson.data.invoice as { _id: string },
+        created: invoiceRes.status === 201,
+      };
     },
-    onSuccess: ({ invoice }) => {
+    onSuccess: ({ invoice, created }) => {
       queryClient.invalidateQueries({ queryKey: ["admin", "bookings"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "booking", bookingId] });
       queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
@@ -94,12 +95,8 @@ export function PickupBookingDialog({
       setPaymentAmount(dueAmount);
       setSecurityDepositOverride(null);
       onOpenChange(false);
-      if (invoice) {
-        toast.success("Booking picked up and invoice generated");
-        router.push(`/admin/invoices/${invoice._id}`);
-      } else {
-        toast.success("Booking marked as picked up");
-      }
+      toast.success(created ? "Booking picked up and invoice generated" : "Booking picked up and invoice updated");
+      router.push(`/admin/invoices/${invoice._id}`);
     },
     onError: (error: Error) => toast.error(error.message),
   });

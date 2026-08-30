@@ -25,9 +25,12 @@ export async function GET(request: NextRequest): Promise<Response> {
   const SORTABLE_FIELDS: Record<string, string> = {
     itemName: "itemName",
     vendorName: "vendorName",
+    quantity: "quantity",
     totalCost: "totalCost",
     purchaseDate: "purchaseDate",
+    paymentStatus: "paymentStatus",
     createdAt: "createdAt",
+    deletedAt: "deletedAt",
   };
   const sort = sortBy && SORTABLE_FIELDS[sortBy]
     ? { [SORTABLE_FIELDS[sortBy]]: sortDir as 1 | -1 }

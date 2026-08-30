@@ -484,14 +484,26 @@ function StaffTable({
                   Name <SortIcon field="name" sortBy={sortBy} sortDir={sortDir} />
                 </button>
               </th>
-              <th className="px-4 py-3">Designation</th>
-              <th className="px-4 py-3">Phone</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("designation")}>
+                  Designation <SortIcon field="designation" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("phone")}>
+                  Phone <SortIcon field="phone" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3">
                 <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("monthlySalary")}>
                   Monthly Salary <SortIcon field="monthlySalary" sortBy={sortBy} sortDir={sortDir} />
                 </button>
               </th>
-              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("isActive")}>
+                  Status <SortIcon field="isActive" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
@@ -808,15 +820,26 @@ function SalaryPaymentsTable() {
   const [editing, setEditing] = useState<SalaryPaymentRow | null>(null);
   const [status, setStatus] = useState<"active" | "trash">("active");
   const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState("paymentDate");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [deleteTarget, setDeleteTarget] = useState<SalaryPaymentRow | null>(null);
   const [permanentDeleteTarget, setPermanentDeleteTarget] = useState<SalaryPaymentRow | null>(null);
   const [bulkConfirmAction, setBulkConfirmAction] = useState<"delete" | "permanent-delete" | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isExporting, setIsExporting] = useState(false);
 
+  function toggleSort(field: string) {
+    if (sortBy === field) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(field);
+      setSortDir("asc");
+    }
+  }
+
   const { data } = useQuery({
-    queryKey: ["admin", "salary-payments", { status, page }],
-    queryFn: () => fetchSalaryPayments({ status, page }),
+    queryKey: ["admin", "salary-payments", { status, page, sortBy, sortDir }],
+    queryFn: () => fetchSalaryPayments({ status, page, sortBy, sortDir }),
   });
 
   const { data: staffOptions = [] } = useQuery({
@@ -1030,7 +1053,7 @@ function SalaryPaymentsTable() {
               <DropdownMenuItem
                 onClick={() =>
                   withExportGuard(async () => {
-                    const result = await fetchSalaryPayments({ status, page: 1, all: true });
+                    const result = await fetchSalaryPayments({ status, page: 1, sortBy, sortDir, all: true });
                     await downloadExcel("salary-payments", "Salary Payments", exportHeaders, paymentsToRows(result.payments));
                   })
                 }
@@ -1041,7 +1064,7 @@ function SalaryPaymentsTable() {
               <DropdownMenuItem
                 onClick={() =>
                   withExportGuard(async () => {
-                    const result = await fetchSalaryPayments({ status, page: 1, all: true });
+                    const result = await fetchSalaryPayments({ status, page: 1, sortBy, sortDir, all: true });
                     await downloadPdf("salary-payments", "Salary Payments", exportHeaders, paymentsToRows(result.payments));
                   })
                 }
@@ -1120,10 +1143,26 @@ function SalaryPaymentsTable() {
                 />
               </th>
               <th className="px-4 py-3">Staff</th>
-              <th className="px-4 py-3">For Month</th>
-              <th className="px-4 py-3">Amount</th>
-              <th className="px-4 py-3">Payment Date</th>
-              <th className="px-4 py-3">Method</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("forMonth")}>
+                  For Month <SortIcon field="forMonth" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("amount")}>
+                  Amount <SortIcon field="amount" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("paymentDate")}>
+                  Payment Date <SortIcon field="paymentDate" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("paymentMethod")}>
+                  Method <SortIcon field="paymentMethod" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>

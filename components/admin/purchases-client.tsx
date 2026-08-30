@@ -525,9 +525,17 @@ export function PurchasesClient({
                   Item <SortIcon field="itemName" sortBy={sortBy} sortDir={sortDir} />
                 </button>
               </th>
-              <th className="px-4 py-3">Vendor</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("vendorName")}>
+                  Vendor <SortIcon field="vendorName" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3">Linked Dress</th>
-              <th className="px-4 py-3">Qty</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("quantity")}>
+                  Qty <SortIcon field="quantity" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3">
                 <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("totalCost")}>
                   Total Cost <SortIcon field="totalCost" sortBy={sortBy} sortDir={sortDir} />
@@ -538,7 +546,11 @@ export function PurchasesClient({
                   Date <SortIcon field="purchaseDate" sortBy={sortBy} sortDir={sortDir} />
                 </button>
               </th>
-              <th className="px-4 py-3">Payment</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("paymentStatus")}>
+                  Payment <SortIcon field="paymentStatus" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>

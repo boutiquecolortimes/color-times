@@ -52,9 +52,6 @@ export async function POST(request: NextRequest): Promise<Response> {
       deletedAt: null,
       status: { $ne: "cancelled" },
     }).lean();
-    if (existing) {
-      return apiError("This booking already has an active invoice", 409);
-    }
 
     const isReturned = booking.status === "returned";
     const dateRange = `${formatDate(booking.rentalStartDate)} to ${formatDate(booking.rentalEndDate)}`;
@@ -88,6 +85,74 @@ export async function POST(request: NextRequest): Promise<Response> {
     // advance and whatever portion of the deposit was applied.
     const depositRefundAmount = isReturned ? (booking.depositRefundAmount ?? 0) : 0;
     const depositApplied = isReturned ? Math.max(0, booking.securityDeposit - depositRefundAmount) : 0;
+
+    if (existing) {
+      // A booking generates/refreshes its invoice at more than one lifecycle
+      // stage (Confirm, Pickup, Return) — this used to hard-fail with a 409
+      // the second time around, leaving whatever was collected later (a
+      // payment at pickup, damage charges + settlement at return) never
+      // reflected on the invoice already created back at Confirm. Instead of
+      // failing, bring the same invoice in line with the booking's current
+      // state and hand it back, so calling this is safe at every stage.
+      if (existing.status === "paid" || existing.status === "cancelled") {
+        return apiSuccess({ invoice: existing });
+      }
+
+      const discountAmount = Math.min(existing.discountAmount ?? 0, subtotal);
+      const taxableAmount = subtotal - discountAmount;
+      const taxAmount = ((existing.taxRate ?? 0) * taxableAmount) / 100;
+      const total =
+        (isReturned ? subtotal : subtotal + booking.securityDeposit) - discountAmount + taxAmount;
+
+      const computedPaid = isReturned
+        ? Math.min(total, Math.max(0, advancePaid + depositApplied))
+        : Math.min(total, advancePaid);
+      // Never move amountPaid backwards — staff may have recorded additional
+      // manual payments directly on the invoice beyond what the booking tracks.
+      const amountPaid = Math.max(existing.amountPaid, computedPaid);
+      const amountDue = Math.max(0, total - amountPaid);
+      const status = amountDue === 0 ? "paid" : existing.status;
+
+      const updated = await Invoice.findByIdAndUpdate(
+        existing._id,
+        {
+          lineItems,
+          subtotal,
+          securityDeposit: booking.securityDeposit,
+          depositRefunded: isReturned ? Boolean(booking.depositRefunded) : existing.depositRefunded,
+          total,
+          amountPaid,
+          amountDue,
+          status,
+          notes: isReturned
+            ? `Auto-generated from booking ${booking.bookingNumber} — settled after return`
+            : existing.notes,
+        },
+        { returnDocument: "after" }
+      );
+
+      if (
+        amountPaid !== existing.amountPaid ||
+        total !== existing.total ||
+        status !== existing.status
+      ) {
+        await recordAuditLog({
+          entityType: "Invoice",
+          entityId: String(existing._id),
+          action: "update",
+          actor: auth.user,
+          changes: [
+            { field: "total", from: existing.total, to: total },
+            { field: "amountPaid", from: existing.amountPaid, to: amountPaid },
+            { field: "status", from: existing.status, to: status },
+          ],
+          metadata: { syncedFromBooking: booking.bookingNumber },
+        });
+      }
+
+      return apiSuccess({ invoice: updated });
+    }
+
     const total = isReturned ? subtotal : subtotal + booking.securityDeposit;
     // Not-yet-returned invoices (generated at Confirm or Pickup time) used
     // to hardcode this to 0, which ignored any advance/pickup payment

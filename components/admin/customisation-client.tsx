@@ -444,13 +444,21 @@ export function CustomisationClient({
                   Customer <SortIcon field="customerName" sortBy={sortBy} sortDir={sortDir} />
                 </button>
               </th>
-              <th className="px-4 py-3">Stitching Type</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("stitchingType")}>
+                  Stitching Type <SortIcon field="stitchingType" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3">
                 <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("totalAmount")}>
                   Total <SortIcon field="totalAmount" sortBy={sortBy} sortDir={sortDir} />
                 </button>
               </th>
-              <th className="px-4 py-3">Advance</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("advancePayment")}>
+                  Advance <SortIcon field="advancePayment" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3">
                 <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("dueAmount")}>
                   Due <SortIcon field="dueAmount" sortBy={sortBy} sortDir={sortDir} />
@@ -461,7 +469,11 @@ export function CustomisationClient({
                   Order Date <SortIcon field="orderDate" sortBy={sortBy} sortDir={sortDir} />
                 </button>
               </th>
-              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("status")}>
+                  Status <SortIcon field="status" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>

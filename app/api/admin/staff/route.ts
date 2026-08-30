@@ -22,9 +22,13 @@ export async function GET(request: NextRequest): Promise<Response> {
   const sortDir = searchParams.get("sortDir") === "desc" ? -1 : 1;
   const SORTABLE_FIELDS: Record<string, string> = {
     name: "name",
+    designation: "designation",
+    phone: "phone",
     monthlySalary: "monthlySalary",
     joiningDate: "joiningDate",
+    isActive: "isActive",
     createdAt: "createdAt",
+    deletedAt: "deletedAt",
   };
   const sort = sortBy && SORTABLE_FIELDS[sortBy]
     ? { [SORTABLE_FIELDS[sortBy]]: sortDir as 1 | -1 }

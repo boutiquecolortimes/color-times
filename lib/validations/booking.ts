@@ -9,6 +9,15 @@ export const bookingStatusSchema = z.object({
   // is computed against this value instead of always trusting whatever was
   // recorded back when the booking was first created.
   securityDeposit: z.number().min(0).optional(),
+  // Lets staff correct the rental-fee portion (separate from the security
+  // deposit) at the moment a booking is confirmed — the figure entered when
+  // the booking was first noted down (often a phone inquiry) may not match
+  // what's actually being charged once it's confirmed.
+  rentAmount: z.number().min(0).optional(),
+  // Direct override of the advance actually collected, sent at Confirm time.
+  // Distinct from pickupPaymentAmount below, which adds to whatever advance
+  // is already on file instead of replacing it.
+  advancePaid: z.number().min(0).optional(),
   returnCondition: z.enum(["good", "minor_damage", "major_damage", "missing_items"]).optional(),
   returnNotes: z.string().trim().max(2000).optional().or(z.literal("")),
   dryCleaningRequired: z.boolean().optional(),

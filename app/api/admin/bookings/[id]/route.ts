@@ -98,7 +98,41 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
     }
 
     const update: Record<string, unknown> = { status: input.status };
-    if (input.status === "returned") {
+    if (input.status === "confirmed") {
+      // Same correction pattern as Pickup/Return below — the rent, security
+      // deposit, and advance entered when the booking was first noted down
+      // (often a phone inquiry) may not match what's actually being charged
+      // and collected now, so let staff correct all three right here before
+      // the invoice is generated.
+      const securityDeposit = input.securityDeposit ?? before.securityDeposit;
+      const currentRentTotal = before.totalAmount - before.securityDeposit;
+      const rentAmount = input.rentAmount ?? currentRentTotal;
+      update.securityDeposit = securityDeposit;
+      update.totalAmount = rentAmount + securityDeposit;
+      if (typeof input.advancePaid === "number") {
+        update.advancePaid = input.advancePaid;
+      }
+      // The invoice's line items are priced per booking item (rentalFee),
+      // not off the booking's aggregate total — so a corrected rent figure
+      // has to be spread across the items too, or it'd never make it onto
+      // the generated invoice. Preserve each item's relative share; if the
+      // original total was ₹0 (nothing to take a ratio from), put the whole
+      // corrected amount on the first item instead of dropping it.
+      if (typeof input.rentAmount === "number" && rentAmount !== currentRentTotal) {
+        if (currentRentTotal > 0) {
+          const scale = rentAmount / currentRentTotal;
+          update.items = before.items.map((item) => ({
+            ...item,
+            rentalFee: Math.round(item.rentalFee * scale),
+          }));
+        } else if (before.items.length > 0) {
+          update.items = before.items.map((item, index) => ({
+            ...item,
+            rentalFee: index === 0 ? rentAmount : 0,
+          }));
+        }
+      }
+    } else if (input.status === "returned") {
       update.returnedAt = new Date();
       if (input.returnCondition) update.returnCondition = input.returnCondition;
       if (input.returnNotes) update.returnNotes = input.returnNotes;
@@ -165,7 +199,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       statusChanges.push({ field: "status", from: before.status, to: input.status });
     }
     if (
-      (input.status === "returned" || input.status === "in_use") &&
+      (input.status === "confirmed" || input.status === "returned" || input.status === "in_use") &&
       typeof update.securityDeposit === "number" &&
       update.securityDeposit !== before.securityDeposit
     ) {
@@ -173,6 +207,28 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
         field: "securityDeposit",
         from: before.securityDeposit,
         to: update.securityDeposit,
+      });
+    }
+    if (
+      input.status === "confirmed" &&
+      typeof update.totalAmount === "number" &&
+      update.totalAmount !== before.totalAmount
+    ) {
+      statusChanges.push({
+        field: "totalAmount",
+        from: before.totalAmount,
+        to: update.totalAmount,
+      });
+    }
+    if (
+      input.status === "confirmed" &&
+      typeof update.advancePaid === "number" &&
+      update.advancePaid !== (before.advancePaid ?? 0)
+    ) {
+      statusChanges.push({
+        field: "advancePaid",
+        from: before.advancePaid ?? 0,
+        to: update.advancePaid,
       });
     }
     if (statusChanges.length > 0) {

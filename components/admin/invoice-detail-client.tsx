@@ -11,6 +11,7 @@ import { InvoicePaymentDialog } from "@/components/admin/invoice-payment-dialog"
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AuditLogList } from "@/components/admin/audit-log-list";
 import { downloadInvoicePdf } from "@/lib/admin/invoice-pdf";
+import { getInvoiceDueBreakdown } from "@/lib/admin/invoice-totals";
 import { formatDate, isWalkinEmail } from "@/lib/utils";
 import type { InvoiceLineItem, InvoiceStatus, PaymentMethod } from "@/models/Invoice";
 
@@ -103,6 +104,12 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
     queryFn: () => fetchInvoice(initialInvoice._id),
     initialData: initialInvoice,
   });
+
+  // The security deposit is usually collected and held separately from
+  // what's logged as an invoice payment, so a single "Due" figure that
+  // includes it reads as if the deposit is still owed even once it's
+  // sitting in hand. Split it out so rent and deposit show separately.
+  const due = getInvoiceDueBreakdown(invoice);
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["admin", "invoice", initialInvoice._id] });
@@ -290,7 +297,15 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
                   <span className="text-muted-foreground">Security Deposit</span>
                   <span>
                     {formatCurrency(invoice.securityDeposit)}
-                    {invoice.depositRefunded && " (refunded)"}
+                    {invoice.depositRefunded
+                      ? " (refunded)"
+                      : invoice.securityDeposit <= 0
+                        ? ""
+                        : due.securityDue <= 0
+                          ? " (held)"
+                          : due.securityDue < due.securityInTotal
+                            ? ` (${formatCurrency(due.securityDue)} due)`
+                            : " (due)"}
                   </span>
                 </p>
                 <p className="flex justify-between font-medium">
@@ -302,9 +317,15 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
                   <span>{formatCurrency(invoice.amountPaid)}</span>
                 </p>
                 <p className="flex justify-between font-medium text-red-700">
-                  <span>Due</span>
-                  <span>{formatCurrency(invoice.amountDue)}</span>
+                  <span>Rent Due</span>
+                  <span>{formatCurrency(due.rentDue)}</span>
                 </p>
+                {due.securityDue > 0 && (
+                  <p className="flex justify-between font-medium text-amber-700">
+                    <span>Security Due</span>
+                    <span>{formatCurrency(due.securityDue)}</span>
+                  </p>
+                )}
               </div>
             </div>
           </div>

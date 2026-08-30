@@ -8,7 +8,7 @@ import { whyChooseUs } from "@/lib/data/home-content";
 export const metadata: Metadata = {
   title: "About Us",
   description:
-    "Color Times Boutique is Mumbai's premium designer dress rental house, making couture accessible for every celebration.",
+    "Color Times Boutique is Rajasthan's premium designer dress rental house, making couture accessible for every celebration.",
   alternates: { canonical: "/about" },
 };
 

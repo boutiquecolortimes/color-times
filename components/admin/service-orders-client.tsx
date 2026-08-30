@@ -569,7 +569,11 @@ export function ServiceOrdersClient({
                   Total <SortIcon field="totalAmount" sortBy={sortBy} sortDir={sortDir} />
                 </button>
               </th>
-              <th className="px-4 py-3">Assigned To</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("assignedTo")}>
+                  Assigned To <SortIcon field="assignedTo" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3">
                 <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("expectedReturnDate")}>
                   Expected Return <SortIcon field="expectedReturnDate" sortBy={sortBy} sortDir={sortDir} />

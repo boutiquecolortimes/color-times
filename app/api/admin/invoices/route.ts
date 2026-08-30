@@ -10,7 +10,7 @@ import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 
-const SORTABLE_FIELDS = new Set(["invoiceNumber", "total", "amountDue", "dueDate", "createdAt", "status"]);
+const SORTABLE_FIELDS = new Set(["invoiceNumber", "total", "amountDue", "amountPaid", "dueDate", "createdAt", "status", "deletedAt"]);
 
 export async function GET(request: NextRequest): Promise<Response> {
   const auth = await requireApiRole(ADMIN_ROLES);

@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { siteConfig } from "@/lib/config/site";
+import { getInvoiceDueBreakdown } from "@/lib/admin/invoice-totals";
 import { formatDate } from "@/lib/utils";
 import type { InvoiceLineItem, InvoiceStatus, PaymentMethod } from "@/models/Invoice";
 
@@ -108,6 +109,10 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData): Promise<void>
   const afterLineItemsY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
     .finalY;
 
+  // Security deposits are usually collected and held separately from what
+  // gets logged as an invoice payment, so "Amount Due" alone reads as if
+  // the deposit is still owed even once it's in hand. Split it out.
+  const due = getInvoiceDueBreakdown(invoice);
   const summaryLines = [
     ["Rent", formatCurrency(invoice.subtotal)],
     ["Discount", `-${formatCurrency(invoice.discountAmount)}`],
@@ -115,7 +120,8 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData): Promise<void>
     ["Security Deposit", formatCurrency(invoice.securityDeposit)],
     ["Total", formatCurrency(invoice.total)],
     ["Amount Paid", formatCurrency(invoice.amountPaid)],
-    ["Amount Due", formatCurrency(invoice.amountDue)],
+    ["Rent Due", formatCurrency(due.rentDue)],
+    ...(due.securityDue > 0 ? [["Security Due", formatCurrency(due.securityDue)]] : []),
   ];
 
   autoTable(doc, {

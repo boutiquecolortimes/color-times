@@ -21,7 +21,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   const all = searchParams.get("all") === "true";
   const sortBy = searchParams.get("sortBy");
   const sortDir = searchParams.get("sortDir") === "desc" ? -1 : 1;
-  const SORTABLE_FIELDS: Record<string, string> = { name: "name", slug: "slug", createdAt: "createdAt" };
+  const SORTABLE_FIELDS: Record<string, string> = { name: "name", slug: "slug", createdAt: "createdAt", deletedAt: "deletedAt" };
   const sort = sortBy && SORTABLE_FIELDS[sortBy]
     ? { [SORTABLE_FIELDS[sortBy]]: sortDir as 1 | -1 }
     : { displayOrder: 1 as const, name: 1 as const };

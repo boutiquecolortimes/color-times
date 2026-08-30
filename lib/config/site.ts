@@ -46,7 +46,7 @@ export const siteConfig = {
     phone: "+91 98765 43210",
     whatsapp: "+91 98765 43210",
     email: "hello@colortimesboutique.com",
-    address: "12 Fashion Street, Bandra West, Mumbai, Maharashtra 400050",
+    address: "Balaji Market, Main Pathar Road, Phalodi (Raj.) 342301",
   },
   social: {
     instagram: "https://www.instagram.com/color_times_boutique/",

@@ -12,7 +12,7 @@ export default async function AdminCustomersPage() {
 
   const [customers, total] = await Promise.all([
     User.find({ role: "customer", deletedAt: null })
-      .select("name email phone createdAt")
+      .select("name email phone addresses createdAt")
       .sort({ createdAt: -1 })
       .limit(PAGE_SIZE)
       .lean(),
@@ -24,6 +24,14 @@ export default async function AdminCustomersPage() {
     name: customer.name,
     email: customer.email,
     phone: customer.phone ?? null,
+    addresses: (customer.addresses ?? []).map((address) => ({
+      label: address.label,
+      line1: address.line1,
+      line2: address.line2,
+      city: address.city,
+      state: address.state,
+      postalCode: address.postalCode,
+    })),
     createdAt: customer.createdAt.toISOString(),
   }));
 

@@ -38,14 +38,20 @@ export interface IUser extends Document {
   updatedAt: Date;
 }
 
+// City/state/postal are intentionally not required — walk-in customers at
+// the counter are often jotted down with just a line1 address (a locality
+// or landmark), and the quick-add customer flows in the Booking and Sale
+// forms only ever collect that one line. Requiring the full breakdown here
+// meant those addresses were silently discarded on save (see the POST
+// handler in app/api/admin/customers/route.ts).
 const addressSchema = new Schema(
   {
     label: { type: String, required: true, trim: true },
-    line1: { type: String, required: true, trim: true },
+    line1: { type: String, trim: true, default: "" },
     line2: { type: String, trim: true },
-    city: { type: String, required: true, trim: true },
-    state: { type: String, required: true, trim: true },
-    postalCode: { type: String, required: true, trim: true },
+    city: { type: String, trim: true, default: "" },
+    state: { type: String, trim: true, default: "" },
+    postalCode: { type: String, trim: true, default: "" },
     isDefault: { type: Boolean, default: false },
   },
   { _id: false }

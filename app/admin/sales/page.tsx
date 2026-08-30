@@ -21,8 +21,12 @@ export default async function AdminSalesPage() {
       .limit(PAGE_SIZE)
       .lean(),
     Sale.countDocuments(activeFilter),
-    // A dress that's been sold outright is no longer available to sell again.
-    Product.find({ deletedAt: null, status: { $ne: "sold" } })
+    // Already sold outright, or currently out on an active rental (booked /
+    // reserved / picked up by a renter) — either way it's not available to
+    // sell right now. Once the rental item comes back ("returned") or the
+    // booking is cancelled, Product.status resets to "available" and it
+    // reappears here.
+    Product.find({ deletedAt: null, status: { $nin: ["sold", "booked", "reserved", "picked_up"] } })
       .sort({ name: 1 })
       .select("name sku")
       .limit(500)

@@ -34,7 +34,9 @@ export async function GET(request: NextRequest): Promise<Response> {
     amount: "amount",
     paymentDate: "paymentDate",
     forMonth: "forMonth",
+    paymentMethod: "paymentMethod",
     createdAt: "createdAt",
+    deletedAt: "deletedAt",
   };
   const sort = sortBy && SORTABLE_FIELDS[sortBy]
     ? { [SORTABLE_FIELDS[sortBy]]: sortDir as 1 | -1 }

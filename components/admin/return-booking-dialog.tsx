@@ -151,10 +151,14 @@ export function ReturnBookingDialog({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
-      return json.data.invoice as { _id: string };
+      // 201 = a brand-new invoice; 200 = one already existed (e.g. generated
+      // back at Confirm or Pickup) and was just resynced with the return
+      // settlement — damage charges, final total, and the deposit payoff —
+      // instead of failing with "already has an active invoice".
+      return { invoice: json.data.invoice as { _id: string }, created: res.status === 201 };
     },
-    onSuccess: (invoice) => {
-      toast.success("Invoice generated and added to Sale");
+    onSuccess: ({ invoice, created }) => {
+      toast.success(created ? "Invoice generated and added to Sale" : "Invoice updated with the settlement");
       queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "sales"] });
       resetForm();
@@ -219,7 +223,7 @@ export function ReturnBookingDialog({
           </DialogFooter>
         </DialogContent>
       ) : (
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Mark as returned</DialogTitle>
           <DialogDescription>
@@ -229,136 +233,143 @@ export function ReturnBookingDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="text-sm font-medium">Condition</label>
+              <Select value={condition} onValueChange={(value) => setCondition(value as ReturnCondition)}>
+                <SelectTrigger className="mt-2 w-full">
+                  <SelectValue>
+                    {(value: string) =>
+                      CONDITION_OPTIONS.find((option) => option.value === value)?.label ?? value
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {CONDITION_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col justify-center gap-2">
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={dryCleaningRequired}
+                  onCheckedChange={(checked) => setDryCleaningRequired(checked === true)}
+                />
+                Dry cleaning required — sends to Services automatically
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={stitchingRequired}
+                  onCheckedChange={(checked) => setStitchingRequired(checked === true)}
+                />
+                Stitching / repair required — sends to Services automatically
+              </label>
+            </div>
+          </div>
+
           <div>
-            <label className="text-sm font-medium">Condition</label>
-            <Select value={condition} onValueChange={(value) => setCondition(value as ReturnCondition)}>
-              <SelectTrigger className="mt-2 w-full">
-                <SelectValue>
-                  {(value: string) =>
-                    CONDITION_OPTIONS.find((option) => option.value === value)?.label ?? value
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <label className="text-sm font-medium">Security deposit (&#8377;)</label>
+                <Input
+                  className="mt-2"
+                  type="number"
+                  min={0}
+                  value={securityDeposit === 0 ? "" : securityDeposit}
+                  onChange={(event) =>
+                    setSecurityDepositOverride(Math.max(0, Number(event.target.value) || 0))
                   }
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {CONDITION_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={dryCleaningRequired}
-                onCheckedChange={(checked) => setDryCleaningRequired(checked === true)}
-              />
-              Dry cleaning required — sends the dress to Services automatically
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={stitchingRequired}
-                onCheckedChange={(checked) => setStitchingRequired(checked === true)}
-              />
-              Stitching / repair required — sends the dress to Services automatically
-            </label>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium">Security deposit (&#8377;)</label>
-            <Input
-              className="mt-2"
-              type="number"
-              min={0}
-              value={securityDeposit === 0 ? "" : securityDeposit}
-              onChange={(event) =>
-                setSecurityDepositOverride(Math.max(0, Number(event.target.value) || 0))
-              }
-              disabled={isLoadingFinancials}
-            />
+                  disabled={isLoadingFinancials}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Damage charges (&#8377;)</label>
+                <Input
+                  className="mt-2"
+                  type="number"
+                  min={0}
+                  value={damageCharges === 0 ? "" : damageCharges}
+                  onChange={(event) => setDamageCharges(Math.max(0, Number(event.target.value) || 0))}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Pending rent (&#8377;)</label>
+                <Input
+                  className="mt-2"
+                  type="number"
+                  min={0}
+                  value={pendingRentAmount}
+                  onChange={(event) => setPendingRentOverride(Math.max(0, Number(event.target.value)))}
+                />
+              </div>
+            </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Defaults to the deposit recorded on the booking &mdash; correct it here if a different
-              amount was actually collected or topped up. The refund/settlement below always uses
-              this value.
+              Security deposit defaults to what&rsquo;s recorded on the booking &mdash; correct it
+              here if a different amount was actually collected or topped up. The
+              refund/settlement below always uses this value.
             </p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="text-sm font-medium">Damage charges (&#8377;)</label>
-              <Input
-                className="mt-2"
-                type="number"
-                min={0}
-                value={damageCharges === 0 ? "" : damageCharges}
-                onChange={(event) => setDamageCharges(Math.max(0, Number(event.target.value) || 0))}
-              />
+            <div className="flex items-start sm:pt-1">
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={depositRefunded}
+                  onCheckedChange={(checked) => setDepositRefunded(checked === true)}
+                />
+                Refund the remaining security deposit now
+              </label>
             </div>
-            <div>
-              <label className="text-sm font-medium">Pending rent (&#8377;)</label>
-              <Input
-                className="mt-2"
-                type="number"
-                min={0}
-                value={pendingRentAmount}
-                onChange={(event) => setPendingRentOverride(Math.max(0, Number(event.target.value)))}
-              />
-            </div>
-          </div>
 
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox
-              checked={depositRefunded}
-              onCheckedChange={(checked) => setDepositRefunded(checked === true)}
-            />
-            Refund the remaining security deposit now
-          </label>
-
-          <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm">
-            {isLoadingFinancials ? (
-              <div className="space-y-2.5">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="flex justify-between">
-                    <Skeleton className="h-3.5 w-32" />
-                    <Skeleton className="h-3.5 w-16" />
+            <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm">
+              {isLoadingFinancials ? (
+                <div className="space-y-2.5">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="flex justify-between">
+                      <Skeleton className="h-3.5 w-32" />
+                      <Skeleton className="h-3.5 w-16" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Security deposit held</span>
+                    <span>{formatCurrency(securityDeposit)}</span>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Security deposit held</span>
-                  <span>{formatCurrency(securityDeposit)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Damage + pending rent</span>
-                  <span>{formatCurrency(amountOwed)}</span>
-                </div>
-                <div className="mt-2 flex justify-between border-t border-border pt-2 font-medium">
-                  <span>
-                    {finalSettlementAmount > 0 ? "Customer still owes" : "Refund to customer"}
-                  </span>
-                  <span
-                    className={cn(
-                      finalSettlementAmount > 0 ? "text-destructive" : "text-emerald-600"
-                    )}
-                  >
-                    {formatCurrency(
-                      finalSettlementAmount > 0 ? finalSettlementAmount : depositRefundAmount
-                    )}
-                  </span>
-                </div>
-              </>
-            )}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Damage + pending rent</span>
+                    <span>{formatCurrency(amountOwed)}</span>
+                  </div>
+                  <div className="mt-2 flex justify-between border-t border-border pt-2 font-medium">
+                    <span>
+                      {finalSettlementAmount > 0 ? "Customer still owes" : "Refund to customer"}
+                    </span>
+                    <span
+                      className={cn(
+                        finalSettlementAmount > 0 ? "text-destructive" : "text-emerald-600"
+                      )}
+                    >
+                      {formatCurrency(
+                        finalSettlementAmount > 0 ? finalSettlementAmount : depositRefundAmount
+                      )}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           <div>
             <label className="text-sm font-medium">Notes (optional)</label>
             <Textarea
               className="mt-2"
-              rows={3}
+              rows={2}
               placeholder="Describe any damage or missing items..."
               value={notes}
               onChange={(event) => setNotes(event.target.value)}

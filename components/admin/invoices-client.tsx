@@ -41,6 +41,7 @@ import { InvoiceStatusBadge } from "@/components/admin/invoice-status-badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { downloadPdf, downloadExcel } from "@/lib/admin/export";
+import { getInvoiceDueBreakdown } from "@/lib/admin/invoice-totals";
 import { customerContact, formatDate } from "@/lib/utils";
 import type { InvoiceStatus } from "@/models/Invoice";
 
@@ -48,6 +49,10 @@ interface InvoiceRow {
   _id: string;
   invoiceNumber: string;
   status: InvoiceStatus;
+  subtotal: number;
+  discountAmount: number;
+  taxAmount: number;
+  securityDeposit: number;
   total: number;
   amountPaid: number;
   amountDue: number;
@@ -321,24 +326,39 @@ export function InvoicesClient({
     totals: (string | number)[];
   }> {
     const full = await fetchInvoices({ page: 1, status, view, search, sortBy, sortDir, all: true });
-    const headers = ["Sr No", "Invoice #", "Customer", "Total", "Paid", "Due", "Status", "Due Date"];
-    const rows = full.invoices.map((invoice, index) => [
-      index + 1,
-      invoice.invoiceNumber,
-      invoice.customer?.name ?? "—",
-      invoice.total,
-      invoice.amountPaid,
-      invoice.amountDue,
-      STATUS_FILTERS.find((option) => option.value === invoice.status)?.label ?? invoice.status,
-      formatDate(invoice.dueDate),
-    ]);
+    const headers = [
+      "Sr No",
+      "Invoice #",
+      "Customer",
+      "Total",
+      "Paid",
+      "Rent Due",
+      "Security Due",
+      "Status",
+      "Due Date",
+    ];
+    const rows = full.invoices.map((invoice, index) => {
+      const due = getInvoiceDueBreakdown(invoice);
+      return [
+        index + 1,
+        invoice.invoiceNumber,
+        invoice.customer?.name ?? "—",
+        invoice.total,
+        invoice.amountPaid,
+        due.rentDue,
+        due.securityDue,
+        STATUS_FILTERS.find((option) => option.value === invoice.status)?.label ?? invoice.status,
+        formatDate(invoice.dueDate),
+      ];
+    });
     const totals = [
       "",
       "TOTAL",
       "",
       full.invoices.reduce((sum, invoice) => sum + invoice.total, 0),
       full.invoices.reduce((sum, invoice) => sum + invoice.amountPaid, 0),
-      full.invoices.reduce((sum, invoice) => sum + invoice.amountDue, 0),
+      full.invoices.reduce((sum, invoice) => sum + getInvoiceDueBreakdown(invoice).rentDue, 0),
+      full.invoices.reduce((sum, invoice) => sum + getInvoiceDueBreakdown(invoice).securityDue, 0),
       "",
       "",
     ];
@@ -347,7 +367,9 @@ export function InvoicesClient({
 
   const cardGrid = (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {invoices.map((invoice) => (
+      {invoices.map((invoice) => {
+        const due = getInvoiceDueBreakdown(invoice);
+        return (
         <div key={invoice._id} className="rounded-lg border border-border bg-card p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2.5">
@@ -379,12 +401,17 @@ export function InvoicesClient({
               <p className="text-emerald-700">{formatCurrency(invoice.amountPaid)}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Due</p>
-              <p className={invoice.amountDue > 0 ? "text-red-700" : undefined}>
-                {formatCurrency(invoice.amountDue)}
+              <p className="text-xs text-muted-foreground">Rent Due</p>
+              <p className={due.rentDue > 0 ? "text-red-700" : undefined}>
+                {formatCurrency(due.rentDue)}
               </p>
             </div>
           </div>
+          {due.securityDue > 0 && (
+            <p className="mt-1 text-xs text-amber-700">
+              + {formatCurrency(due.securityDue)} security due
+            </p>
+          )}
           <p className="mt-2 text-xs text-muted-foreground">Due {formatDate(invoice.dueDate)}</p>
           <div className="mt-3 flex justify-end gap-2">
             {view === "trash" ? (
@@ -447,7 +474,8 @@ export function InvoicesClient({
             )}
           </div>
         </div>
-      ))}
+        );
+      })}
       {invoices.length === 0 && (
         <p className="col-span-full py-10 text-center text-muted-foreground">No invoices found.</p>
       )}
@@ -645,13 +673,21 @@ export function InvoicesClient({
                   Total <SortIcon field="total" sortBy={sortBy} sortDir={sortDir} />
                 </button>
               </th>
-              <th className="px-4 py-3">Paid</th>
               <th className="px-4 py-3">
-                <button className="flex items-center gap-1" onClick={() => toggleSort("amountDue")}>
-                  Due <SortIcon field="amountDue" sortBy={sortBy} sortDir={sortDir} />
+                <button className="flex items-center gap-1" onClick={() => toggleSort("amountPaid")}>
+                  Paid <SortIcon field="amountPaid" sortBy={sortBy} sortDir={sortDir} />
                 </button>
               </th>
-              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">
+                <button className="flex items-center gap-1" onClick={() => toggleSort("amountDue")}>
+                  Rent Due <SortIcon field="amountDue" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button className="flex items-center gap-1" onClick={() => toggleSort("status")}>
+                  Status <SortIcon field="status" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3">
                 <button className="flex items-center gap-1" onClick={() => toggleSort("dueDate")}>
                   Due Date <SortIcon field="dueDate" sortBy={sortBy} sortDir={sortDir} />
@@ -661,7 +697,9 @@ export function InvoicesClient({
             </tr>
           </thead>
           <tbody>
-            {invoices.map((invoice, index) => (
+            {invoices.map((invoice, index) => {
+              const due = getInvoiceDueBreakdown(invoice);
+              return (
               <tr key={invoice._id} className="border-b border-border last:border-0">
                 <td className="px-4 py-3 text-muted-foreground">
                   {(pagination.page - 1) * pagination.pageSize + index + 1}
@@ -690,10 +728,15 @@ export function InvoicesClient({
                 <td className="px-4 py-3">{formatCurrency(invoice.total)}</td>
                 <td className="px-4 py-3 text-emerald-700">{formatCurrency(invoice.amountPaid)}</td>
                 <td className="px-4 py-3">
-                  {invoice.amountDue > 0 ? (
-                    <span className="text-red-700">{formatCurrency(invoice.amountDue)}</span>
+                  {due.rentDue > 0 ? (
+                    <span className="text-red-700">{formatCurrency(due.rentDue)}</span>
                   ) : (
                     formatCurrency(0)
+                  )}
+                  {due.securityDue > 0 && (
+                    <p className="text-xs font-normal text-amber-700">
+                      +{formatCurrency(due.securityDue)} security
+                    </p>
                   )}
                 </td>
                 <td className="px-4 py-3">
@@ -763,7 +806,8 @@ export function InvoicesClient({
                   )}
                 </td>
               </tr>
-            ))}
+              );
+            })}
             {invoices.length === 0 && (
               <tr>
                 <td colSpan={11} className="px-4 py-10 text-center text-muted-foreground">

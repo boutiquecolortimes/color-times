@@ -494,7 +494,11 @@ export function ExpensesClient({
                   Description <SortIcon field="description" sortBy={sortBy} sortDir={sortDir} />
                 </button>
               </th>
-              <th className="px-4 py-3">Category</th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("category")}>
+                  Category <SortIcon field="category" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3">
                 <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("amount")}>
                   Amount <SortIcon field="amount" sortBy={sortBy} sortDir={sortDir} />

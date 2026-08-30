@@ -766,7 +766,17 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Status"];
                     </button>
                   </th>
                 )}
-                {columnVisibility.status && <th className="px-4 py-3">Status</th>}
+                {columnVisibility.status && (
+                  <th className="px-4 py-3">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-foreground"
+                      onClick={() => toggleSort("status")}
+                    >
+                      Status <SortIcon field="status" sortBy={sortBy} sortDir={sortDir} />
+                    </button>
+                  </th>
+                )}
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
