@@ -21,6 +21,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button-link";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -60,6 +61,7 @@ import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 
 interface PurchaseRow {
   _id: string;
+  billNumber?: string;
   itemName: string;
   vendorName: string;
   vendorContact?: string;
@@ -366,11 +368,12 @@ export function PurchasesClient({
     setSelectedIds(new Set());
   }
 
-  const exportHeaders = ["Sr No", "Item", "Vendor", "Quantity", "Unit Cost", "Total Cost", "Purchase Date", "Payment Status"];
+  const exportHeaders = ["Sr No", "Bill #", "Item", "Vendor", "Quantity", "Unit Cost", "Total Cost", "Purchase Date", "Payment Status"];
 
   function purchasesToRows(rows: PurchaseRow[]): (string | number)[][] {
     return rows.map((purchase, index) => [
       index + 1,
+      purchase.billNumber || "—",
       purchase.itemName,
       purchase.vendorName,
       purchase.quantity,
@@ -457,10 +460,10 @@ export function PurchasesClient({
             </DropdownMenuContent>
           </DropdownMenu>
           {status === "active" && (
-            <Button onClick={openCreateDialog} className="rounded-md">
+            <ButtonLink href="/admin/purchases/new" className="rounded-md">
               <Plus className="h-4 w-4" />
               New Purchase
-            </Button>
+            </ButtonLink>
           )}
         </div>
       </div>
@@ -521,6 +524,11 @@ export function PurchasesClient({
                 />
               </th>
               <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("billNumber")}>
+                  Bill # <SortIcon field="billNumber" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
                 <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("itemName")}>
                   Item <SortIcon field="itemName" sortBy={sortBy} sortDir={sortDir} />
                 </button>
@@ -567,6 +575,7 @@ export function PurchasesClient({
                     aria-label={`Select ${purchase.itemName}`}
                   />
                 </td>
+                <td className="px-4 py-3 text-muted-foreground">{purchase.billNumber || "—"}</td>
                 <td className="px-4 py-3 font-medium">{purchase.itemName}</td>
                 <td className="px-4 py-3 text-muted-foreground">{purchase.vendorName}</td>
                 <td className="px-4 py-3 text-muted-foreground">
@@ -635,7 +644,7 @@ export function PurchasesClient({
             ))}
             {purchases.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={11} className="px-4 py-10 text-center text-muted-foreground">
                   {status === "trash" ? "Trash is empty." : "No purchases yet. Record your first one."}
                 </td>
               </tr>

@@ -10,6 +10,15 @@ export function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 
+/** Turns a name into a URL-safe slug, e.g. "Red Silk Saree" -> "red-silk-saree". */
+export function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+}
+
 /** Formats a date as "10-Jul-2026". */
 export function formatDate(value: string | number | Date): string {
   const date = new Date(value)

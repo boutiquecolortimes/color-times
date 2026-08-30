@@ -22,6 +22,7 @@ export default async function AdminPurchasesPage() {
 
   const initialPurchases = purchases.map((purchase) => ({
     _id: String(purchase._id),
+    billNumber: purchase.billNumber ?? "",
     itemName: purchase.itemName,
     vendorName: purchase.vendorName,
     vendorContact: purchase.vendorContact ?? "",

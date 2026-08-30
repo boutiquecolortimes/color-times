@@ -6,6 +6,13 @@ export const PURCHASE_PAYMENT_STATUSES: PurchasePaymentStatus[] = ["paid", "pend
 
 export interface IPurchase extends Document {
   _id: Types.ObjectId;
+  // The dealer's own bill/invoice number — not system-generated. Purchases
+  // entered together as one parcel (see the parcel-entry endpoint) share the
+  // same billNumber, which is how the Purchases list groups them back
+  // together even though each product line is still its own document. Left
+  // optional (not unique) so older purchases entered one at a time before
+  // this existed keep working untouched.
+  billNumber?: string;
   itemName: string;
   vendorName: string;
   vendorContact?: string;
@@ -28,6 +35,7 @@ export interface IPurchase extends Document {
 
 const purchaseSchema = new Schema<IPurchase>(
   {
+    billNumber: { type: String, trim: true, index: true },
     itemName: { type: String, required: true, trim: true },
     vendorName: { type: String, required: true, trim: true },
     vendorContact: { type: String, trim: true },

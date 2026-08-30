@@ -23,6 +23,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   const sortBy = searchParams.get("sortBy");
   const sortDir = searchParams.get("sortDir") === "desc" ? -1 : 1;
   const SORTABLE_FIELDS: Record<string, string> = {
+    billNumber: "billNumber",
     itemName: "itemName",
     vendorName: "vendorName",
     quantity: "quantity",
