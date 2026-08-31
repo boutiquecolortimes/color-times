@@ -15,7 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BookingStatusBadge, STATUS_LABELS } from "@/components/admin/booking-status-badge";
+import {
+  BookingStatusBadge,
+  STATUS_LABELS,
+  BOOKING_STATUS_TRANSITIONS,
+} from "@/components/admin/booking-status-badge";
 import { ReturnBookingDialog } from "@/components/admin/return-booking-dialog";
 import { ConfirmBookingDialog } from "@/components/admin/confirm-booking-dialog";
 import { PickupBookingDialog } from "@/components/admin/pickup-booking-dialog";
@@ -30,16 +34,9 @@ import type { BookingStatus, ReturnCondition } from "@/models/Booking";
 
 const REMINDABLE_STATUSES: BookingStatus[] = ["inquiry", "confirmed", "in_use"];
 
-// "pending_payment" is dropped from the picker — it was never set
-// automatically anywhere and just added a confusing extra option. Still
-// recognized by the schema/badge for any pre-existing booking that has it.
-const STATUS_OPTIONS: BookingStatus[] = [
-  "inquiry",
-  "confirmed",
-  "in_use",
-  "returned",
-  "cancelled",
-];
+// The status dropdown's options now come from BOOKING_STATUS_TRANSITIONS —
+// only the states this booking can actually move to next, so staff can't
+// jump straight from Inquiry to Returned. See booking-status-badge.tsx.
 
 const RETURN_CONDITION_LABELS: Record<ReturnCondition, string> = {
   good: "Good — no issues",
@@ -237,12 +234,13 @@ export function BookingDetailClient({
               }
               updateStatusMutation.mutate(value as BookingStatus);
             }}
+            disabled={BOOKING_STATUS_TRANSITIONS[booking.status].length === 0}
           >
             <SelectTrigger className="w-48">
               <SelectValue>{(value: BookingStatus) => STATUS_LABELS[value]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {STATUS_OPTIONS.map((option) => (
+              {BOOKING_STATUS_TRANSITIONS[booking.status].map((option) => (
                 <SelectItem key={option} value={option}>
                   {STATUS_LABELS[option]}
                 </SelectItem>

@@ -39,7 +39,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { BookingStatusBadge, STATUS_LABELS } from "@/components/admin/booking-status-badge";
+import {
+  BookingStatusBadge,
+  STATUS_LABELS,
+  BOOKING_STATUS_TRANSITIONS,
+} from "@/components/admin/booking-status-badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BookingCalendar } from "@/components/admin/booking-calendar";
 import { ReturnBookingDialog } from "@/components/admin/return-booking-dialog";
@@ -137,18 +141,14 @@ const STATUS_TABS: { value: string; label: string; countKey: keyof StatusCounts 
   { value: "cancelled", label: "Cancelled", countKey: "cancelled" },
 ];
 
-// "pending_payment" is dropped from the picker — it was never set
-// automatically anywhere (booking creation defaults to "inquiry", and
-// confirming goes straight to "confirmed" via the Confirm dialog), so it
-// was just a confusing extra option. Still recognized by the schema/badge
-// for any pre-existing booking that has it.
-const STATUS_OPTIONS: BookingStatus[] = [
-  "inquiry",
-  "confirmed",
-  "in_use",
-  "returned",
-  "cancelled",
-];
+// The status dropdown's options now come from BOOKING_STATUS_TRANSITIONS
+// (booking-status-badge.tsx) — only the states a booking can actually move
+// to next from wherever it currently is, so staff can't jump straight from
+// Inquiry to Returned. "pending_payment" was never set automatically
+// anywhere (booking creation defaults to "inquiry", and confirming goes
+// straight to "confirmed" via the Confirm dialog), so it's still recognized
+// by the schema/badge for any pre-existing booking that has it, but never
+// offered as a destination.
 
 async function fetchBookings(params: {
   page: number;
@@ -544,12 +544,13 @@ export function BookingsClient({
                       status: value as BookingStatus,
                     });
                   }}
+                  disabled={BOOKING_STATUS_TRANSITIONS[booking.status].length === 0}
                 >
                   <SelectTrigger className="w-full" size="sm">
                     <SelectValue>{(value: BookingStatus) => STATUS_LABELS[value]}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {STATUS_OPTIONS.map((option) => (
+                    {BOOKING_STATUS_TRANSITIONS[booking.status].map((option) => (
                       <SelectItem key={option} value={option}>
                         {STATUS_LABELS[option]}
                       </SelectItem>
@@ -983,6 +984,7 @@ export function BookingsClient({
                               status: value as BookingStatus,
                             });
                           }}
+                          disabled={BOOKING_STATUS_TRANSITIONS[booking.status].length === 0}
                         >
                           <SelectTrigger className="ml-auto w-40" size="sm">
                             <SelectValue>
@@ -990,7 +992,7 @@ export function BookingsClient({
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
-                            {STATUS_OPTIONS.map((option) => (
+                            {BOOKING_STATUS_TRANSITIONS[booking.status].map((option) => (
                               <SelectItem key={option} value={option}>
                                 {STATUS_LABELS[option]}
                               </SelectItem>

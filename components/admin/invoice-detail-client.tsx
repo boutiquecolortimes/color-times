@@ -3,14 +3,21 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Bell, Download, Loader2, Printer } from "lucide-react";
+import { Bell, ChevronDown, Download, Loader2, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InvoiceStatusBadge } from "@/components/admin/invoice-status-badge";
 import { InvoicePaymentDialog } from "@/components/admin/invoice-payment-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AuditLogList } from "@/components/admin/audit-log-list";
 import { downloadInvoicePdf } from "@/lib/admin/invoice-pdf";
+import type { PdfLang } from "@/lib/admin/pdf-labels";
 import { getInvoiceDueBreakdown } from "@/lib/admin/invoice-totals";
 import { formatDate, isWalkinEmail } from "@/lib/utils";
 import type { InvoiceLineItem, InvoiceStatus, PaymentMethod } from "@/models/Invoice";
@@ -173,6 +180,29 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const handleDownloadPdf = (lang: PdfLang) =>
+    void downloadInvoicePdf(
+      {
+        invoiceNumber: invoice.invoiceNumber,
+        status: invoice.status,
+        createdAt: invoice.createdAt,
+        dueDate: invoice.dueDate,
+        customer: invoice.customer,
+        lineItems: invoice.lineItems,
+        subtotal: invoice.subtotal,
+        discountAmount: invoice.discountAmount,
+        taxRate: invoice.taxRate,
+        taxAmount: invoice.taxAmount,
+        securityDeposit: invoice.securityDeposit,
+        total: invoice.total,
+        amountPaid: invoice.amountPaid,
+        amountDue: invoice.amountDue,
+        payments: invoice.payments,
+        notes: invoice.notes,
+      },
+      lang
+    );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -189,32 +219,29 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              void downloadInvoicePdf({
-                invoiceNumber: invoice.invoiceNumber,
-                status: invoice.status,
-                createdAt: invoice.createdAt,
-                dueDate: invoice.dueDate,
-                customer: invoice.customer,
-                lineItems: invoice.lineItems,
-                subtotal: invoice.subtotal,
-                discountAmount: invoice.discountAmount,
-                taxRate: invoice.taxRate,
-                taxAmount: invoice.taxAmount,
-                securityDeposit: invoice.securityDeposit,
-                total: invoice.total,
-                amountPaid: invoice.amountPaid,
-                amountDue: invoice.amountDue,
-                payments: invoice.payments,
-                notes: invoice.notes,
-              })
-            }
-          >
-            <Download className="h-4 w-4" /> PDF
-          </Button>
+          <div className="flex">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-r-none"
+              onClick={() => handleDownloadPdf("en")}
+            >
+              <Download className="h-4 w-4" /> PDF
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button variant="outline" size="sm" className="rounded-l-none border-l-0 px-1.5" />
+                }
+              >
+                <ChevronDown className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleDownloadPdf("en")}>English</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDownloadPdf("hi")}>हिंदी (Hindi)</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <Button variant="outline" size="sm" onClick={() => window.print()}>
             <Printer className="h-4 w-4" /> Print
           </Button>
@@ -301,11 +328,7 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
                       ? " (refunded)"
                       : invoice.securityDeposit <= 0
                         ? ""
-                        : due.securityDue <= 0
-                          ? " (held)"
-                          : due.securityDue < due.securityInTotal
-                            ? ` (${formatCurrency(due.securityDue)} due)`
-                            : " (due)"}
+                        : " (held)"}
                   </span>
                 </p>
                 <p className="flex justify-between font-medium">
@@ -320,10 +343,10 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
                   <span>Rent Due</span>
                   <span>{formatCurrency(due.rentDue)}</span>
                 </p>
-                {due.securityDue > 0 && (
-                  <p className="flex justify-between font-medium text-amber-700">
-                    <span>Security Due</span>
-                    <span>{formatCurrency(due.securityDue)}</span>
+                {due.securityHeld > 0 && !invoice.depositRefunded && (
+                  <p className="flex justify-between font-medium text-blue-700">
+                    <span>Security Held</span>
+                    <span>{formatCurrency(due.securityHeld)}</span>
                   </p>
                 )}
               </div>

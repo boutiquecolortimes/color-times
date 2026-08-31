@@ -1,6 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { BookingStatus } from "@/models/Booking";
+import { STATUS_LABELS, BOOKING_STATUS_TRANSITIONS } from "@/lib/admin/booking-status";
+
+// Re-exported so existing screens can keep importing both alongside
+// BookingStatusBadge from here — the actual maps live in
+// lib/admin/booking-status.ts (framework-free) so the API route can share
+// them too without pulling this React component into server code.
+export { STATUS_LABELS, BOOKING_STATUS_TRANSITIONS };
 
 const STATUS_STYLES: Record<BookingStatus, string> = {
   inquiry: "bg-secondary text-foreground",
@@ -9,18 +16,6 @@ const STATUS_STYLES: Record<BookingStatus, string> = {
   in_use: "bg-emerald-100 text-emerald-800",
   returned: "bg-slate-200 text-slate-700",
   cancelled: "bg-red-100 text-red-800",
-};
-
-// "in_use" is the underlying stored value (unchanged, so existing bookings
-// don't need a data migration) — only the label shown to staff changed from
-// "In Use" to "Picked Up" per their workflow.
-export const STATUS_LABELS: Record<BookingStatus, string> = {
-  inquiry: "Inquiry",
-  pending_payment: "Pending Payment",
-  confirmed: "Confirmed",
-  in_use: "Picked Up",
-  returned: "Returned",
-  cancelled: "Cancelled",
 };
 
 export function BookingStatusBadge({ status }: { status: BookingStatus }) {

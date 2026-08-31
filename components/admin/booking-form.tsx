@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm, useFieldArray, useWatch, type Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertTriangle, Loader2, Plus, Trash2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -430,6 +430,7 @@ export function BookingForm({
   defaultValues?: BookingCreateInput;
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const isEditing = Boolean(bookingId);
   const [customerList, setCustomerList] = useState<CustomerOption[]>(customers);
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
@@ -544,6 +545,13 @@ export function BookingForm({
     },
     onSuccess: () => {
       toast.success(isEditing ? "Booking updated" : "Booking created");
+      // router.refresh() alone re-fetches the server component's data, but
+      // the Bookings list's own React Query cache (staleTime: 60s in
+      // app/providers.tsx) can still be holding an older, still-"fresh"
+      // result from before this booking existed — invalidate it directly so
+      // the list is correct the instant it's back on screen, not up to a
+      // minute later.
+      queryClient.invalidateQueries({ queryKey: ["admin", "bookings"] });
       router.push(isEditing ? `/admin/bookings/${bookingId}` : "/admin/bookings");
       router.refresh();
     },

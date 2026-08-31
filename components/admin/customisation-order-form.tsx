@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -80,6 +80,7 @@ const EMPTY_VALUES: CustomisationOrderInput = {
 
 export function CustomisationOrderForm({ customers }: { customers: CustomerOption[] }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [customerList, setCustomerList] = useState<CustomerOption[]>(customers);
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
 
@@ -160,6 +161,13 @@ export function CustomisationOrderForm({ customers }: { customers: CustomerOptio
     },
     onSuccess: () => {
       toast.success("Order created");
+      // router.refresh() alone re-fetches the server component's data, but
+      // the Customisation list's own React Query cache (staleTime: 60s in
+      // app/providers.tsx) can still be holding an older, still-"fresh"
+      // result from before this order existed — invalidate it directly so
+      // the list shows the new order immediately instead of only after a
+      // manual page reload (or up to a minute later).
+      queryClient.invalidateQueries({ queryKey: ["admin", "customisation-orders"] });
       router.push("/admin/customisation");
       router.refresh();
     },

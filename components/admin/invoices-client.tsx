@@ -40,7 +40,6 @@ import {
 import { InvoiceStatusBadge } from "@/components/admin/invoice-status-badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
-import { useCanEdit } from "@/components/admin/current-user-context";
 import { downloadPdf, downloadExcel } from "@/lib/admin/export";
 import { getInvoiceDueBreakdown } from "@/lib/admin/invoice-totals";
 import { customerContact, formatDate } from "@/lib/utils";
@@ -54,6 +53,7 @@ interface InvoiceRow {
   discountAmount: number;
   taxAmount: number;
   securityDeposit: number;
+  depositRefunded: boolean;
   total: number;
   amountPaid: number;
   amountDue: number;
@@ -131,7 +131,6 @@ export function InvoicesClient({
 }) {
   const queryClient = useQueryClient();
   const router = useRouter();
-  const canEdit = useCanEdit();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("all");
   const [view, setView] = useState<"active" | "trash">("active");
@@ -335,7 +334,7 @@ export function InvoicesClient({
       "Total",
       "Paid",
       "Rent Due",
-      "Security Due",
+      "Security Held",
       "Status",
       "Due Date",
     ];
@@ -348,7 +347,7 @@ export function InvoicesClient({
         invoice.total,
         invoice.amountPaid,
         due.rentDue,
-        due.securityDue,
+        invoice.depositRefunded ? 0 : due.securityHeld,
         STATUS_FILTERS.find((option) => option.value === invoice.status)?.label ?? invoice.status,
         formatDate(invoice.dueDate),
       ];
@@ -360,7 +359,11 @@ export function InvoicesClient({
       full.invoices.reduce((sum, invoice) => sum + invoice.total, 0),
       full.invoices.reduce((sum, invoice) => sum + invoice.amountPaid, 0),
       full.invoices.reduce((sum, invoice) => sum + getInvoiceDueBreakdown(invoice).rentDue, 0),
-      full.invoices.reduce((sum, invoice) => sum + getInvoiceDueBreakdown(invoice).securityDue, 0),
+      full.invoices.reduce(
+        (sum, invoice) =>
+          sum + (invoice.depositRefunded ? 0 : getInvoiceDueBreakdown(invoice).securityHeld),
+        0
+      ),
       "",
       "",
     ];
@@ -409,9 +412,9 @@ export function InvoicesClient({
               </p>
             </div>
           </div>
-          {due.securityDue > 0 && (
-            <p className="mt-1 text-xs text-amber-700">
-              + {formatCurrency(due.securityDue)} security due
+          {due.securityHeld > 0 && !invoice.depositRefunded && (
+            <p className="mt-1 text-xs text-blue-700">
+              + {formatCurrency(due.securityHeld)} security held
             </p>
           )}
           <p className="mt-2 text-xs text-muted-foreground">Due {formatDate(invoice.dueDate)}</p>
@@ -427,19 +430,17 @@ export function InvoicesClient({
                   <RotateCcw className="h-3.5 w-3.5" />
                   Restore
                 </Button>
-                {canEdit && (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="text-destructive"
-                    aria-label="Delete permanently"
-                    title="Delete permanently"
-                    disabled={permanentDeleteMutation.isPending}
-                    onClick={() => setPermanentDeleteTarget(invoice)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                )}
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-destructive"
+                  aria-label="Delete permanently"
+                  title="Delete permanently"
+                  disabled={permanentDeleteMutation.isPending}
+                  onClick={() => setPermanentDeleteTarget(invoice)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
               </>
             ) : (
               <DropdownMenu>
@@ -620,17 +621,15 @@ export function InvoicesClient({
                   <RotateCcw className="h-3.5 w-3.5" />
                   Restore
                 </Button>
-                {canEdit && (
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    disabled={bulkActionMutation.isPending}
-                    onClick={() => setBulkConfirmAction("permanent-delete")}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Delete Permanently
-                  </Button>
-                )}
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={bulkActionMutation.isPending}
+                  onClick={() => setBulkConfirmAction("permanent-delete")}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete Permanently
+                </Button>
               </>
             ) : (
               <Button
@@ -739,9 +738,9 @@ export function InvoicesClient({
                   ) : (
                     formatCurrency(0)
                   )}
-                  {due.securityDue > 0 && (
-                    <p className="text-xs font-normal text-amber-700">
-                      +{formatCurrency(due.securityDue)} security
+                  {due.securityHeld > 0 && !invoice.depositRefunded && (
+                    <p className="text-xs font-normal text-blue-700">
+                      +{formatCurrency(due.securityHeld)} held
                     </p>
                   )}
                 </td>
@@ -763,19 +762,17 @@ export function InvoicesClient({
                         <RotateCcw className="h-3.5 w-3.5" />
                         Restore
                       </Button>
-                      {canEdit && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive"
-                          aria-label="Delete permanently"
-                          title="Delete permanently"
-                          disabled={permanentDeleteMutation.isPending}
-                          onClick={() => setPermanentDeleteTarget(invoice)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive"
+                        aria-label="Delete permanently"
+                        title="Delete permanently"
+                        disabled={permanentDeleteMutation.isPending}
+                        onClick={() => setPermanentDeleteTarget(invoice)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   ) : (
                     <DropdownMenu>

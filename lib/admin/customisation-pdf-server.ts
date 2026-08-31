@@ -4,6 +4,7 @@ import path from "node:path";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { siteConfig } from "@/lib/config/site";
+import { TERMS_IMAGE_PATH, TERMS_IMAGE_RATIO, ownerDetailLines } from "@/lib/admin/pdf-footer";
 import { formatDate } from "@/lib/utils";
 import type { CustomisationMeasurements } from "@/models/CustomisationOrder";
 import { MEASUREMENT_FIELD_DEFS } from "@/lib/config/measurement-fields";
@@ -37,6 +38,16 @@ async function loadLogoDataUrl(): Promise<{ dataUrl: string; ratio: number } | n
   }
 }
 
+async function loadTermsImageDataUrl(): Promise<string | null> {
+  try {
+    const filePath = path.join(process.cwd(), "public", TERMS_IMAGE_PATH);
+    const buffer = await readFile(filePath);
+    return `data:image/png;base64,${buffer.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
 const MEASUREMENT_LABELS: { key: keyof CustomisationMeasurements; label: string }[] =
   MEASUREMENT_FIELD_DEFS;
 
@@ -57,6 +68,10 @@ export async function generateCustomisationPdfBuffer(order: CustomisationPdfData
   doc.setFontSize(9);
   doc.text(siteConfig.contact.address, textStartX, 25);
   doc.text(`${siteConfig.contact.email} · ${siteConfig.contact.phone}`, textStartX, 30);
+  doc.setFontSize(8);
+  ownerDetailLines().forEach((line, index) => {
+    doc.text(line, textStartX, 34 + index * 4);
+  });
 
   doc.setFontSize(16);
   doc.text("CUSTOMISATION BILL", 196, 18, { align: "right" });
@@ -118,6 +133,18 @@ export async function generateCustomisationPdfBuffer(order: CustomisationPdfData
   if (order.notes) {
     doc.setFontSize(9);
     doc.text(`Notes: ${order.notes}`, 14, cursorY);
+    cursorY += 8;
+  }
+
+  const termsDataUrl = await loadTermsImageDataUrl();
+  if (termsDataUrl) {
+    const termsWidth = 182;
+    const termsHeight = termsWidth * TERMS_IMAGE_RATIO;
+    if (cursorY + termsHeight > 280) {
+      doc.addPage();
+      cursorY = 20;
+    }
+    doc.addImage(termsDataUrl, "PNG", 14, cursorY, termsWidth, termsHeight);
   }
 
   return Buffer.from(doc.output("arraybuffer"));

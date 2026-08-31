@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { Sale } from "@/models/Sale";
 import { Product } from "@/models/Product";
 import { saleUpdateSchema } from "@/lib/validations/sale";
+import { findUpcomingBookingForProduct } from "@/lib/admin/booking-availability";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES, MANAGER_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog, diffObjects } from "@/lib/audit/log";
@@ -56,6 +57,22 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
     const before = await Sale.findById(id).lean();
     if (!before) {
       return apiError("Sale not found", 404);
+    }
+
+    // Same check as creating a new sale — only relevant when the product on
+    // this manual sale is actually being changed to something else.
+    if (
+      before.source !== "booking" &&
+      input.product !== undefined &&
+      String(input.product) !== String(before.product)
+    ) {
+      const conflict = await findUpcomingBookingForProduct(input.product);
+      if (conflict) {
+        return apiError(
+          `This dress already has a booking (${conflict.bookingNumber}) from ${conflict.rentalStartDate.toDateString()} to ${conflict.rentalEndDate.toDateString()} — cancel that booking first before selling this dress outright`,
+          409
+        );
+      }
     }
 
     const update: Record<string, unknown> = {};

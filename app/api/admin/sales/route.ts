@@ -4,10 +4,11 @@ import { Sale } from "@/models/Sale";
 import { Product } from "@/models/Product";
 import { saleSchema } from "@/lib/validations/sale";
 import { nextSharedBillNumber } from "@/lib/admin/bill-number";
+import { findUpcomingBookingForProduct } from "@/lib/admin/booking-availability";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
-import { apiSuccess, apiErrorFromUnknown } from "@/lib/api/response";
+import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 
 export async function GET(request: NextRequest): Promise<Response> {
   const auth = await requireApiRole(ADMIN_ROLES);
@@ -66,6 +67,18 @@ export async function POST(request: NextRequest): Promise<Response> {
     const input = saleSchema.parse(body);
 
     await connectToDatabase();
+
+    // A product already excluded from the Sale picker (Confirmed/Picked-up)
+    // never reaches here, but an Inquiry-stage booking never touches
+    // Product.status — so without this, staff could still sell a dress
+    // outright that's already promised to someone else's upcoming booking.
+    const conflict = await findUpcomingBookingForProduct(input.product);
+    if (conflict) {
+      return apiError(
+        `This dress already has a booking (${conflict.bookingNumber}) from ${conflict.rentalStartDate.toDateString()} to ${conflict.rentalEndDate.toDateString()} — cancel that booking first before selling this dress outright`,
+        409
+      );
+    }
 
     const billNumber = await nextSharedBillNumber();
 

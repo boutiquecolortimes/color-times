@@ -5,6 +5,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { siteConfig } from "@/lib/config/site";
 import { getInvoiceDueBreakdown } from "@/lib/admin/invoice-totals";
+import { TERMS_IMAGE_PATH, TERMS_IMAGE_RATIO, ownerDetailLines } from "@/lib/admin/pdf-footer";
 import { formatDate } from "@/lib/utils";
 import type { InvoiceLineItem, InvoiceStatus, PaymentMethod } from "@/models/Invoice";
 
@@ -48,6 +49,16 @@ async function loadLogoDataUrl(): Promise<{ dataUrl: string; ratio: number } | n
   }
 }
 
+async function loadTermsImageDataUrl(): Promise<string | null> {
+  try {
+    const filePath = path.join(process.cwd(), "public", TERMS_IMAGE_PATH);
+    const buffer = await readFile(filePath);
+    return `data:image/png;base64,${buffer.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
 export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise<Buffer> {
   const doc = new jsPDF({ orientation: "portrait" });
   const logo = await loadLogoDataUrl();
@@ -65,6 +76,10 @@ export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise
   doc.setFontSize(9);
   doc.text(siteConfig.contact.address, textStartX, 25);
   doc.text(`${siteConfig.contact.email} · ${siteConfig.contact.phone}`, textStartX, 30);
+  doc.setFontSize(8);
+  ownerDetailLines().forEach((line, index) => {
+    doc.text(line, textStartX, 34 + index * 4);
+  });
 
   doc.setFontSize(16);
   doc.text("INVOICE", 196, 18, { align: "right" });
@@ -109,7 +124,7 @@ export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise
     ["Total", formatCurrency(invoice.total)],
     ["Amount Paid", formatCurrency(invoice.amountPaid)],
     ["Rent Due", formatCurrency(due.rentDue)],
-    ...(due.securityDue > 0 ? [["Security Due", formatCurrency(due.securityDue)]] : []),
+    ...(due.securityHeld > 0 ? [["Security Held", formatCurrency(due.securityHeld)]] : []),
   ];
 
   autoTable(doc, {
@@ -144,6 +159,18 @@ export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise
   if (invoice.notes) {
     doc.setFontSize(9);
     doc.text(`Notes: ${invoice.notes}`, 14, cursorY);
+    cursorY += 8;
+  }
+
+  const termsDataUrl = await loadTermsImageDataUrl();
+  if (termsDataUrl) {
+    const termsWidth = 182;
+    const termsHeight = termsWidth * TERMS_IMAGE_RATIO;
+    if (cursorY + termsHeight > 280) {
+      doc.addPage();
+      cursorY = 20;
+    }
+    doc.addImage(termsDataUrl, "PNG", 14, cursorY, termsWidth, termsHeight);
   }
 
   return Buffer.from(doc.output("arraybuffer"));

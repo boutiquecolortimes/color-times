@@ -53,6 +53,16 @@ export const siteConfig = {
     facebook: "https://facebook.com/colortimesboutique",
     pinterest: "https://pinterest.com/colortimesboutique",
   },
+  // Proprietor details as printed on physical bills/receipts (order slips,
+  // sale bills, customisation bills). Kept separate from `contact` and
+  // `social` above, which drive the public website, so this can carry the
+  // owner's real details without touching website copy.
+  proprietor: {
+    name: "Neelam Soni",
+    printTagline: "You Choose, We Design",
+    phones: ["7891919789", "9509786777"],
+    instagramHandle: "Color_times_boutique",
+  },
   nav,
   footerLinks: {
     shop: [

@@ -1,15 +1,18 @@
 // Splits an invoice's outstanding balance into what's actually still owed
-// for the rent vs. what's still owed for the security deposit.
+// for the rent vs. the security deposit sitting with the business.
 //
 // Why this exists: `total` (and therefore `amountDue`) includes the security
 // deposit for any booking that hasn't been returned yet, so a plain "Due"
-// figure silently blends "the customer still owes rent" with "we're still
-// waiting on the security deposit" into one number. In practice the deposit
-// is usually collected and held separately (cash/valuables kept at the
-// counter) rather than logged as an invoice payment the moment it changes
-// hands, so that blended number kept showing the deposit as still "due"
-// even once it was sitting in the drawer. Splitting it lets the UI show the
-// real rent balance on its own, with the deposit called out separately.
+// figure silently blends "the customer still owes rent" with the deposit
+// into one number. The deposit itself is never treated as still owed here —
+// it's almost always collected in cash at pickup and kept at the counter
+// rather than logged as an invoice payment the moment it changes hands, so
+// there's no reliable way to tell "collected but not logged" apart from
+// "genuinely outstanding" from the payment records alone. Labeling it "due"
+// in that gap reads as a debt the customer still owes, when in practice
+// it's simply being held pending the dress's return — so it's always shown
+// as held, never due. Splitting it out also lets the UI show the real rent
+// balance on its own.
 export interface InvoiceDueBreakdownInput {
   subtotal: number;
   discountAmount: number;
@@ -32,11 +35,11 @@ export interface InvoiceDueBreakdown {
   /** What's still owed for the rent itself. */
   rentDue: number;
   /**
-   * What's still owed toward the security deposit. Payments recorded on the
-   * invoice are applied to rent first, so this only clears once a payment
-   * covering the deposit is explicitly recorded (e.g. via Record Payment).
+   * The security deposit portion still sitting with the business, not yet
+   * refunded. Same value as `securityInTotal` — kept as its own field so
+   * call sites read "held", not "due", at the point of use.
    */
-  securityDue: number;
+  securityHeld: number;
 }
 
 export function getInvoiceDueBreakdown(invoice: InvoiceDueBreakdownInput): InvoiceDueBreakdown {
@@ -44,7 +47,5 @@ export function getInvoiceDueBreakdown(invoice: InvoiceDueBreakdownInput): Invoi
   const securityInTotal = Math.max(0, invoice.total - rentTotal);
   const paidTowardRent = Math.min(Math.max(0, invoice.amountPaid), rentTotal);
   const rentDue = Math.max(0, rentTotal - paidTowardRent);
-  const paidTowardSecurity = Math.max(0, invoice.amountPaid - rentTotal);
-  const securityDue = Math.max(0, securityInTotal - paidTowardSecurity);
-  return { rentTotal, securityInTotal, rentDue, securityDue };
+  return { rentTotal, securityInTotal, rentDue, securityHeld: securityInTotal };
 }

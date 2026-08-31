@@ -10,6 +10,7 @@ import {
   computeBookingSettlement,
 } from "@/lib/validations/booking";
 import { ACTIVE_BOOKING_STATUSES, findBookingConflicts } from "@/lib/admin/booking-availability";
+import { BOOKING_STATUS_TRANSITIONS, STATUS_LABELS } from "@/lib/admin/booking-status";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES, MANAGER_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog, diffObjects } from "@/lib/audit/log";
@@ -75,6 +76,21 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
     const before = await Booking.findById(id).lean();
     if (!before) {
       return apiError("Booking not found", 404);
+    }
+
+    // Enforce the same lifecycle order the status dropdown now offers
+    // (Inquiry -> Confirmed -> Picked Up -> Returned, Cancel from any
+    // non-final state) — a defense-in-depth check against a stale client
+    // or a direct API call skipping straight from, say, Inquiry to
+    // Returned, bypassing the intermediate steps entirely.
+    if (
+      input.status !== before.status &&
+      !BOOKING_STATUS_TRANSITIONS[before.status].includes(input.status)
+    ) {
+      return apiError(
+        `Booking is currently "${STATUS_LABELS[before.status]}" and can't move directly to "${STATUS_LABELS[input.status]}"`,
+        409
+      );
     }
 
     // Availability is only checked when a booking is first created or its
