@@ -123,11 +123,18 @@ export async function GET(request: NextRequest): Promise<Response> {
   ]);
 
   const summaryRow = summaryAgg[0] ?? { totalAmount: 0, securityDeposit: 0, advancePaid: 0 };
+  // Security deposits are held, not owed — excluded from "due" the same way
+  // invoices and the booking detail page treat them, so this tile doesn't
+  // read as outstanding rent when it's actually just the deposit sitting
+  // with the business pending return.
   const summary = {
     totalAmount: summaryRow.totalAmount,
     securityDeposit: summaryRow.securityDeposit,
     advancePaid: summaryRow.advancePaid,
-    dueAmount: summaryRow.totalAmount - summaryRow.advancePaid,
+    dueAmount: Math.max(
+      0,
+      summaryRow.totalAmount - summaryRow.securityDeposit - summaryRow.advancePaid
+    ),
   };
 
   const rawStatusCounts: Record<string, number> = {};

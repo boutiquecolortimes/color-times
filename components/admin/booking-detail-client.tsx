@@ -15,15 +15,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  BookingStatusBadge,
-  STATUS_LABELS,
-  BOOKING_STATUS_TRANSITIONS,
-} from "@/components/admin/booking-status-badge";
+import { BookingStatusBadge, STATUS_LABELS } from "@/components/admin/booking-status-badge";
 import { ReturnBookingDialog } from "@/components/admin/return-booking-dialog";
 import { ConfirmBookingDialog } from "@/components/admin/confirm-booking-dialog";
 import { PickupBookingDialog } from "@/components/admin/pickup-booking-dialog";
 import { AuditLogList } from "@/components/admin/audit-log-list";
+import { ImagePreviewDialog } from "@/components/admin/image-preview-dialog";
 import {
   ServiceOrderFormDialog,
   type ServiceOrderInitialValues,
@@ -34,9 +31,16 @@ import type { BookingStatus, ReturnCondition } from "@/models/Booking";
 
 const REMINDABLE_STATUSES: BookingStatus[] = ["inquiry", "confirmed", "in_use"];
 
-// The status dropdown's options now come from BOOKING_STATUS_TRANSITIONS —
-// only the states this booking can actually move to next, so staff can't
-// jump straight from Inquiry to Returned. See booking-status-badge.tsx.
+// "pending_payment" is dropped from the picker — it was never set
+// automatically anywhere and just added a confusing extra option. Still
+// recognized by the schema/badge for any pre-existing booking that has it.
+const STATUS_OPTIONS: BookingStatus[] = [
+  "inquiry",
+  "confirmed",
+  "in_use",
+  "returned",
+  "cancelled",
+];
 
 const RETURN_CONDITION_LABELS: Record<ReturnCondition, string> = {
   good: "Good — no issues",
@@ -124,6 +128,8 @@ export function BookingDetailClient({
   const [pickupDialogOpen, setPickupDialogOpen] = useState(false);
   const [dryCleanValues, setDryCleanValues] = useState<ServiceOrderInitialValues | null>(null);
   const [dryCleanDialogOpen, setDryCleanDialogOpen] = useState(false);
+  const [previewItemIndex, setPreviewItemIndex] = useState<number | null>(null);
+  const [previewImageIndex, setPreviewImageIndex] = useState(-1);
 
   const { data: booking = initialBooking } = useQuery({
     queryKey: ["admin", "booking", initialBooking._id],
@@ -160,6 +166,25 @@ export function BookingDetailClient({
     onSuccess: () => toast.success("Reminder sent"),
     onError: (error: Error) => toast.error(error.message),
   });
+
+  const previewItem = previewItemIndex !== null ? booking.items[previewItemIndex] : null;
+  const previewImages = previewItem?.product?.images ?? [];
+
+  function openImagePreview(itemIndex: number) {
+    if (!booking.items[itemIndex]?.product?.images?.length) return;
+    setPreviewItemIndex(itemIndex);
+    setPreviewImageIndex(0);
+  }
+
+  // The security deposit is almost always collected and held separately
+  // from rent — showing it as part of "Due" reads as money the customer
+  // still owes, when it's actually just sitting with the business pending
+  // the dress's return. Same split used on invoices: rent due on its own,
+  // deposit shown as held (never due), and 0 once it's been refunded back.
+  const rentTotal = Math.max(0, booking.totalAmount - booking.securityDeposit);
+  const paidTowardRent = Math.min(Math.max(0, booking.advancePaid ?? 0), rentTotal);
+  const rentDue = Math.max(0, rentTotal - paidTowardRent);
+  const securityHeld = booking.depositRefunded ? 0 : booking.securityDeposit;
 
   return (
     <div className="space-y-6">
@@ -234,13 +259,12 @@ export function BookingDetailClient({
               }
               updateStatusMutation.mutate(value as BookingStatus);
             }}
-            disabled={BOOKING_STATUS_TRANSITIONS[booking.status].length === 0}
           >
             <SelectTrigger className="w-48">
               <SelectValue>{(value: BookingStatus) => STATUS_LABELS[value]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {BOOKING_STATUS_TRANSITIONS[booking.status].map((option) => (
+              {STATUS_OPTIONS.map((option) => (
                 <SelectItem key={option} value={option}>
                   {STATUS_LABELS[option]}
                 </SelectItem>
@@ -294,13 +318,20 @@ export function BookingDetailClient({
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
                           {item.product?.images?.[0] && (
-                            <Image
-                              src={item.product.images[0]}
-                              alt={item.product.name}
-                              width={48}
-                              height={48}
-                              className="h-12 w-12 rounded-md object-cover"
-                            />
+                            <button
+                              type="button"
+                              onClick={() => openImagePreview(index)}
+                              className="relative h-12 w-12 shrink-0 cursor-zoom-in overflow-hidden rounded-md"
+                              aria-label={`Preview ${item.product.name} image`}
+                            >
+                              <Image
+                                src={item.product.images[0]}
+                                alt={item.product.name}
+                                fill
+                                sizes="48px"
+                                className="object-cover"
+                              />
+                            </button>
                           )}
                           <div>
                             <p className="text-sm font-medium">{item.product?.name ?? "—"}</p>
@@ -396,11 +427,15 @@ export function BookingDetailClient({
                   </p>
                 )}
                 <p className="flex justify-between border-t border-border pt-2 font-medium">
-                  <span>Due Amount</span>
-                  <span className="text-accent">
-                    {formatCurrency(booking.totalAmount - (booking.advancePaid ?? 0))}
-                  </span>
+                  <span>Rent Due</span>
+                  <span className="text-accent">{formatCurrency(rentDue)}</span>
                 </p>
+                {securityHeld > 0 && (
+                  <p className="flex justify-between">
+                    <span className="text-muted-foreground">Security Held</span>
+                    <span>{formatCurrency(securityHeld)}</span>
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -537,6 +572,21 @@ export function BookingDetailClient({
         editingOrder={null}
         initialValues={dryCleanValues}
       />
+
+      {previewItem?.product && previewImages.length > 0 && (
+        <ImagePreviewDialog
+          images={previewImages}
+          index={previewImageIndex}
+          onIndexChange={setPreviewImageIndex}
+          onOpenChange={(open) => {
+            if (!open) {
+              setPreviewImageIndex(-1);
+              setPreviewItemIndex(null);
+            }
+          }}
+          title={previewItem.product.name}
+        />
+      )}
     </div>
   );
 }

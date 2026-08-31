@@ -11,6 +11,7 @@ import {
   Grid3x3,
   List,
   Eye,
+  RotateCcw,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -24,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import {
   SaleFormDialog,
@@ -101,6 +103,11 @@ export function SalesClient({
   const [formOpen, setFormOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<SaleRow | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [permanentDeleteId, setPermanentDeleteId] = useState<string | null>(null);
+  const [bulkConfirmAction, setBulkConfirmAction] = useState<"delete" | "permanent-delete" | null>(
+    null
+  );
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const isDefaultQuery = page === 1 && view === "active" && sortBy === "createdAt" && sortDir === "desc";
 
@@ -111,6 +118,25 @@ export function SalesClient({
       setSortBy(field);
       setSortDir("asc");
     }
+  }
+
+  function changeView(next: "active" | "trash") {
+    setView(next);
+    setPage(1);
+    setSelectedIds(new Set());
+  }
+
+  function toggleSelectOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => (prev.size === sales.length ? new Set() : new Set(sales.map((s) => s._id))));
   }
 
   const { data } = useQuery({
@@ -136,7 +162,7 @@ export function SalesClient({
       return json.data;
     },
     onSuccess: () => {
-      toast.success("Sale deleted");
+      toast.success("Sale moved to trash");
       invalidate();
       setDeleteId(null);
     },
@@ -154,12 +180,84 @@ export function SalesClient({
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const restoreMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/sales/${id}/restore`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data;
+    },
+    onSuccess: () => {
+      toast.success("Sale restored");
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const permanentDeleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/sales/${id}/permanent`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data;
+    },
+    onSuccess: () => {
+      toast.success("Sale permanently deleted");
+      invalidate();
+      setPermanentDeleteId(null);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const bulkActionMutation = useMutation({
+    mutationFn: async ({
+      ids,
+      action,
+    }: {
+      ids: string[];
+      action: "delete" | "restore" | "permanent-delete";
+    }) => {
+      const res = await fetch("/api/admin/sales/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, action }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data;
+    },
+    onSuccess: (_data, variables) => {
+      if (variables.action === "permanent-delete") {
+        toast.success(
+          `Permanently deleted ${variables.ids.length} sale${variables.ids.length === 1 ? "" : "s"}`
+        );
+      } else if (variables.action === "restore") {
+        toast.success(`Restored ${variables.ids.length} sale${variables.ids.length === 1 ? "" : "s"}`);
+      } else {
+        toast.success(
+          `Moved ${variables.ids.length} sale${variables.ids.length === 1 ? "" : "s"} to trash`
+        );
+      }
+      invalidate();
+      setSelectedIds(new Set());
+      setBulkConfirmAction(null);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const cardGrid = (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {sales.map((sale) => (
         <div key={sale._id} className="rounded-lg border border-border bg-card p-4">
           <div className="flex items-start justify-between gap-3">
-            <p className="font-medium">{sale.billNumber}</p>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={selectedIds.has(sale._id)}
+                onCheckedChange={() => toggleSelectOne(sale._id)}
+                aria-label={`Select ${sale.billNumber}`}
+              />
+              <p className="font-medium">{sale.billNumber}</p>
+            </div>
             <p className="text-sm font-medium text-accent">{formatCurrency(sale.totalAmount)}</p>
           </div>
           <p className="mt-2 text-sm">{sale.customerName}</p>
@@ -167,50 +265,78 @@ export function SalesClient({
           <p className="mt-2 text-sm text-muted-foreground">{sale.product?.name ?? "—"}</p>
           <p className="text-xs text-muted-foreground">{sale.product?.sku}</p>
           <p className="mt-2 text-xs text-muted-foreground">Sale date {formatDate(sale.saleDate)}</p>
-          {view === "active" && (
-            <div className="mt-3 flex justify-end gap-1">
-              <ButtonLink
-                variant="ghost"
-                size="icon"
-                href={`/admin/sales/${sale._id}`}
-                title="View details"
-              >
-                <Eye className="h-4 w-4" />
-              </ButtonLink>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => sendMutation.mutate(sale._id)}
-                title="Send via WhatsApp"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-              {canEdit && (
+          <div className="mt-3 flex justify-end gap-1">
+            {view === "trash" ? (
+              <>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => {
-                    setEditingSale(sale);
-                    setFormOpen(true);
-                  }}
+                  disabled={restoreMutation.isPending}
+                  onClick={() => restoreMutation.mutate(sale._id)}
+                  title="Restore"
                 >
-                  <Pencil className="h-4 w-4" />
+                  <RotateCcw className="h-4 w-4" />
                 </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-destructive"
-                onClick={() => setDeleteId(sale._id)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
+                {canEdit && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive"
+                    disabled={permanentDeleteMutation.isPending}
+                    onClick={() => setPermanentDeleteId(sale._id)}
+                    title="Delete permanently"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </>
+            ) : (
+              <>
+                <ButtonLink
+                  variant="ghost"
+                  size="icon"
+                  href={`/admin/sales/${sale._id}`}
+                  title="View details"
+                >
+                  <Eye className="h-4 w-4" />
+                </ButtonLink>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => sendMutation.mutate(sale._id)}
+                  title="Send via WhatsApp"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+                {canEdit && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setEditingSale(sale);
+                      setFormOpen(true);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-destructive"
+                  onClick={() => setDeleteId(sale._id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       ))}
       {sales.length === 0 && (
-        <p className="col-span-full py-10 text-center text-muted-foreground">No sales found.</p>
+        <p className="col-span-full py-10 text-center text-muted-foreground">
+          {view === "trash" ? "Trash is empty." : "No sales found."}
+        </p>
       )}
     </div>
   );
@@ -235,10 +361,7 @@ export function SalesClient({
       <div className="flex flex-wrap items-center gap-3">
         <Select
           value={view}
-          onValueChange={(value) => {
-            setView((value as "active" | "trash") ?? "active");
-            setPage(1);
-          }}
+          onValueChange={(value) => changeView((value as "active" | "trash") ?? "active")}
         >
           <SelectTrigger className="w-36">
             <SelectValue>{(value: string) => (value === "active" ? "Active" : "Trash")}</SelectValue>
@@ -268,15 +391,69 @@ export function SalesClient({
         </div>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2.5">
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <div className="ml-auto flex flex-wrap gap-2">
+            {view === "trash" ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={bulkActionMutation.isPending}
+                  onClick={() =>
+                    bulkActionMutation.mutate({ ids: Array.from(selectedIds), action: "restore" })
+                  }
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Restore
+                </Button>
+                {canEdit && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={bulkActionMutation.isPending}
+                    onClick={() => setBulkConfirmAction("permanent-delete")}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete Permanently
+                  </Button>
+                )}
+              </>
+            ) : (
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={bulkActionMutation.isPending}
+                onClick={() => setBulkConfirmAction("delete")}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Move to Trash
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="lg:hidden">{cardGrid}</div>
 
       {layout === "card" ? (
         <div className="hidden lg:block">{cardGrid}</div>
       ) : (
       <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
-        <table className="w-full min-w-[760px] text-sm whitespace-nowrap">
+        <table className="w-full min-w-[820px] text-sm whitespace-nowrap">
           <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
+              <th className="px-4 py-3">
+                <Checkbox
+                  checked={sales.length > 0 && selectedIds.size === sales.length}
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Select all"
+                />
+              </th>
               <th className="px-4 py-3">
                 <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("billNumber")}>
                   Bill # <SortIcon field="billNumber" sortBy={sortBy} sortDir={sortDir} />
@@ -304,6 +481,13 @@ export function SalesClient({
           <tbody>
             {sales.map((sale) => (
               <tr key={sale._id} className="border-b border-border last:border-0">
+                <td className="px-4 py-3">
+                  <Checkbox
+                    checked={selectedIds.has(sale._id)}
+                    onCheckedChange={() => toggleSelectOne(sale._id)}
+                    aria-label={`Select ${sale.billNumber}`}
+                  />
+                </td>
                 <td className="px-4 py-3 font-medium">{sale.billNumber}</td>
                 <td className="px-4 py-3">
                   <p>{sale.customerName}</p>
@@ -318,53 +502,79 @@ export function SalesClient({
                   {formatDate(sale.saleDate)}
                 </td>
                 <td className="px-4 py-3">
-                  {view === "active" && (
-                    <div className="flex justify-end gap-1">
-                      <ButtonLink
-                        variant="ghost"
-                        size="icon"
-                        href={`/admin/sales/${sale._id}`}
-                        title="View details"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </ButtonLink>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => sendMutation.mutate(sale._id)}
-                        title="Send via WhatsApp"
-                      >
-                        <Send className="h-4 w-4" />
-                      </Button>
-                      {canEdit && (
+                  <div className="flex justify-end gap-1">
+                    {view === "trash" ? (
+                      <>
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => {
-                            setEditingSale(sale);
-                            setFormOpen(true);
-                          }}
+                          disabled={restoreMutation.isPending}
+                          onClick={() => restoreMutation.mutate(sale._id)}
+                          title="Restore"
                         >
-                          <Pencil className="h-4 w-4" />
+                          <RotateCcw className="h-4 w-4" />
                         </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive"
-                        onClick={() => setDeleteId(sale._id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
+                        {canEdit && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive"
+                            disabled={permanentDeleteMutation.isPending}
+                            onClick={() => setPermanentDeleteId(sale._id)}
+                            title="Delete permanently"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <ButtonLink
+                          variant="ghost"
+                          size="icon"
+                          href={`/admin/sales/${sale._id}`}
+                          title="View details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </ButtonLink>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => sendMutation.mutate(sale._id)}
+                          title="Send via WhatsApp"
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                        {canEdit && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setEditingSale(sale);
+                              setFormOpen(true);
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive"
+                          onClick={() => setDeleteId(sale._id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
             {sales.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
-                  No sales found.
+                <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                  {view === "trash" ? "Trash is empty." : "No sales found."}
                 </td>
               </tr>
             )}
@@ -398,6 +608,40 @@ export function SalesClient({
         variant="destructive"
         isLoading={deleteMutation.isPending}
         onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
+      />
+
+      <ConfirmDialog
+        open={permanentDeleteId !== null}
+        onOpenChange={(open) => !open && setPermanentDeleteId(null)}
+        title="Permanently delete sale?"
+        description="This cannot be undone."
+        confirmLabel="Delete Permanently"
+        variant="destructive"
+        isLoading={permanentDeleteMutation.isPending}
+        onConfirm={() => permanentDeleteId && permanentDeleteMutation.mutate(permanentDeleteId)}
+      />
+
+      <ConfirmDialog
+        open={bulkConfirmAction !== null}
+        onOpenChange={(open) => !open && setBulkConfirmAction(null)}
+        title={
+          bulkConfirmAction === "permanent-delete"
+            ? `Permanently delete ${selectedIds.size} sale${selectedIds.size === 1 ? "" : "s"}?`
+            : `Move ${selectedIds.size} sale${selectedIds.size === 1 ? "" : "s"} to trash?`
+        }
+        description={
+          bulkConfirmAction === "permanent-delete"
+            ? "This cannot be undone."
+            : "You can restore these from the Trash view at any time."
+        }
+        confirmLabel={bulkConfirmAction === "permanent-delete" ? "Delete Permanently" : "Move to Trash"}
+        variant="destructive"
+        isLoading={bulkActionMutation.isPending}
+        onConfirm={() => {
+          if (bulkConfirmAction) {
+            bulkActionMutation.mutate({ ids: Array.from(selectedIds), action: bulkConfirmAction });
+          }
+        }}
       />
     </div>
   );

@@ -101,6 +101,15 @@ function formatINR(value: number): string {
   return `₹${Math.round(value).toLocaleString("en-IN")}`;
 }
 
+// The security deposit is usually collected and held separately from rent,
+// so folding it into "Due" makes it read as money the customer still owes.
+// Same split used on invoices/booking detail: only the unpaid rent counts
+// as due — the deposit is shown in its own "Security" column instead.
+function bookingDueAmount(booking: { totalAmount: number; securityDeposit: number; advancePaid: number }): number {
+  const rentTotal = Math.max(0, booking.totalAmount - booking.securityDeposit);
+  return Math.max(0, rentTotal - booking.advancePaid);
+}
+
 function SortIcon({
   field,
   sortBy,
@@ -353,7 +362,7 @@ export function BookingsClient({
       booking.totalAmount,
       booking.securityDeposit,
       booking.advancePaid,
-      booking.totalAmount - booking.advancePaid,
+      bookingDueAmount(booking),
       STATUS_LABELS[booking.status],
     ]);
   }
@@ -372,7 +381,7 @@ export function BookingsClient({
       rows.reduce((sum, b) => sum + b.totalAmount, 0),
       rows.reduce((sum, b) => sum + b.securityDeposit, 0),
       rows.reduce((sum, b) => sum + b.advancePaid, 0),
-      rows.reduce((sum, b) => sum + (b.totalAmount - b.advancePaid), 0),
+      rows.reduce((sum, b) => sum + bookingDueAmount(b), 0),
       "",
     ];
   }
@@ -468,7 +477,7 @@ export function BookingsClient({
             <span className="text-right">{formatINR(booking.advancePaid)}</span>
             <span>Due</span>
             <span className="text-right font-medium text-accent">
-              {formatINR(booking.totalAmount - booking.advancePaid)}
+              {formatINR(bookingDueAmount(booking))}
             </span>
           </div>
           <div className="mt-3 flex items-center gap-2">
@@ -944,7 +953,7 @@ export function BookingsClient({
                       {formatINR(booking.advancePaid)}
                     </td>
                     <td className="px-4 py-3 font-medium text-accent">
-                      {formatINR(booking.totalAmount - booking.advancePaid)}
+                      {formatINR(bookingDueAmount(booking))}
                     </td>
                     <td className="px-4 py-3">
                       <BookingStatusBadge status={booking.status} />

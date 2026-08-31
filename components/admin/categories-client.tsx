@@ -56,6 +56,7 @@ import {
 } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ImageUploadField } from "@/components/admin/image-upload-field";
+import { ImagePreviewDialog } from "@/components/admin/image-preview-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { useCanEdit } from "@/components/admin/current-user-context";
@@ -133,6 +134,8 @@ export function CategoriesClient({
     null
   );
   const [isExporting, setIsExporting] = useState(false);
+  const [previewCategoryId, setPreviewCategoryId] = useState<string | null>(null);
+  const [previewIndex, setPreviewIndex] = useState(-1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const isDefaultQuery = status === "active" && page === 1 && sortBy === "displayOrder";
@@ -192,6 +195,14 @@ export function CategoriesClient({
     setEditing(category);
     form.reset(category);
     setDialogOpen(true);
+  }
+
+  const previewCategory = categories.find((category) => category._id === previewCategoryId) ?? null;
+
+  function openImagePreview(category: CategoryRow) {
+    if (!category.heroImage) return;
+    setPreviewCategoryId(category._id);
+    setPreviewIndex(0);
   }
 
   const saveMutation = useMutation({
@@ -377,13 +388,20 @@ export function CategoriesClient({
         <div key={category._id} className="overflow-hidden rounded-lg border border-border bg-card">
           <div className="relative aspect-square bg-secondary">
             {category.heroImage ? (
-              <Image
-                src={category.heroImage}
-                alt={category.name}
-                fill
-                sizes="(min-width: 1280px) 25vw, (min-width: 640px) 33vw, 50vw"
-                className="object-cover"
-              />
+              <button
+                type="button"
+                onClick={() => openImagePreview(category)}
+                className="absolute inset-0 h-full w-full cursor-zoom-in"
+                aria-label={`Preview ${category.name} image`}
+              >
+                <Image
+                  src={category.heroImage}
+                  alt={category.name}
+                  fill
+                  sizes="(min-width: 1280px) 25vw, (min-width: 640px) 33vw, 50vw"
+                  className="object-cover"
+                />
+              </button>
             ) : (
               <Image
                 src="/logo.png"
@@ -615,7 +633,14 @@ export function CategoriesClient({
                 <td className="px-4 py-3">
                   <div className="relative h-10 w-10 overflow-hidden rounded-md bg-secondary">
                     {category.heroImage ? (
-                      <Image src={category.heroImage} alt={category.name} fill sizes="40px" className="object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => openImagePreview(category)}
+                        className="absolute inset-0 h-full w-full cursor-zoom-in"
+                        aria-label={`Preview ${category.name} image`}
+                      >
+                        <Image src={category.heroImage} alt={category.name} fill sizes="40px" className="object-cover" />
+                      </button>
                     ) : (
                       <Image
                         src="/logo.png"
@@ -779,6 +804,21 @@ export function CategoriesClient({
           </Form>
         </DialogContent>
       </Dialog>
+
+      {previewCategory?.heroImage && (
+        <ImagePreviewDialog
+          images={[previewCategory.heroImage]}
+          index={previewIndex}
+          onIndexChange={setPreviewIndex}
+          onOpenChange={(open) => {
+            if (!open) {
+              setPreviewIndex(-1);
+              setPreviewCategoryId(null);
+            }
+          }}
+          title={previewCategory.name}
+        />
+      )}
 
       <ConfirmDialog
         open={deleteTarget !== null}

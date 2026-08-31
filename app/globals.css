@@ -223,6 +223,34 @@
   background: linear-gradient(180deg, #28081a 0%, var(--sidebar) 100%);
 }
 
+/* Themed scrollbars for the admin panel — tables (their overflow-x-auto
+   wrapper), dropdowns, dialogs, and any other scrollable region get a thin
+   wine/gold bar matching the panel instead of the browser's plain grey
+   default. Scoped to .admin-theme so the public storefront is untouched. */
+.admin-theme * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.admin-theme *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.admin-theme *::-webkit-scrollbar-track {
+  background: transparent;
+}
+.admin-theme *::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.admin-theme *::-webkit-scrollbar-thumb:hover {
+  background-color: var(--accent);
+}
+.admin-theme *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
