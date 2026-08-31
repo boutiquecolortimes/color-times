@@ -40,6 +40,7 @@ import {
 import { InvoiceStatusBadge } from "@/components/admin/invoice-status-badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { useCanEdit } from "@/components/admin/current-user-context";
 import { downloadPdf, downloadExcel } from "@/lib/admin/export";
 import { getInvoiceDueBreakdown } from "@/lib/admin/invoice-totals";
 import { customerContact, formatDate } from "@/lib/utils";
@@ -131,6 +132,7 @@ export function InvoicesClient({
 }) {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const canEdit = useCanEdit();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("all");
   const [view, setView] = useState<"active" | "trash">("active");
@@ -138,9 +140,11 @@ export function InvoicesClient({
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [confirmState, setConfirmState] = useState<{ type: "cancel" | "delete"; id: string } | null>(
-    null
-  );
+  const [confirmState, setConfirmState] = useState<{
+    type: "cancel" | "delete";
+    id: string;
+    wasPaid?: boolean;
+  } | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [permanentDeleteTarget, setPermanentDeleteTarget] = useState<InvoiceRow | null>(null);
@@ -456,9 +460,15 @@ export function InvoicesClient({
                       Send
                     </DropdownMenuItem>
                   )}
-                  {invoice.status !== "paid" && invoice.status !== "cancelled" && (
+                  {invoice.status !== "cancelled" && (invoice.status !== "paid" || canEdit) && (
                     <DropdownMenuItem
-                      onClick={() => setConfirmState({ type: "cancel", id: invoice._id })}
+                      onClick={() =>
+                        setConfirmState({
+                          type: "cancel",
+                          id: invoice._id,
+                          wasPaid: invoice.status === "paid",
+                        })
+                      }
                     >
                       Cancel
                     </DropdownMenuItem>
@@ -843,7 +853,9 @@ export function InvoicesClient({
         description={
           confirmState?.type === "delete"
             ? "This will move the invoice to trash. You can restore it later."
-            : "This will mark the invoice as cancelled. This cannot be undone."
+            : confirmState?.wasPaid
+              ? "This invoice is marked Paid. Cancelling it will remove it from your Paid revenue totals and reports — the payment itself isn't reversed, only the invoice record. This cannot be undone."
+              : "This will mark the invoice as cancelled. This cannot be undone."
         }
         confirmLabel={confirmState?.type === "delete" ? "Delete" : "Cancel Invoice"}
         variant="destructive"

@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Invoice } from "@/models/Invoice";
 import { requireApiRole } from "@/lib/api/require-role";
-import { ADMIN_ROLES } from "@/lib/auth/roles";
+import { ADMIN_ROLES, MANAGER_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 
@@ -21,8 +21,16 @@ export async function POST(
     if (!existing) {
       return apiError("Invoice not found", 404);
     }
-    if (existing.status === "paid" || existing.status === "cancelled") {
-      return apiError(`Cannot cancel an invoice that is already ${existing.status}`, 409);
+    if (existing.status === "cancelled") {
+      return apiError("Invoice is already cancelled", 409);
+    }
+
+    // Cancelling a Paid invoice pulls it out of revenue reporting, so it
+    // needs a manager-level account, not just any staff login — same bar as
+    // permanently deleting a record. Cancelling anything else (draft, sent,
+    // partially paid, overdue) stays open to any admin-role user, as before.
+    if (existing.status === "paid" && !MANAGER_ROLES.includes(auth.user.role)) {
+      return apiError("You do not have permission to cancel a paid invoice", 403);
     }
 
     const invoice = await Invoice.findByIdAndUpdate(
@@ -37,6 +45,7 @@ export async function POST(
       action: "status_change",
       actor: auth.user,
       changes: [{ field: "status", from: existing.status, to: "cancelled" }],
+      metadata: existing.status === "paid" ? { cancelledFromPaid: true } : undefined,
     });
 
     return apiSuccess({ invoice });
