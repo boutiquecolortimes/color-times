@@ -32,6 +32,7 @@ export default async function AdminInvoicesPage() {
     discountAmount: invoice.discountAmount,
     taxAmount: invoice.taxAmount,
     securityDeposit: invoice.securityDeposit,
+    depositRefunded: invoice.depositRefunded,
     total: invoice.total,
     amountPaid: invoice.amountPaid,
     amountDue: invoice.amountDue,
