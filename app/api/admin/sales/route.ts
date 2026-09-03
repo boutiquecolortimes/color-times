@@ -88,6 +88,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       customerName: input.customerName,
       customerPhone: input.customerPhone,
       customerAddress: input.customerAddress,
+      customer: input.customer || undefined,
       product: input.product,
       details: input.details,
       totalAmount: input.totalAmount,

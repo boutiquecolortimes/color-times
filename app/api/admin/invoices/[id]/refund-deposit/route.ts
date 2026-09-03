@@ -21,8 +21,12 @@ export async function POST(
     if (!existing) {
       return apiError("Invoice not found", 404);
     }
-    if (existing.status !== "paid") {
-      return apiError("Deposit can only be refunded on paid invoices", 409);
+    // The deposit is held and returned independently of the rent balance —
+    // requiring the whole invoice to be "paid" first left a genuinely
+    // already-returned deposit with no way to be marked as such whenever
+    // anything else (rent, damage charges) was still outstanding.
+    if (existing.status === "cancelled") {
+      return apiError("Deposit can't be refunded on a cancelled invoice", 409);
     }
     if (existing.securityDeposit <= 0) {
       return apiError("This invoice has no security deposit to refund", 409);

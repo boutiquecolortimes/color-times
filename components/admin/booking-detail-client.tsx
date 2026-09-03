@@ -57,10 +57,10 @@ interface BookingItemDetail {
   rentalFee: number;
   wearerName?: string;
   measurements?: {
-    upperChest?: number;
-    lowerChest?: number;
-    sleeveLength?: number;
-    armhole?: number;
+    upperChest?: string;
+    lowerChest?: string;
+    sleeveLength?: string;
+    armhole?: string;
     other?: string;
   };
 }
@@ -410,8 +410,11 @@ export function BookingDetailClient({
                   </p>
                 ))}
                 <p className="flex justify-between">
-                  <span className="text-muted-foreground">Security Deposit</span>
-                  <span>{formatCurrency(booking.securityDeposit)}</span>
+                  <span className="text-muted-foreground">Security To Be Returned</span>
+                  <span>
+                    {formatCurrency(booking.securityDeposit)}
+                    {booking.depositRefunded && " (Refunded)"}
+                  </span>
                 </p>
                 <p className="flex justify-between font-medium">
                   <span>Total</span>

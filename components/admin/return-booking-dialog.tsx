@@ -168,12 +168,47 @@ export function ReturnBookingDialog({
     onError: (error: Error) => toast.error(error.message),
   });
 
+  // "Skip for now" used to just close the dialog — the booking itself was
+  // already settled by the mutation above (damage charges, deposit
+  // refunded, final total), but an invoice generated earlier at Confirm or
+  // Pickup was left exactly as it was, so the Invoice page could go on
+  // showing the pre-return numbers (and an unrefunded deposit) forever.
+  // Calling the same sync used by "Generate Invoice" — without navigating
+  // there — brings that invoice in line with the settlement even when
+  // nobody opens it right away.
+  const syncInvoiceMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/invoices/from-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data.invoice;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "sales"] });
+      resetForm();
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      // The booking is already settled either way — a failure here just
+      // means the invoice sync didn't go through, not that Return itself
+      // failed, so still close instead of trapping staff in the dialog.
+      toast.error(`Booking settled, but the invoice couldn't be synced: ${error.message}`);
+      resetForm();
+      onOpenChange(false);
+    },
+  });
+
   function handleSkipInvoice() {
-    resetForm();
-    onOpenChange(false);
+    syncInvoiceMutation.mutate();
   }
 
-  const isBusy = mutation.isPending || generateInvoiceMutation.isPending;
+  const isBusy =
+    mutation.isPending || generateInvoiceMutation.isPending || syncInvoiceMutation.isPending;
 
   return (
     <Dialog open={open} onOpenChange={(next) => !isBusy && onOpenChange(next)}>
@@ -190,7 +225,15 @@ export function ReturnBookingDialog({
           <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">
-                {finalSettlementAmount > 0 ? "Pending amount" : "Refund due"}
+                {finalSettlementAmount > 0
+                  ? "Pending amount"
+                  : // depositRefunded was just submitted along with this
+                    // return, so if it's checked, the refund already
+                    // happened — showing "due" here would flatly contradict
+                    // what staff just did.
+                    depositRefunded
+                    ? "Refunded"
+                    : "Refund due"}
               </span>
               <span
                 className={cn(
@@ -207,6 +250,7 @@ export function ReturnBookingDialog({
 
           <DialogFooter>
             <Button variant="outline" onClick={handleSkipInvoice} disabled={isBusy}>
+              {syncInvoiceMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Skip for now
             </Button>
             <Button
@@ -339,7 +383,7 @@ export function ReturnBookingDialog({
               ) : (
                 <>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Security deposit held</span>
+                    <span className="text-muted-foreground">Security To Be Returned</span>
                     <span>{formatCurrency(securityDeposit)}</span>
                   </div>
                   <div className="flex justify-between">

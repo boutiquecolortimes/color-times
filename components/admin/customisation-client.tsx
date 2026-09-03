@@ -38,11 +38,7 @@ import { CustomisationStatusBadge } from "@/components/admin/customisation-statu
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { useCanEdit } from "@/components/admin/current-user-context";
-import {
-  CustomisationFormDialog,
-  type CustomisationOrderRow,
-  type CustomerOption,
-} from "@/components/admin/customisation-form-dialog";
+import type { CustomisationOrderRow, CustomerOption } from "@/components/admin/customisation-form-dialog";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 import { formatDate } from "@/lib/utils";
 import type { CustomisationOrderStatus } from "@/models/CustomisationOrder";
@@ -116,8 +112,6 @@ export function CustomisationClient({
   const [layout, setLayout] = useState<"table" | "card">("table");
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [formOpen, setFormOpen] = useState(false);
-  const [editingOrder, setEditingOrder] = useState<CustomisationOrderRow | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -302,16 +296,14 @@ export function CustomisationClient({
                   <Send className="h-4 w-4" />
                 </Button>
                 {canEdit && (
-                  <Button
+                  <ButtonLink
                     variant="ghost"
                     size="icon"
-                    onClick={() => {
-                      setEditingOrder(order);
-                      setFormOpen(true);
-                    }}
+                    href={`/admin/customisation/${order._id}/edit`}
+                    title="Edit"
                   >
                     <Pencil className="h-4 w-4" />
-                  </Button>
+                  </ButtonLink>
                 )}
                 <Button
                   variant="ghost"
@@ -544,16 +536,14 @@ export function CustomisationClient({
                         <Send className="h-4 w-4" />
                       </Button>
                       {canEdit && (
-                        <Button
+                        <ButtonLink
                           variant="ghost"
                           size="icon"
-                          onClick={() => {
-                            setEditingOrder(order);
-                            setFormOpen(true);
-                          }}
+                          href={`/admin/customisation/${order._id}/edit`}
+                          title="Edit"
                         >
                           <Pencil className="h-4 w-4" />
-                        </Button>
+                        </ButtonLink>
                       )}
                       <Button
                         variant="ghost"
@@ -586,13 +576,6 @@ export function CustomisationClient({
         total={pagination.total}
         itemLabel="orders"
         onPageChange={setPage}
-      />
-
-      <CustomisationFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        customers={customers}
-        editingOrder={editingOrder}
       />
 
       <ConfirmDialog

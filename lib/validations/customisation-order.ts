@@ -7,6 +7,9 @@ export const customisationOrderSchema = z.object({
   customerName: z.string().trim().min(1, "Customer name is required"),
   customerPhone: phoneSchema,
   customerAddress: z.string().trim().min(1, "Address is required"),
+  // Set when the order is created against a real customer via the picker —
+  // lets the customer's own profile page show this as real order history.
+  customer: z.string().trim().optional().or(z.literal("")),
   stitchingType: z.string().trim().min(1, "Stitching type is required"),
   detail: z.string().trim().min(1, "Detail is required"),
   measurements: measurementsZodSchema.optional(),

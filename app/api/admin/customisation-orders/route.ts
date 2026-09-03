@@ -77,6 +77,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       customerName: input.customerName,
       customerPhone: input.customerPhone,
       customerAddress: input.customerAddress,
+      customer: input.customer || undefined,
       stitchingType: input.stitchingType,
       detail: input.detail,
       measurements: input.measurements ?? {},

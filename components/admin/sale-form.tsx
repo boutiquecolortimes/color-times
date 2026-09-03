@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -36,16 +36,23 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  customisationOrderSchema,
-  computeCustomisationDue,
-  type CustomisationOrderInput,
-} from "@/lib/validations/customisation-order";
-import type { CustomisationMeasurements } from "@/models/CustomisationOrder";
+import { saleSchema, type SaleInput } from "@/lib/validations/sale";
 import type { CustomerCreateInput } from "@/lib/validations/customer";
-import { MEASUREMENT_FIELD_DEFS } from "@/lib/config/measurement-fields";
 import { customerContact } from "@/lib/utils";
-import type { CustomerOption } from "@/components/admin/customisation-form-dialog";
+
+export interface ProductOption {
+  _id: string;
+  name: string;
+  sku: string;
+}
+
+export interface CustomerOption {
+  _id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  address?: string;
+}
 
 const RELATION_OPTIONS = ["S/O", "D/O", "W/O"] as const;
 
@@ -62,52 +69,51 @@ const quickCustomerSchema = z.object({
 
 type QuickCustomerInput = z.infer<typeof quickCustomerSchema>;
 
-const MEASUREMENT_FIELDS: { key: keyof CustomisationMeasurements; label: string }[] =
-  MEASUREMENT_FIELD_DEFS;
-
-const EMPTY_VALUES: CustomisationOrderInput = {
-  orderDate: new Date().toISOString().slice(0, 10),
+const EMPTY_VALUES: SaleInput = {
+  saleDate: new Date().toISOString().slice(0, 10),
   customerName: "",
   customerPhone: "",
   customerAddress: "",
   customer: "",
-  stitchingType: "",
-  detail: "",
-  measurements: {},
+  product: "",
+  details: "",
   totalAmount: 0,
-  advancePayment: 0,
-  notes: "",
 };
 
-// A full page for both New and Edit — matches how Sale's own form works
-// (components/admin/sale-form.tsx) rather than the "big popup" this used to
-// open as for editing (see customisation-form-dialog.tsx, now unused).
-// `orderId` present means Edit; absent means New.
-export function CustomisationOrderForm({
-  orderId,
+// A full page for both New and Edit — matches how Booking's own form works
+// (components/admin/booking-form.tsx), rather than the "big popup" this
+// used to open as (see sale-form-dialog.tsx, now unused). `saleId` present
+// means Edit; absent means New.
+export function SaleForm({
+  saleId,
   defaultValues,
+  products,
   customers,
 }: {
-  orderId?: string;
-  defaultValues?: CustomisationOrderInput;
+  saleId?: string;
+  defaultValues?: SaleInput;
+  products: ProductOption[];
   customers: CustomerOption[];
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const isEditing = Boolean(orderId);
+  const isEditing = Boolean(saleId);
   const [customerList, setCustomerList] = useState<CustomerOption[]>(customers);
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
 
-  const form = useForm<CustomisationOrderInput>({
-    resolver: zodResolver(customisationOrderSchema),
-    defaultValues: defaultValues ?? EMPTY_VALUES,
+  const form = useForm<SaleInput>({
+    resolver: zodResolver(saleSchema),
+    defaultValues: useMemo(() => defaultValues ?? EMPTY_VALUES, [defaultValues]),
   });
+
+  const productValue = form.watch("product");
+  const selectedProduct = products.find((p) => p._id === productValue);
 
   function applyCustomer(customer: CustomerOption) {
     form.setValue("customerName", customer.name);
-    // Links this order to the real customer record — lets it show up as
-    // real order history on the customer's own profile page instead of
-    // only matching on name/phone spelling.
+    // Links this sale to the real customer record — lets it show up as real
+    // order history on the customer's own profile page instead of only
+    // matching on name/phone spelling.
     form.setValue("customer", customer._id);
     if (customer.phone) form.setValue("customerPhone", customer.phone);
     if (customer.address) form.setValue("customerAddress", customer.address);
@@ -123,7 +129,7 @@ export function CustomisationOrderForm({
       const digits = values.phone.replace(/[^0-9]/g, "") || "customer";
       const payload: CustomerCreateInput = {
         name: values.name,
-        // Walk-in orders usually don't come with an email — generate a
+        // Walk-in sales usually don't come with an email — generate a
         // unique placeholder so account creation isn't blocked on one.
         email: `${digits}.${Date.now()}@walkin.vchuki.local`,
         phone: values.phone,
@@ -159,18 +165,9 @@ export function CustomisationOrderForm({
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const totalAmount = form.watch("totalAmount");
-  const advancePayment = form.watch("advancePayment");
-  const dueAmount = computeCustomisationDue({
-    totalAmount: totalAmount || 0,
-    advancePayment: advancePayment || 0,
-  });
-
   const mutation = useMutation({
-    mutationFn: async (values: CustomisationOrderInput) => {
-      const url = isEditing
-        ? `/api/admin/customisation-orders/${orderId}`
-        : "/api/admin/customisation-orders";
+    mutationFn: async (values: SaleInput) => {
+      const url = isEditing ? `/api/admin/sales/${saleId}` : "/api/admin/sales";
       const res = await fetch(url, {
         method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -178,18 +175,13 @@ export function CustomisationOrderForm({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
-      return json.data.order as { _id: string };
+      return json.data.sale as { _id: string };
     },
-    onSuccess: () => {
-      toast.success(isEditing ? "Order updated" : "Order created");
-      // router.refresh() alone re-fetches the server component's data, but
-      // the Customisation list's own React Query cache (staleTime: 60s in
-      // app/providers.tsx) can still be holding an older, still-"fresh"
-      // result from before this order existed — invalidate it directly so
-      // the list shows the change immediately instead of only after a
-      // manual page reload (or up to a minute later).
-      queryClient.invalidateQueries({ queryKey: ["admin", "customisation-orders"] });
-      router.push("/admin/customisation");
+    onSuccess: (sale) => {
+      toast.success(isEditing ? "Sale updated" : "Sale created");
+      queryClient.invalidateQueries({ queryKey: ["admin", "sales"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
+      router.push(isEditing ? `/admin/sales/${sale._id}` : "/admin/sales");
       router.refresh();
     },
     onError: (error: Error) => toast.error(error.message),
@@ -203,39 +195,10 @@ export function CustomisationOrderForm({
           className="space-y-6"
         >
           <section className="space-y-4 rounded-lg border border-border bg-card p-6">
-            <h2 className="font-heading text-lg">Order Details</h2>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="orderDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Order Date</FormLabel>
-                    <FormControl>
-                      <DatePicker value={field.value} onChange={field.onChange} className="w-full" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="stitchingType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Stitching Type</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. Blouse, Lehenga" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <h2 className="font-heading text-lg">Customer</h2>
 
             <FormItem>
-              <FormLabel>Customer</FormLabel>
+              <FormLabel>Search Customer</FormLabel>
               <div className="flex gap-2">
                 <SearchableSelect
                   value=""
@@ -306,13 +269,47 @@ export function CustomisationOrderForm({
                 </FormItem>
               )}
             />
+          </section>
+
+          <section className="space-y-4 rounded-lg border border-border bg-card p-6">
+            <h2 className="font-heading text-lg">Sale Details</h2>
 
             <FormField
               control={form.control}
-              name="detail"
+              name="product"
+              render={() => (
+                <FormItem>
+                  <FormLabel>Product</FormLabel>
+                  <FormControl>
+                    <SearchableSelect
+                      value={productValue}
+                      onChange={(value) => form.setValue("product", value)}
+                      placeholder="Select a product"
+                      searchPlaceholder="Search by name or code..."
+                      emptyText="No products found."
+                      options={products.map((product) => ({
+                        value: product._id,
+                        label: `${product.name} (${product.sku})`,
+                      }))}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {selectedProduct && (
+              <p className="text-xs text-muted-foreground">
+                Selling {selectedProduct.name} ({selectedProduct.sku}) — it drops out of the rental
+                and sale pickers once this is saved.
+              </p>
+            )}
+
+            <FormField
+              control={form.control}
+              name="details"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Detail</FormLabel>
+                  <FormLabel>Details (optional)</FormLabel>
                   <FormControl>
                     <Textarea rows={2} {...field} />
                   </FormControl>
@@ -320,56 +317,21 @@ export function CustomisationOrderForm({
                 </FormItem>
               )}
             />
-          </section>
 
-          <section className="space-y-4 rounded-lg border border-border bg-card p-6">
-            <h2 className="font-heading text-lg">Measurements (inches)</h2>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {MEASUREMENT_FIELDS.map(({ key, label }) => (
-                <FormField
-                  key={key}
-                  control={form.control}
-                  name={`measurements.${key}` as const}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">{label}</FormLabel>
-                      <FormControl>
-                        {/* Free text, not a number field — some
-                            measurements need more than one value (e.g.
-                            "4 50 59" or "4,5,6" for a bulk order), which a
-                            number input rejects outright. */}
-                        <Input
-                          type="text"
-                          inputMode="decimal"
-                          placeholder="e.g. 14 or 4,5,6"
-                          value={(field.value as string | undefined) ?? ""}
-                          onChange={(event) =>
-                            field.onChange(event.target.value === "" ? undefined : event.target.value)
-                          }
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              ))}
-            </div>
-            <FormField
-              control={form.control}
-              name="measurements.other"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs">Other Measurement Notes</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Any other measurement details" {...field} />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-          </section>
-
-          <section className="space-y-4 rounded-lg border border-border bg-card p-6">
-            <h2 className="font-heading text-lg">Payment</h2>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="saleDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sale Date</FormLabel>
+                    <FormControl>
+                      <DatePicker value={field.value} onChange={field.onChange} className="w-full" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="totalAmount"
@@ -390,53 +352,13 @@ export function CustomisationOrderForm({
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="advancePayment"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Advance Payment (₹)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={field.value ? field.value : ""}
-                        onChange={(event) =>
-                          field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormItem>
-                <FormLabel>Due Amount</FormLabel>
-                <div className="flex h-9 items-center rounded-md border border-border bg-secondary/40 px-3 text-sm font-medium">
-                  ₹{dueAmount.toLocaleString("en-IN")}
-                </div>
-              </FormItem>
             </div>
-
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes (optional)</FormLabel>
-                  <FormControl>
-                    <Textarea rows={2} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
           </section>
 
           <div className="flex justify-end">
             <Button type="submit" disabled={mutation.isPending}>
               {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {isEditing ? "Save Changes" : "Create Order"}
+              {isEditing ? "Save Changes" : "Create Sale"}
             </Button>
           </div>
         </form>

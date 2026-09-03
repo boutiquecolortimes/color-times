@@ -37,6 +37,42 @@ function parseIsoDate(value: string): Date | null {
   return new Date(year, month - 1, day)
 }
 
+// Old bookings/bills getting entered after the fact need a way to type the
+// date directly instead of clicking back through the calendar — accepts
+// ISO (2023-03-15), day-first with / or - (15/03/2023, 15-03-2023), and a
+// 2-digit year (15/03/23, assumed 2000s). Returns null for anything that
+// doesn't look like a real calendar date.
+function parseTypedDate(raw: string): Date | null {
+  const value = raw.trim()
+  if (!value) return null
+
+  const isoMatch = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+  if (isoMatch) {
+    const [, y, m, d] = isoMatch
+    return toValidDate(Number(y), Number(m), Number(d))
+  }
+
+  const dayFirstMatch = value.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/)
+  if (dayFirstMatch) {
+    const [, d, m, yRaw] = dayFirstMatch
+    const year = yRaw.length === 2 ? 2000 + Number(yRaw) : Number(yRaw)
+    return toValidDate(year, Number(m), Number(d))
+  }
+
+  return null
+}
+
+function toValidDate(year: number, month: number, day: number): Date | null {
+  if (!year || !month || !day || month < 1 || month > 12) return null
+  const date = new Date(year, month - 1, day)
+  // Rejects overflowed dates like 31/02/2024 rolling into March instead of
+  // silently accepting a date the user didn't type.
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return null
+  }
+  return date
+}
+
 interface DatePickerProps {
   value: string
   onChange: (value: string) => void
@@ -51,13 +87,33 @@ function DatePicker({ value, onChange, placeholder = "Select date", className }:
     const base = selected ?? new Date()
     return new Date(base.getFullYear(), base.getMonth(), 1)
   })
+  // Lets someone type a date directly (old bookings/bills entered after the
+  // fact) instead of only clicking through the calendar. Kept separate from
+  // `value` so a half-typed date doesn't clobber the real value until it
+  // parses to something real.
+  const [typedValue, setTypedValue] = React.useState("")
+  const [typedError, setTypedError] = React.useState(false)
 
   function handleOpenChange(nextOpen: boolean) {
     if (nextOpen) {
       const base = selected ?? new Date()
       setCursor(new Date(base.getFullYear(), base.getMonth(), 1))
+      setTypedValue(value || "")
+      setTypedError(false)
     }
     setOpen(nextOpen)
+  }
+
+  function applyTypedValue() {
+    const parsed = parseTypedDate(typedValue)
+    if (!parsed) {
+      if (typedValue.trim()) setTypedError(true)
+      return
+    }
+    setTypedError(false)
+    onChange(toIsoDate(parsed))
+    setCursor(new Date(parsed.getFullYear(), parsed.getMonth(), 1))
+    setOpen(false)
   }
 
   // Bounded around today, but stretched to always include whatever year is
@@ -108,7 +164,38 @@ function DatePicker({ value, onChange, placeholder = "Select date", className }:
       <PopoverPrimitive.Portal>
         <PopoverPrimitive.Positioner className="isolate z-50 outline-none" align="start" sideOffset={6}>
           <PopoverPrimitive.Popup className="w-80 origin-(--transform-origin) rounded-lg bg-popover p-3 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
-            <div className="flex items-center justify-between gap-1 pb-2">
+            {/* Typing the date directly matters for backdating old
+                bookings/bills — clicking back through months to reach
+                2023 is slow when the whole point is a past record. */}
+            <div className="mb-2 pb-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="Or type DD/MM/YYYY"
+                value={typedValue}
+                onChange={(event) => {
+                  setTypedValue(event.target.value)
+                  if (typedError) setTypedError(false)
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault()
+                    applyTypedValue()
+                  }
+                }}
+                onBlur={applyTypedValue}
+                className={cn(
+                  "h-8 w-full rounded-md border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+                  typedError && "border-destructive focus-visible:ring-destructive/30"
+                )}
+              />
+              {typedError && (
+                <p className="mt-1 text-xs text-destructive">
+                  Couldn&rsquo;t read that date — try DD/MM/YYYY.
+                </p>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-1 border-t border-border pt-2 pb-2">
               <button
                 type="button"
                 onClick={() => setCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}

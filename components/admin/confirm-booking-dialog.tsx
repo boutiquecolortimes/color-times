@@ -40,21 +40,22 @@ export function ConfirmBookingDialog({
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  // The rent, security deposit, and advance entered when the booking was
-  // first noted down (often a phone inquiry) may not match what's actually
-  // being charged and collected now — let staff correct all three right
-  // here before the invoice is generated. Lazy initializers (not an effect)
-  // so opening the dialog never silently changes what's about to be sent.
+  // The rent and advance entered when the booking was first noted down
+  // (often a phone inquiry) may not match what's actually being charged and
+  // collected now — let staff correct both right here before the invoice is
+  // generated. Lazy initializers (not an effect) so opening the dialog
+  // never silently changes what's about to be sent. Security deposit is no
+  // longer set here — it's collected at Pickup instead — so it's carried
+  // through read-only from whatever's already on the booking (0 for a
+  // brand-new one).
   const [rentAmount, setRentAmount] = useState(() => summary.totalAmount - summary.securityDeposit);
-  const [securityDeposit, setSecurityDeposit] = useState(() => summary.securityDeposit);
   const [advancePaid, setAdvancePaid] = useState(() => summary.advancePaid);
 
-  const totalAmount = rentAmount + securityDeposit;
+  const totalAmount = rentAmount + summary.securityDeposit;
   const dueAmount = Math.max(0, totalAmount - advancePaid);
 
   function resetToSummary() {
     setRentAmount(summary.totalAmount - summary.securityDeposit);
-    setSecurityDeposit(summary.securityDeposit);
     setAdvancePaid(summary.advancePaid);
   }
 
@@ -66,7 +67,6 @@ export function ConfirmBookingDialog({
         body: JSON.stringify({
           status: "confirmed",
           rentAmount,
-          securityDeposit,
           advancePaid,
         }),
       });
@@ -130,16 +130,12 @@ export function ConfirmBookingDialog({
             />
           </div>
 
-          <div>
-            <label className="text-sm font-medium">Security deposit (&#8377;)</label>
-            <Input
-              className="mt-2"
-              type="number"
-              min={0}
-              value={securityDeposit === 0 ? "" : securityDeposit}
-              onChange={(event) => setSecurityDeposit(Math.max(0, Number(event.target.value) || 0))}
-            />
-          </div>
+          {summary.securityDeposit > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Security deposit of {formatCurrency(summary.securityDeposit)} already on file carries
+              over as-is — correct it at Pickup instead of here.
+            </p>
+          )}
 
           <div>
             <label className="text-sm font-medium">Advance paid (&#8377;)</label>

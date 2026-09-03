@@ -270,15 +270,23 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
               </Button>
             </>
           )}
-          {invoice.status === "paid" && invoice.securityDeposit > 0 && !invoice.depositRefunded && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setConfirmAction("refund-deposit")}
-            >
-              Mark Deposit Refunded
-            </Button>
-          )}
+          {/* The security deposit is a separate pool of money from rent —
+              held and refunded independently of whether the rent itself has
+              been fully paid — so this used to be stuck unreachable
+              whenever anything else was still outstanding (only "paid"
+              showed it), even though there was no other way to clear a
+              deposit that had genuinely already been returned. */}
+          {invoice.status !== "cancelled" &&
+            invoice.securityDeposit > 0 &&
+            !invoice.depositRefunded && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setConfirmAction("refund-deposit")}
+              >
+                Mark Deposit Refunded
+              </Button>
+            )}
           {invoice.status !== "paid" && invoice.status !== "cancelled" && (
             <Button size="sm" variant="destructive" onClick={() => setConfirmAction("cancel")}>
               Cancel Invoice
@@ -321,11 +329,11 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
                   <span>{formatCurrency(invoice.taxAmount)}</span>
                 </p>
                 <p className="flex justify-between">
-                  <span className="text-muted-foreground">Security Deposit</span>
+                  <span className="text-muted-foreground">Security To Be Returned</span>
                   <span>
                     {formatCurrency(invoice.securityDeposit)}
                     {invoice.depositRefunded
-                      ? " (refunded)"
+                      ? " (Refunded)"
                       : invoice.securityDeposit <= 0
                         ? ""
                         : " (held)"}

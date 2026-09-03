@@ -4,7 +4,7 @@ import { siteConfig } from "@/lib/config/site";
 import { getInvoiceDueBreakdown } from "@/lib/admin/invoice-totals";
 import { TERMS_IMAGE_PATH, ownerDetailLines } from "@/lib/admin/pdf-footer";
 import { EN_LABELS, loadHindiLabels, type HindiLabelMap, type LabelKey, type PdfLang } from "@/lib/admin/pdf-labels";
-import { formatDate } from "@/lib/utils";
+import { formatDate, isWalkinEmail } from "@/lib/utils";
 import type { InvoiceLineItem, InvoiceStatus, PaymentMethod } from "@/models/Invoice";
 
 interface InvoicePdfPayment {
@@ -166,12 +166,18 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
   labelValue("due", formatDate(invoice.dueDate), 196, 34);
   labelValue("status", invoice.status.replace("_", " ").toUpperCase(), 196, 39);
 
+  // Walk-in customers get a generated placeholder email just to satisfy the
+  // account system's unique/required email field (e.g.
+  // "98765xxxxx.<timestamp>@walkin.vchuki.local") — never something a
+  // customer should see printed on their own bill, so it's skipped here in
+  // favor of their phone number.
   doc.setFontSize(10);
   label("billTo", 14, 46);
   doc.setFontSize(9);
   doc.text(invoice.customer.name, 14, 51);
-  doc.text(invoice.customer.email, 14, 56);
-  if (invoice.customer.phone) doc.text(invoice.customer.phone, 14, 61);
+  const showEmail = !isWalkinEmail(invoice.customer.email);
+  if (showEmail) doc.text(invoice.customer.email, 14, 56);
+  if (invoice.customer.phone) doc.text(invoice.customer.phone, 14, showEmail ? 61 : 56);
 
   const lineItemHeadKeys: LabelKey[] = ["colDescription", "colQty", "colUnitPrice", "colAmount"];
   autoTable(doc, {

@@ -125,7 +125,15 @@ async function buildBookingsReport(
     Booking.countDocuments(filter),
     Booking.aggregate([
       { $match: { ...filter, status: { $in: REVENUE_STATUSES } } },
-      { $group: { _id: null, total: { $sum: "$totalAmount" }, count: { $sum: 1 } } },
+      // Revenue is rent only — the security deposit is refundable, not
+      // income, so it's netted out of totalAmount (rent + deposit) here.
+      {
+        $group: {
+          _id: null,
+          total: { $sum: { $subtract: ["$totalAmount", "$securityDeposit"] } },
+          count: { $sum: 1 },
+        },
+      },
     ]),
     Booking.countDocuments({ ...filter, status: "in_use" }),
     Booking.find(filter)
@@ -433,7 +441,8 @@ async function buildProfitLossReport(dateFilter: Record<string, unknown>) {
   const [bookingRevenueAgg, saleRevenueAgg, expenseAgg, salaryAgg, purchaseAgg] = await Promise.all([
     Booking.aggregate([
       { $match: { ...dateFilter, deletedAt: null, status: { $in: REVENUE_STATUSES } } },
-      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+      // Revenue is rent only — see the same fix in dashboard-stats.ts.
+      { $group: { _id: null, total: { $sum: { $subtract: ["$totalAmount", "$securityDeposit"] } } } },
     ]),
     Sale.aggregate([
       { $match: { ...dateFilter, deletedAt: null, source: "manual" } },

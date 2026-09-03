@@ -379,14 +379,17 @@ function BookingItemRow({
                 <FormItem>
                   <FormLabel className="text-xs">{label}</FormLabel>
                   <FormControl>
+                    {/* Free text, not a number field — some measurements
+                        need more than one value (e.g. "4 50 59" or "4,5,6"
+                        for a bulk order), which a number input rejects
+                        outright. */}
                     <Input
-                      type="number"
-                      step="0.1"
-                      value={(field.value as number | undefined) ?? ""}
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="e.g. 14 or 4,5,6"
+                      value={(field.value as string | undefined) ?? ""}
                       onChange={(event) =>
-                        field.onChange(
-                          event.target.value === "" ? undefined : Number(event.target.value)
-                        )
+                        field.onChange(event.target.value === "" ? undefined : event.target.value)
                       }
                     />
                   </FormControl>
@@ -434,11 +437,6 @@ export function BookingForm({
   const isEditing = Boolean(bookingId);
   const [customerList, setCustomerList] = useState<CustomerOption[]>(customers);
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
-  // Editing an existing booking loads its already-set security deposit —
-  // starting this "touched" so the 30%-of-rent auto-suggestion below
-  // doesn't silently overwrite it the moment the form mounts. Creating a
-  // new booking still starts untouched so the suggestion applies as usual.
-  const [securityTouched, setSecurityTouched] = useState(isEditing);
 
   const form = useForm<BookingCreateInput>({
     resolver: zodResolver(bookingCreateSchema),
@@ -472,8 +470,12 @@ export function BookingForm({
   const rentalStartDate = form.watch("rentalStartDate");
   const rentalEndDate = form.watch("rentalEndDate");
   const items = form.watch("items");
-  const securityDepositValue = form.watch("securityDeposit") ?? 0;
   const advancePaidValue = form.watch("advancePaid") ?? 0;
+  // Whatever security deposit already exists on this booking (0 for a
+  // brand-new one — it's no longer collected here, only at Pickup) — kept
+  // in the total so an already-picked-up booking being edited still shows
+  // its true total, without this form ever letting staff touch the figure.
+  const securityDepositValue = form.watch("securityDeposit") ?? 0;
 
   // Flat rent per item — the total isn't multiplied by the rental duration.
   const rentTotal = items.reduce((sum, item) => {
@@ -492,11 +494,6 @@ export function BookingForm({
     productUsageCounts.set(item.product, (productUsageCounts.get(item.product) ?? 0) + 1);
   }
 
-  // Suggested deposit is 30% of the total rent across all items — not a sum
-  // of each dress's own deposit (that overcharged multi-item bookings, e.g.
-  // 5 dresses meant 5x the deposit). Still editable below.
-  const suggestedSecurityDeposit = Math.round(rentTotal * 0.3);
-
   // Flags dresses already held by another active booking for these dates so
   // the picker can show that upfront, before the user selects one.
   const bookedProductsQuery = useQuery({
@@ -505,13 +502,6 @@ export function BookingForm({
     enabled: Boolean(rentalStartDate && rentalEndDate),
   });
   const bookedProductIds = new Set(bookedProductsQuery.data ?? []);
-
-  useEffect(() => {
-    if (!securityTouched) {
-      form.setValue("securityDeposit", suggestedSecurityDeposit);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suggestedSecurityDeposit, securityTouched]);
 
   const [conflicts, setConflicts] = useState<Record<number, boolean>>({});
   const hasAnyConflict = Object.values(conflicts).some(Boolean);
@@ -765,32 +755,20 @@ export function BookingForm({
             <span className="text-muted-foreground">Rent Total (flat, not per day)</span>
             <span className="font-medium">{formatCurrency(rentTotal)}</span>
           </div>
+          {/* Security deposit is no longer collected here — only at Pickup,
+              where the dress actually changes hands (see
+              pickup-booking-dialog.tsx). An existing booking that already
+              has one (set at Pickup, or from before this change) still
+              shows it in the total below, just not editable from this
+              form. */}
+          {securityDepositValue > 0 && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Includes {formatCurrency(securityDepositValue)} security deposit already on file —
+              adjust that at Pickup, not here.
+            </p>
+          )}
 
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <FormField
-              control={form.control}
-              name="securityDeposit"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Security Amount (&#8377;)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={field.value === 0 ? "" : field.value}
-                      onChange={(event) => {
-                        setSecurityTouched(true);
-                        field.onChange(Number(event.target.value) || 0);
-                      }}
-                    />
-                  </FormControl>
-                  <p className="text-xs text-muted-foreground">
-                    Suggested: 30% of rent total ({formatCurrency(suggestedSecurityDeposit)}) — editable
-                  </p>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField
               control={form.control}
               name="advancePaid"
@@ -836,7 +814,9 @@ export function BookingForm({
           </div>
 
           <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
-            <span className="text-sm text-muted-foreground">Total Amount (rent + security)</span>
+            <span className="text-sm text-muted-foreground">
+              Total Amount{securityDepositValue > 0 ? " (rent + security)" : " (rent)"}
+            </span>
             <span className="font-heading text-xl">{formatCurrency(grandTotal)}</span>
           </div>
 

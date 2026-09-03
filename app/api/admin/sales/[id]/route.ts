@@ -80,6 +80,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
     if (input.customerName !== undefined) update.customerName = input.customerName;
     if (input.customerPhone !== undefined) update.customerPhone = input.customerPhone;
     if (input.customerAddress !== undefined) update.customerAddress = input.customerAddress;
+    if (input.customer !== undefined) update.customer = input.customer || null;
     if (input.product !== undefined) update.product = input.product;
     if (input.details !== undefined) update.details = input.details;
     if (input.totalAmount !== undefined) update.totalAmount = input.totalAmount;

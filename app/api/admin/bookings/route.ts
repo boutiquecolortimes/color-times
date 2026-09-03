@@ -234,13 +234,12 @@ export async function POST(request: NextRequest): Promise<Response> {
       });
     }
 
-    // Suggested deposit is 30% of the total rent across all items — not a sum
-    // of each dress's own deposit, which overcharged multi-item bookings
-    // (e.g. 5 dresses previously meant 5x the deposit). Still overridable
-    // from the form.
-    const totalRent = items.reduce((sum, item) => sum + item.rentalFee, 0);
-    const suggestedSecurityDeposit = Math.round(totalRent * 0.3);
-    const securityDeposit = input.securityDeposit ?? suggestedSecurityDeposit;
+    // Security deposit is no longer collected at booking time — it's set
+    // later, at Pickup, when the dress actually changes hands (see
+    // pickup-booking-dialog.tsx and the "confirmed"/"in_use" transitions in
+    // app/api/admin/bookings/[id]/route.ts). `input.securityDeposit` is kept
+    // here only so a bulk historical import can still set one directly.
+    const securityDeposit = input.securityDeposit ?? 0;
     const totalAmount = items.reduce((sum, item) => sum + item.rentalFee, 0) + securityDeposit;
     const bookingNumber = await generateBookingNumber();
 

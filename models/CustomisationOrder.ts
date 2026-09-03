@@ -17,6 +17,10 @@ export interface ICustomisationOrder extends Document {
   customerName: string;
   customerPhone: string;
   customerAddress: string;
+  // Optional link to the actual customer record — see the identical field
+  // on models/Sale.ts for why this stays optional alongside the free-text
+  // name/phone/address rather than replacing them.
+  customer?: Types.ObjectId;
   stitchingType: string;
   detail: string;
   measurements: CustomisationMeasurements;
@@ -37,6 +41,7 @@ const customisationOrderSchema = new Schema<ICustomisationOrder>(
     customerName: { type: String, required: true, trim: true },
     customerPhone: { type: String, required: true, trim: true },
     customerAddress: { type: String, required: true, trim: true },
+    customer: { type: Schema.Types.ObjectId, ref: "User", index: true },
     stitchingType: { type: String, required: true, trim: true },
     detail: { type: String, required: true, trim: true },
     measurements: { type: measurementsSchema, default: () => ({}) },

@@ -14,6 +14,12 @@ export interface ISale extends Document {
   customerName: string;
   customerPhone: string;
   customerAddress: string;
+  // Optional link to the actual customer record — customerName/Phone/
+  // Address above stay free text (walk-in sales don't always have a linked
+  // profile), but when the sale was created against a real customer via the
+  // picker, this lets their profile page show it as real order history
+  // instead of only matching on name/phone spelling.
+  customer?: Types.ObjectId;
   product: Types.ObjectId;
   details?: string;
   totalAmount: number;
@@ -30,6 +36,7 @@ const saleSchema = new Schema<ISale>(
     customerName: { type: String, required: true, trim: true },
     customerPhone: { type: String, required: true, trim: true },
     customerAddress: { type: String, required: true, trim: true },
+    customer: { type: Schema.Types.ObjectId, ref: "User", index: true },
     product: { type: Schema.Types.ObjectId, ref: "Product", required: true, index: true },
     details: { type: String, trim: true },
     totalAmount: { type: Number, required: true, min: 0 },

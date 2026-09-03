@@ -146,7 +146,6 @@ export function SaleFormDialog({
   }, [products, editingSale]);
 
   const productValue = form.watch("product");
-  const selectedProduct = availableProducts.find((p) => p._id === productValue);
 
   function applyCustomer(customer: CustomerOption) {
     form.setValue("customerName", customer.name);
@@ -312,29 +311,19 @@ export function SaleFormDialog({
               render={() => (
                 <FormItem>
                   <FormLabel>Product</FormLabel>
-                  <Select
-                    value={productValue}
-                    onValueChange={(value) => form.setValue("product", value ?? "")}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select a product">
-                          {() =>
-                            selectedProduct
-                              ? `${selectedProduct.name} (${selectedProduct.sku})`
-                              : "Select a product"
-                          }
-                        </SelectValue>
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {availableProducts.map((product) => (
-                        <SelectItem key={product._id} value={product._id}>
-                          {product.name} ({product.sku})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormControl>
+                    <SearchableSelect
+                      value={productValue}
+                      onChange={(value) => form.setValue("product", value)}
+                      placeholder="Select a product"
+                      searchPlaceholder="Search by name or code..."
+                      emptyText="No products found."
+                      options={availableProducts.map((product) => ({
+                        value: product._id,
+                        label: `${product.name} (${product.sku})`,
+                      }))}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

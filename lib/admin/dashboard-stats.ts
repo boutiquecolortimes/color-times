@@ -126,7 +126,10 @@ async function computeDashboardStats(): Promise<DashboardStats> {
   ] = await Promise.all([
     Booking.aggregate([
       { $match: { status: { $in: REVENUE_STATUSES }, deletedAt: null } },
-      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+      // Revenue is rent only — the security deposit is refundable money held
+      // for the customer, not income, so it's netted out here rather than
+      // summing totalAmount (rent + deposit) as if all of it were earned.
+      { $group: { _id: null, total: { $sum: { $subtract: ["$totalAmount", "$securityDeposit"] } } } },
     ]),
     Booking.countDocuments({ deletedAt: null }),
     Booking.countDocuments({ status: "in_use", deletedAt: null }),
@@ -182,7 +185,8 @@ async function computeDashboardStats(): Promise<DashboardStats> {
           deletedAt: null,
         },
       },
-      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+      // See totalRevenue above — security deposit excluded, rent only.
+      { $group: { _id: null, total: { $sum: { $subtract: ["$totalAmount", "$securityDeposit"] } } } },
     ]),
     Booking.aggregate([
       {
@@ -192,7 +196,8 @@ async function computeDashboardStats(): Promise<DashboardStats> {
           deletedAt: null,
         },
       },
-      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+      // See totalRevenue above — security deposit excluded, rent only.
+      { $group: { _id: null, total: { $sum: { $subtract: ["$totalAmount", "$securityDeposit"] } } } },
     ]),
     Settings.findOne({ module: "inventory" }).lean(),
     Product.aggregate([
@@ -253,7 +258,8 @@ async function computeDashboardStats(): Promise<DashboardStats> {
       {
         $group: {
           _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
-          revenue: { $sum: "$totalAmount" },
+          // See totalRevenue above — security deposit excluded, rent only.
+          revenue: { $sum: { $subtract: ["$totalAmount", "$securityDeposit"] } },
           bookings: { $sum: 1 },
         },
       },
@@ -579,7 +585,8 @@ async function computeDashboardAnalytics(
       {
         $group: {
           _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
-          revenue: { $sum: "$totalAmount" },
+          // See totalRevenue above — security deposit excluded, rent only.
+          revenue: { $sum: { $subtract: ["$totalAmount", "$securityDeposit"] } },
           bookings: { $sum: 1 },
         },
       },

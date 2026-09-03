@@ -27,11 +27,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
-import {
-  SaleFormDialog,
-  type SaleRow,
-  type CustomerOption,
-} from "@/components/admin/sale-form-dialog";
+import type { SaleRow, CustomerOption } from "@/components/admin/sale-form-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { useCanEdit } from "@/components/admin/current-user-context";
 import { formatDate } from "@/lib/utils";
@@ -100,8 +96,6 @@ export function SalesClient({
   const [layout, setLayout] = useState<"table" | "card">("table");
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [formOpen, setFormOpen] = useState(false);
-  const [editingSale, setEditingSale] = useState<SaleRow | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [permanentDeleteId, setPermanentDeleteId] = useState<string | null>(null);
   const [bulkConfirmAction, setBulkConfirmAction] = useState<"delete" | "permanent-delete" | null>(
@@ -309,16 +303,14 @@ export function SalesClient({
                   <Send className="h-4 w-4" />
                 </Button>
                 {canEdit && (
-                  <Button
+                  <ButtonLink
                     variant="ghost"
                     size="icon"
-                    onClick={() => {
-                      setEditingSale(sale);
-                      setFormOpen(true);
-                    }}
+                    href={`/admin/sales/${sale._id}/edit`}
+                    title="Edit"
                   >
                     <Pencil className="h-4 w-4" />
-                  </Button>
+                  </ButtonLink>
                 )}
                 <Button
                   variant="ghost"
@@ -348,14 +340,9 @@ export function SalesClient({
           <h1 className="font-heading text-2xl">Sale</h1>
           <p className="mt-1 text-sm text-muted-foreground">Outright dress purchases.</p>
         </div>
-        <Button
-          onClick={() => {
-            setEditingSale(null);
-            setFormOpen(true);
-          }}
-        >
+        <ButtonLink href="/admin/sales/new">
           <Plus className="h-4 w-4" /> New Sale
-        </Button>
+        </ButtonLink>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -546,16 +533,14 @@ export function SalesClient({
                           <Send className="h-4 w-4" />
                         </Button>
                         {canEdit && (
-                          <Button
+                          <ButtonLink
                             variant="ghost"
                             size="icon"
-                            onClick={() => {
-                              setEditingSale(sale);
-                              setFormOpen(true);
-                            }}
+                            href={`/admin/sales/${sale._id}/edit`}
+                            title="Edit"
                           >
                             <Pencil className="h-4 w-4" />
-                          </Button>
+                          </ButtonLink>
                         )}
                         <Button
                           variant="ghost"
@@ -589,14 +574,6 @@ export function SalesClient({
         total={pagination.total}
         itemLabel="sales"
         onPageChange={setPage}
-      />
-
-      <SaleFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        products={products}
-        customers={customers}
-        editingSale={editingSale}
       />
 
       <ConfirmDialog

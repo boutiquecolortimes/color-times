@@ -6,13 +6,14 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Download, Loader2, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Pencil, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AuditLogList } from "@/components/admin/audit-log-list";
+import { useCanEdit } from "@/components/admin/current-user-context";
 import { formatDate } from "@/lib/utils";
 import type { SaleSource } from "@/models/Sale";
 
@@ -56,6 +57,7 @@ async function fetchSale(id: string): Promise<SaleDetail> {
 export function SaleDetailClient({ initialSale }: { initialSale: SaleDetail }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const canEdit = useCanEdit();
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const { data: sale = initialSale } = useQuery({
@@ -134,6 +136,11 @@ export function SaleDetailClient({ initialSale }: { initialSale: SaleDetail }) {
             )}
             Send via WhatsApp
           </Button>
+          {canEdit && (
+            <ButtonLink variant="outline" size="sm" href={`/admin/sales/${sale._id}/edit`}>
+              <Pencil className="h-4 w-4" /> Edit
+            </ButtonLink>
+          )}
           <Button variant="outline" size="sm" className="text-destructive" onClick={() => setDeleteOpen(true)}>
             <Trash2 className="h-4 w-4" /> Delete
           </Button>
