@@ -87,6 +87,7 @@ function toDateInputValue(iso: string): string {
 }
 
 const EMPTY_VALUES: SaleInput = {
+  billNumber: "",
   saleDate: new Date().toISOString().slice(0, 10),
   customerName: "",
   customerPhone: "",

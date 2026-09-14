@@ -93,6 +93,7 @@ const MEASUREMENT_FIELDS: { key: keyof CustomisationMeasurements; label: string 
   MEASUREMENT_FIELD_DEFS;
 
 const EMPTY_VALUES: CustomisationOrderInput = {
+  billNumber: "",
   orderDate: new Date().toISOString().slice(0, 10),
   customerName: "",
   customerPhone: "",

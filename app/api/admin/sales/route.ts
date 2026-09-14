@@ -3,7 +3,6 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { Sale } from "@/models/Sale";
 import { Product } from "@/models/Product";
 import { saleSchema, computeSaleDue } from "@/lib/validations/sale";
-import { nextSharedBillNumber } from "@/lib/admin/bill-number";
 import { findUpcomingBookingForProduct } from "@/lib/admin/booking-availability";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
@@ -92,11 +91,23 @@ export async function POST(request: NextRequest): Promise<Response> {
       );
     }
 
-    const billNumber = await nextSharedBillNumber();
+    // Bill number is staff-entered (pre-filled with a suggested next
+    // number, see nextSharedBillNumber()) but stays editable — same as
+    // Booking — so it must be required and unique, guarded the same way.
+    const duplicateBill = await Sale.findOne({
+      billNumber: input.billNumber,
+      deletedAt: null,
+    })
+      .select("_id")
+      .lean();
+    if (duplicateBill) {
+      return apiError(`Bill number ${input.billNumber} is already used by another sale`, 409);
+    }
+
     const dueAmount = computeSaleDue(input);
 
     const sale = await Sale.create({
-      billNumber,
+      billNumber: input.billNumber,
       saleDate: new Date(input.saleDate),
       customerName: input.customerName,
       customerPhone: input.customerPhone,

@@ -5,13 +5,14 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { Product } from "@/models/Product";
 import { User } from "@/models/User";
 import { SaleForm } from "@/components/admin/sale-form";
+import { nextSharedBillNumber } from "@/lib/admin/bill-number";
 
 export const metadata: Metadata = { title: "New Sale" };
 
 export default async function NewSalePage() {
   await connectToDatabase();
 
-  const [products, customers] = await Promise.all([
+  const [products, customers, suggestedBillNumber] = await Promise.all([
     // Already sold outright, or currently out on an active rental (booked /
     // reserved / picked up by a renter) — either way it's not available to
     // sell right now.
@@ -25,6 +26,7 @@ export default async function NewSalePage() {
       .sort({ name: 1 })
       .limit(500)
       .lean(),
+    nextSharedBillNumber(),
   ]);
 
   return (
@@ -62,6 +64,18 @@ export default async function NewSalePage() {
               : undefined,
           };
         })}
+        defaultValues={{
+          billNumber: suggestedBillNumber,
+          saleDate: new Date().toISOString().slice(0, 10),
+          customerName: "",
+          customerPhone: "",
+          customerAddress: "",
+          customer: "",
+          product: "",
+          details: "",
+          totalAmount: 0,
+          advancePayment: 0,
+        }}
       />
     </div>
   );

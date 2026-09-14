@@ -5,11 +5,10 @@ import {
   customisationOrderSchema,
   computeCustomisationDue,
 } from "@/lib/validations/customisation-order";
-import { nextSharedBillNumber } from "@/lib/admin/bill-number";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
-import { apiSuccess, apiErrorFromUnknown } from "@/lib/api/response";
+import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 
 export async function GET(request: NextRequest): Promise<Response> {
   const auth = await requireApiRole(ADMIN_ROLES);
@@ -68,11 +67,27 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     await connectToDatabase();
 
-    const billNumber = await nextSharedBillNumber();
+    // Bill number is staff-entered (pre-filled with a suggested next
+    // number, see nextSharedBillNumber()) but stays editable — same as
+    // Booking and Sale — so it must be required and unique, guarded the
+    // same way.
+    const duplicateBill = await CustomisationOrder.findOne({
+      billNumber: input.billNumber,
+      deletedAt: null,
+    })
+      .select("_id")
+      .lean();
+    if (duplicateBill) {
+      return apiError(
+        `Bill number ${input.billNumber} is already used by another customisation order`,
+        409
+      );
+    }
+
     const dueAmount = computeCustomisationDue(input);
 
     const order = await CustomisationOrder.create({
-      billNumber,
+      billNumber: input.billNumber,
       orderDate: new Date(input.orderDate),
       customerName: input.customerName,
       customerPhone: input.customerPhone,

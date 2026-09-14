@@ -70,6 +70,7 @@ const quickCustomerSchema = z.object({
 type QuickCustomerInput = z.infer<typeof quickCustomerSchema>;
 
 const EMPTY_VALUES: SaleInput = {
+  billNumber: "",
   saleDate: new Date().toISOString().slice(0, 10),
   customerName: "",
   customerPhone: "",
@@ -326,19 +327,34 @@ export function SaleForm({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="saleDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Sale Date</FormLabel>
-                  <FormControl>
-                    <DatePicker value={field.value} onChange={field.onChange} className="w-full" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="billNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bill Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Manual bill/register no." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="saleDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sale Date</FormLabel>
+                    <FormControl>
+                      <DatePicker value={field.value} onChange={field.onChange} className="w-full" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
           </section>
 
           <section className="space-y-4 rounded-lg border border-border bg-card p-6">

@@ -3,6 +3,7 @@ import { measurementsZodSchema } from "@/lib/validations/measurements";
 import { phoneSchema } from "@/lib/validations/phone";
 
 export const customisationOrderSchema = z.object({
+  billNumber: z.string().trim().min(1, "Bill number is required"),
   orderDate: z.string().min(1, "Order date is required"),
   customerName: z.string().trim().min(1, "Customer name is required"),
   customerPhone: phoneSchema,

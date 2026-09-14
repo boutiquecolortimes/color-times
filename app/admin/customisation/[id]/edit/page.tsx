@@ -43,6 +43,7 @@ export default async function EditCustomisationOrderPage({
   }
 
   const defaultValues: CustomisationOrderInput = {
+    billNumber: order.billNumber,
     orderDate: order.orderDate.toISOString().slice(0, 10),
     customerName: order.customerName,
     customerPhone: order.customerPhone,

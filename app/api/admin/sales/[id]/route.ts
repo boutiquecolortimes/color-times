@@ -83,7 +83,23 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       }
     }
 
+    // Bill number stays staff-editable after creation too — same duplicate
+    // guard as on create, only relevant when it's actually being changed.
+    if (input.billNumber !== undefined && input.billNumber !== before.billNumber) {
+      const duplicateBill = await Sale.findOne({
+        billNumber: input.billNumber,
+        deletedAt: null,
+        _id: { $ne: id },
+      })
+        .select("_id")
+        .lean();
+      if (duplicateBill) {
+        return apiError(`Bill number ${input.billNumber} is already used by another sale`, 409);
+      }
+    }
+
     const update: Record<string, unknown> = {};
+    if (input.billNumber !== undefined) update.billNumber = input.billNumber;
     if (input.saleDate !== undefined) update.saleDate = new Date(input.saleDate);
     if (input.customerName !== undefined) update.customerName = input.customerName;
     if (input.customerPhone !== undefined) update.customerPhone = input.customerPhone;

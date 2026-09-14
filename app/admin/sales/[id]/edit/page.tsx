@@ -58,6 +58,7 @@ export default async function EditSalePage({
       ];
 
   const defaultValues: SaleInput = {
+    billNumber: sale.billNumber,
     saleDate: sale.saleDate.toISOString().slice(0, 10),
     customerName: sale.customerName,
     customerPhone: sale.customerPhone,

@@ -4,17 +4,21 @@ import { ArrowLeft } from "lucide-react";
 import { connectToDatabase } from "@/lib/db/connect";
 import { User } from "@/models/User";
 import { CustomisationOrderForm } from "@/components/admin/customisation-order-form";
+import { nextSharedBillNumber } from "@/lib/admin/bill-number";
 
 export const metadata: Metadata = { title: "New Customisation Order" };
 
 export default async function NewCustomisationOrderPage() {
   await connectToDatabase();
 
-  const customers = await User.find({ role: "customer", deletedAt: null })
-    .select("name email phone addresses")
-    .sort({ name: 1 })
-    .limit(500)
-    .lean();
+  const [customers, suggestedBillNumber] = await Promise.all([
+    User.find({ role: "customer", deletedAt: null })
+      .select("name email phone addresses")
+      .sort({ name: 1 })
+      .limit(500)
+      .lean(),
+    nextSharedBillNumber(),
+  ]);
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -46,6 +50,20 @@ export default async function NewCustomisationOrderPage() {
               : undefined,
           };
         })}
+        defaultValues={{
+          billNumber: suggestedBillNumber,
+          orderDate: new Date().toISOString().slice(0, 10),
+          customerName: "",
+          customerPhone: "",
+          customerAddress: "",
+          customer: "",
+          stitchingType: "",
+          detail: "",
+          measurements: {},
+          totalAmount: 0,
+          advancePayment: 0,
+          notes: "",
+        }}
       />
     </div>
   );

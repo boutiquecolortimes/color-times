@@ -66,6 +66,7 @@ const MEASUREMENT_FIELDS: { key: keyof CustomisationMeasurements; label: string 
   MEASUREMENT_FIELD_DEFS;
 
 const EMPTY_VALUES: CustomisationOrderInput = {
+  billNumber: "",
   orderDate: new Date().toISOString().slice(0, 10),
   customerName: "",
   customerPhone: "",
@@ -206,6 +207,19 @@ export function CustomisationOrderForm({
             <h2 className="font-heading text-lg">Order Details</h2>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="billNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bill Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Manual bill/register no." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="orderDate"
