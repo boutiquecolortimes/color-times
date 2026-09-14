@@ -54,6 +54,8 @@ export default async function AdminSalesPage() {
       : null,
     details: sale.details,
     totalAmount: sale.totalAmount,
+    advancePayment: sale.advancePayment,
+    dueAmount: sale.dueAmount,
   }));
 
   return (

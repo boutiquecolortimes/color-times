@@ -252,12 +252,25 @@ export function SalesClient({
               />
               <p className="font-medium">{sale.billNumber}</p>
             </div>
-            <p className="text-sm font-medium text-accent">{formatCurrency(sale.totalAmount)}</p>
           </div>
           <p className="mt-2 text-sm">{sale.customerName}</p>
           <p className="text-xs text-muted-foreground">{sale.customerPhone}</p>
           <p className="mt-2 text-sm text-muted-foreground">{sale.product?.name ?? "—"}</p>
           <p className="text-xs text-muted-foreground">{sale.product?.sku}</p>
+          <div className="mt-2 grid grid-cols-3 gap-2 text-sm">
+            <div>
+              <p className="text-xs text-muted-foreground">Total</p>
+              <p>{formatCurrency(sale.totalAmount)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Advance</p>
+              <p>{formatCurrency(sale.advancePayment)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Due</p>
+              <p className="font-medium">{formatCurrency(sale.dueAmount)}</p>
+            </div>
+          </div>
           <p className="mt-2 text-xs text-muted-foreground">Sale date {formatDate(sale.saleDate)}</p>
           <div className="mt-3 flex justify-end gap-1">
             {view === "trash" ? (
@@ -431,7 +444,7 @@ export function SalesClient({
         <div className="hidden lg:block">{cardGrid}</div>
       ) : (
       <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
-        <table className="w-full min-w-[820px] text-sm whitespace-nowrap">
+        <table className="w-full min-w-[960px] text-sm whitespace-nowrap">
           <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-4 py-3">
@@ -455,6 +468,16 @@ export function SalesClient({
               <th className="px-4 py-3">
                 <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("totalAmount")}>
                   Total <SortIcon field="totalAmount" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("advancePayment")}>
+                  Advance <SortIcon field="advancePayment" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("dueAmount")}>
+                  Due <SortIcon field="dueAmount" sortBy={sortBy} sortDir={sortDir} />
                 </button>
               </th>
               <th className="px-4 py-3">
@@ -485,6 +508,8 @@ export function SalesClient({
                   {sale.product?.sku && ` (${sale.product.sku})`}
                 </td>
                 <td className="px-4 py-3 font-medium">{formatCurrency(sale.totalAmount)}</td>
+                <td className="px-4 py-3">{formatCurrency(sale.advancePayment)}</td>
+                <td className="px-4 py-3 font-medium">{formatCurrency(sale.dueAmount)}</td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {formatDate(sale.saleDate)}
                 </td>
@@ -558,7 +583,7 @@ export function SalesClient({
             ))}
             {sales.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
                   {view === "trash" ? "Trash is empty." : "No sales found."}
                 </td>
               </tr>

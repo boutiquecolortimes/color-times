@@ -23,6 +23,8 @@ export interface ISale extends Document {
   product: Types.ObjectId;
   details?: string;
   totalAmount: number;
+  advancePayment: number;
+  dueAmount: number;
   source: SaleSource;
   deletedAt: Date | null;
   createdAt: Date;
@@ -40,6 +42,8 @@ const saleSchema = new Schema<ISale>(
     product: { type: Schema.Types.ObjectId, ref: "Product", required: true, index: true },
     details: { type: String, trim: true },
     totalAmount: { type: Number, required: true, min: 0 },
+    advancePayment: { type: Number, required: true, min: 0, default: 0 },
+    dueAmount: { type: Number, required: true, min: 0, default: 0 },
     source: { type: String, enum: ["manual", "booking"], default: "manual", index: true },
     deletedAt: { type: Date, default: null, index: true },
   },

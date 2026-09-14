@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Sale } from "@/models/Sale";
 import { Product } from "@/models/Product";
-import { saleSchema } from "@/lib/validations/sale";
+import { saleSchema, computeSaleDue } from "@/lib/validations/sale";
 import { nextSharedBillNumber } from "@/lib/admin/bill-number";
 import { findUpcomingBookingForProduct } from "@/lib/admin/booking-availability";
 import { requireApiRole } from "@/lib/api/require-role";
@@ -26,6 +26,8 @@ export async function GET(request: NextRequest): Promise<Response> {
     billNumber: "billNumber",
     customerName: "customerName",
     totalAmount: "totalAmount",
+    advancePayment: "advancePayment",
+    dueAmount: "dueAmount",
     saleDate: "saleDate",
     createdAt: "createdAt",
   };
@@ -81,6 +83,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
 
     const billNumber = await nextSharedBillNumber();
+    const dueAmount = computeSaleDue(input);
 
     const sale = await Sale.create({
       billNumber,
@@ -92,6 +95,8 @@ export async function POST(request: NextRequest): Promise<Response> {
       product: input.product,
       details: input.details,
       totalAmount: input.totalAmount,
+      advancePayment: input.advancePayment,
+      dueAmount,
       source: "manual",
     });
 

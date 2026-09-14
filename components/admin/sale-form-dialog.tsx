@@ -49,6 +49,8 @@ export interface SaleRow {
   product: { _id: string; name: string; sku: string } | null;
   details?: string;
   totalAmount: number;
+  advancePayment: number;
+  dueAmount: number;
 }
 
 interface ProductOption {
@@ -92,6 +94,7 @@ const EMPTY_VALUES: SaleInput = {
   product: "",
   details: "",
   totalAmount: 0,
+  advancePayment: 0,
 };
 
 export function SaleFormDialog({

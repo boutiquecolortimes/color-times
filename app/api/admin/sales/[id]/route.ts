@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Sale } from "@/models/Sale";
 import { Product } from "@/models/Product";
-import { saleUpdateSchema } from "@/lib/validations/sale";
+import { saleUpdateSchema, computeSaleDue } from "@/lib/validations/sale";
 import { findUpcomingBookingForProduct } from "@/lib/admin/booking-availability";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES, MANAGER_ROLES } from "@/lib/auth/roles";
@@ -84,6 +84,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
     if (input.product !== undefined) update.product = input.product;
     if (input.details !== undefined) update.details = input.details;
     if (input.totalAmount !== undefined) update.totalAmount = input.totalAmount;
+    if (input.advancePayment !== undefined) update.advancePayment = input.advancePayment;
+
+    if (input.totalAmount !== undefined || input.advancePayment !== undefined) {
+      update.dueAmount = computeSaleDue({
+        totalAmount: input.totalAmount ?? before.totalAmount,
+        advancePayment: input.advancePayment ?? before.advancePayment,
+      });
+    }
 
     const sale = await Sale.findByIdAndUpdate(id, update, { returnDocument: "after" });
     if (!sale) {

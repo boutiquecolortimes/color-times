@@ -47,6 +47,7 @@ const NAV_GROUPS_BY_ROLE: { label: string; items: AdminNavItem[] }[] = [
     label: "Rentals",
     items: [
       { label: "Bookings", href: "/admin/bookings", icon: CalendarCheck },
+      { label: "Sale", href: "/admin/sales", icon: ShoppingBag },
       { label: "Dry Clean & Tailor", href: "/admin/services", icon: Sparkles },
       { label: "Customisation", href: "/admin/customisation", icon: Ruler },
     ],
@@ -55,7 +56,6 @@ const NAV_GROUPS_BY_ROLE: { label: string; items: AdminNavItem[] }[] = [
     label: "Billing",
     items: [
       { label: "Invoices", href: "/admin/invoices", icon: FileText },
-      { label: "Sale", href: "/admin/sales", icon: ShoppingBag },
       { label: "Reports", href: "/admin/reports", icon: BarChart3 },
     ],
   },

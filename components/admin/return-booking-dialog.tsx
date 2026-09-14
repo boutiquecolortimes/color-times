@@ -392,7 +392,7 @@ export function ReturnBookingDialog({
                   </div>
                   <div className="mt-2 flex justify-between border-t border-border pt-2 font-medium">
                     <span>
-                      {finalSettlementAmount > 0 ? "Customer still owes" : "Refund to customer"}
+                      {finalSettlementAmount > 0 ? "Customer will pay" : "Refund to customer"}
                     </span>
                     <span
                       className={cn(

@@ -509,7 +509,7 @@ export function BookingDetailClient({
                     <p className="flex justify-between font-medium">
                       <span>
                         {(booking.finalSettlementAmount ?? 0) > 0
-                          ? "Customer still owes"
+                          ? "Customer will pay"
                           : "Net refund to customer"}
                       </span>
                       <span>

@@ -12,6 +12,7 @@ export const saleSchema = z.object({
   product: z.string().min(1, "Select a product"),
   details: z.string().trim().optional(),
   totalAmount: z.number().min(0),
+  advancePayment: z.number().min(0),
 });
 
 export type SaleInput = z.infer<typeof saleSchema>;
@@ -19,3 +20,7 @@ export type SaleInput = z.infer<typeof saleSchema>;
 export const saleUpdateSchema = saleSchema.partial();
 
 export type SaleUpdateInput = z.infer<typeof saleUpdateSchema>;
+
+export function computeSaleDue(input: { totalAmount: number; advancePayment: number }): number {
+  return Math.max(0, input.totalAmount - input.advancePayment);
+}

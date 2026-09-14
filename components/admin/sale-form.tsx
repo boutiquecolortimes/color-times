@@ -36,7 +36,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { saleSchema, type SaleInput } from "@/lib/validations/sale";
+import { saleSchema, computeSaleDue, type SaleInput } from "@/lib/validations/sale";
 import type { CustomerCreateInput } from "@/lib/validations/customer";
 import { customerContact } from "@/lib/utils";
 
@@ -78,6 +78,7 @@ const EMPTY_VALUES: SaleInput = {
   product: "",
   details: "",
   totalAmount: 0,
+  advancePayment: 0,
 };
 
 // A full page for both New and Edit — matches how Booking's own form works
@@ -108,6 +109,13 @@ export function SaleForm({
 
   const productValue = form.watch("product");
   const selectedProduct = products.find((p) => p._id === productValue);
+
+  const totalAmountValue = form.watch("totalAmount");
+  const advancePaymentValue = form.watch("advancePayment");
+  const dueAmount = computeSaleDue({
+    totalAmount: totalAmountValue || 0,
+    advancePayment: advancePaymentValue || 0,
+  });
 
   function applyCustomer(customer: CustomerOption) {
     form.setValue("customerName", customer.name);
@@ -318,20 +326,24 @@ export function SaleForm({
               )}
             />
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="saleDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sale Date</FormLabel>
-                    <FormControl>
-                      <DatePicker value={field.value} onChange={field.onChange} className="w-full" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <FormField
+              control={form.control}
+              name="saleDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Sale Date</FormLabel>
+                  <FormControl>
+                    <DatePicker value={field.value} onChange={field.onChange} className="w-full" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </section>
+
+          <section className="space-y-4 rounded-lg border border-border bg-card p-6">
+            <h2 className="font-heading text-lg">Payment</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <FormField
                 control={form.control}
                 name="totalAmount"
@@ -352,6 +364,32 @@ export function SaleForm({
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="advancePayment"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Advance Paid (₹)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={field.value ? field.value : ""}
+                        onChange={(event) =>
+                          field.onChange(event.target.value === "" ? 0 : Number(event.target.value))
+                        }
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormItem>
+                <FormLabel>Due Amount</FormLabel>
+                <div className="flex h-9 items-center rounded-md border border-border bg-secondary/40 px-3 text-sm font-medium">
+                  ₹{dueAmount.toLocaleString("en-IN")}
+                </div>
+              </FormItem>
             </div>
           </section>
 
