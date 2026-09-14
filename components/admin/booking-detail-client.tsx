@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Bell, Loader2, Pencil, Printer, Sparkles } from "lucide-react";
+import { Bell, FileText, Loader2, Pencil, Printer, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -122,6 +123,7 @@ export function BookingDetailClient({
   invoice?: InvoiceSummary | null;
 }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const canEdit = useCanEdit();
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -164,6 +166,31 @@ export function BookingDetailClient({
       return json.data;
     },
     onSuccess: () => toast.success("Reminder sent"),
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  // Covers bookings that never went through the Confirm dialog's invoice
+  // step — e.g. created directly with an advance payment, which jumps
+  // status straight to "confirmed" without generating one. Safe to call
+  // any time there's no active invoice yet; the endpoint also resyncs an
+  // existing one, so it doubles as a manual "fix it" action.
+  const generateInvoiceMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/invoices/from-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId: booking._id }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data.invoice as { _id: string };
+    },
+    onSuccess: (invoice) => {
+      toast.success("Invoice generated");
+      queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "sales"] });
+      router.push(`/admin/invoices/${invoice._id}`);
+    },
     onError: (error: Error) => toast.error(error.message),
   });
 
@@ -220,6 +247,31 @@ export function BookingDetailClient({
               Invoice #{invoice.invoiceNumber}
             </ButtonLink>
           )}
+          {/* Bookings created with an advance payment jump straight to
+              "confirmed" without ever going through the Confirm dialog's
+              invoice step, so they can be left with no invoice at all —
+              this is the fallback for generating one after the fact. Not
+              shown for inquiry/pending_payment (totals aren't finalized
+              yet — use Confirm instead) or cancelled (nothing to bill). */}
+          {!invoice &&
+            canEdit &&
+            (booking.status === "confirmed" ||
+              booking.status === "in_use" ||
+              booking.status === "returned") && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={generateInvoiceMutation.isPending}
+                onClick={() => generateInvoiceMutation.mutate()}
+              >
+                {generateInvoiceMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4" />
+                )}
+                Generate Invoice
+              </Button>
+            )}
           {canEdit && booking.status !== "returned" && booking.status !== "cancelled" && (
             <ButtonLink variant="outline" size="sm" href={`/admin/bookings/${booking._id}/edit`}>
               <Pencil className="h-4 w-4" />
