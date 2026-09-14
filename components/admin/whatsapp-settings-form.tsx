@@ -9,13 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Form,
   FormControl,
   FormDescription,
@@ -27,30 +20,26 @@ import {
 import {
   whatsAppSettingsSchema,
   type WhatsAppSettingsInput,
-  type WhatsAppProvider,
 } from "@/lib/validations/whatsapp-settings";
-
-const PROVIDER_LABELS: Record<WhatsAppProvider, string> = {
-  brevo: "Brevo",
-  meta: "Meta Cloud API (direct)",
-};
 
 export function WhatsAppSettingsForm({
   initialSettings,
-  isBrevoConfigured,
   isMetaConfigured,
+  isWebhookVerifyTokenConfigured,
 }: {
   initialSettings: WhatsAppSettingsInput;
-  isBrevoConfigured: boolean;
   isMetaConfigured: boolean;
+  isWebhookVerifyTokenConfigured: boolean;
 }) {
   const form = useForm<WhatsAppSettingsInput>({
     resolver: zodResolver(whatsAppSettingsSchema),
     defaultValues: initialSettings,
   });
 
-  const provider = form.watch("provider");
-  const isConfigured = provider === "meta" ? isMetaConfigured : isBrevoConfigured;
+  // Meta Cloud API is the only provider wired up in this UI — Brevo support
+  // stays in the codebase (lib/notifications/brevo-whatsapp.ts) but isn't
+  // exposed here, so "configured" only ever means Meta's credentials.
+  const isConfigured = isMetaConfigured;
 
   const mutation = useMutation({
     mutationFn: async (values: WhatsAppSettingsInput) => {
@@ -85,24 +74,14 @@ export function WhatsAppSettingsForm({
           <AlertTriangle className="h-5 w-5 shrink-0" />
         )}
         <div className="text-sm">
-          {provider === "meta" ? (
-            isConfigured ? (
-              <p>Meta Cloud API credentials are configured. WhatsApp messages can be sent.</p>
-            ) : (
-              <p>
-                <span className="font-medium">META_WHATSAPP_ACCESS_TOKEN</span> and{" "}
-                <span className="font-medium">META_WHATSAPP_PHONE_NUMBER_ID</span> are not set.
-                Add them as environment variables (e.g. in Vercel) once you&apos;ve completed
-                Meta&apos;s business verification — everything else here will still save normally.
-              </p>
-            )
-          ) : isConfigured ? (
-            <p>Brevo API key is configured. WhatsApp messages can be sent.</p>
+          {isConfigured ? (
+            <p>Meta Cloud API credentials are configured. WhatsApp messages can be sent.</p>
           ) : (
             <p>
-              <span className="font-medium">BREVO_API_KEY</span> is not set. Add it as an
-              environment variable (e.g. in Vercel) to enable sending — everything else here will
-              still save normally.
+              <span className="font-medium">META_WHATSAPP_ACCESS_TOKEN</span> and{" "}
+              <span className="font-medium">META_WHATSAPP_PHONE_NUMBER_ID</span> are not set. Add
+              them as environment variables (e.g. in Vercel) once you&apos;ve completed
+              Meta&apos;s business verification — everything else here will still save normally.
             </p>
           )}
         </div>
@@ -127,45 +106,53 @@ export function WhatsAppSettingsForm({
             </div>
 
             <div className="mt-4 sm:pl-12">
-              <FormField
-                control={form.control}
-                name="provider"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Provider</FormLabel>
-                    <Select value={field.value} onValueChange={(value) => field.onChange(value)}>
-                      <FormControl>
-                        <SelectTrigger className="w-full sm:w-72">
-                          <SelectValue>
-                            {(value: WhatsAppProvider) => PROVIDER_LABELS[value]}
-                          </SelectValue>
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="brevo">{PROVIDER_LABELS.brevo}</SelectItem>
-                        <SelectItem value="meta">{PROVIDER_LABELS.meta}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div>
+                <p className="text-sm font-medium">Provider</p>
+                <p className="mt-2 flex h-9 w-full items-center rounded-md border border-border bg-secondary/40 px-3 text-sm sm:w-72">
+                  Meta Cloud API (direct)
+                </p>
+              </div>
 
-              {provider === "meta" && (
-                <div className="mt-4 rounded-lg border border-border bg-secondary/30 p-3 text-xs text-muted-foreground">
+              <div className="mt-4 rounded-lg border border-border bg-secondary/30 p-3 text-xs text-muted-foreground">
                   <p className="font-medium text-foreground">Webhook callback URL</p>
                   <p className="mt-1 break-all font-mono">
                     {typeof window !== "undefined" ? window.location.origin : ""}
                     /api/webhooks/meta-whatsapp
                   </p>
-                  <p className="mt-2">
-                    Paste this into your Meta App&apos;s WhatsApp &rarr; Configuration &rarr;
-                    Webhook settings, using the verify token you set as{" "}
-                    <span className="font-medium">META_WHATSAPP_WEBHOOK_VERIFY_TOKEN</span>.
-                  </p>
+
+                  {isWebhookVerifyTokenConfigured ? (
+                    <p className="mt-2 flex items-start gap-1.5 text-emerald-700 dark:text-emerald-400">
+                      <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <span>
+                        A verify token is set on the server. In Meta&apos;s webhook setup, paste
+                        the callback URL above, and for{" "}
+                        <span className="font-medium">Verify token</span> type the exact secret
+                        value you saved as <span className="font-medium">
+                          META_WHATSAPP_WEBHOOK_VERIFY_TOKEN
+                        </span>{" "}
+                        &mdash; that variable name is only a label for where the value lives, it is
+                        never what you type into Meta.
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="mt-2 flex items-start gap-1.5 text-amber-700 dark:text-amber-400">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <span>
+                        <span className="font-medium">META_WHATSAPP_WEBHOOK_VERIFY_TOKEN</span>{" "}
+                        is not set on the server yet, so Meta&apos;s verification will always fail
+                        with &ldquo;callback URL or verify token couldn&apos;t be
+                        validated&rdquo;. Pick any secret string (e.g. a random password), add it
+                        as an environment variable named{" "}
+                        <span className="font-medium">META_WHATSAPP_WEBHOOK_VERIFY_TOKEN</span> in
+                        your hosting dashboard (e.g. Vercel &rarr; Project &rarr; Settings &rarr;
+                        Environment Variables), redeploy, then come back here and type that same
+                        secret value &mdash; not the variable name &mdash; into Meta&apos;s{" "}
+                        <span className="font-medium">Verify token</span> field.
+                      </span>
+                    </p>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
           </section>
 
           <section className="rounded-lg border border-border bg-card p-6">
@@ -201,9 +188,8 @@ export function WhatsAppSettingsForm({
                       <Input placeholder="919876543210" {...field} />
                     </FormControl>
                     <FormDescription>
-                      {provider === "meta"
-                        ? "The display number for your Meta WhatsApp Business Account — the actual sending number comes from META_WHATSAPP_PHONE_NUMBER_ID."
-                        : "The WhatsApp Business number registered and approved in your Brevo account."}
+                      The display number for your Meta WhatsApp Business Account — the actual
+                      sending number comes from META_WHATSAPP_PHONE_NUMBER_ID.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

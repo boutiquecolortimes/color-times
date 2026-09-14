@@ -11,7 +11,6 @@ import { WhatsAppSettingsForm } from "@/components/admin/whatsapp-settings-form"
 import { WhatsAppTemplatesClient } from "@/components/admin/whatsapp-templates-client";
 import { WhatsAppLogList } from "@/components/admin/whatsapp-log-list";
 import { WhatsAppTestDialog } from "@/components/admin/whatsapp-test-dialog";
-import { isWhatsAppConfigured } from "@/lib/notifications/brevo-whatsapp";
 import { isMetaWhatsAppConfigured } from "@/lib/notifications/meta-whatsapp";
 import { DEFAULT_WHATSAPP_SETTINGS, type WhatsAppSettingsInput } from "@/lib/validations/whatsapp-settings";
 
@@ -30,10 +29,21 @@ export default async function AdminWhatsAppPage() {
     WhatsAppTemplate.find().sort({ triggerEvent: 1, createdAt: -1 }).lean(),
   ]);
 
-  const settings = (settingsDoc?.data as WhatsAppSettingsInput) ?? DEFAULT_WHATSAPP_SETTINGS;
-  const brevoConfigured = isWhatsAppConfigured();
+  // Meta Cloud API is the only provider wired up in the admin UI (Brevo
+  // support stays in the codebase, unused, in case it's needed again later
+  // — see lib/notifications/brevo-whatsapp.ts). Force it here too so a
+  // settings document saved back when Brevo was still selectable doesn't
+  // silently route real sends through Brevo again.
+  const settings: WhatsAppSettingsInput = {
+    ...((settingsDoc?.data as WhatsAppSettingsInput) ?? DEFAULT_WHATSAPP_SETTINGS),
+    provider: "meta",
+  };
   const metaConfigured = isMetaWhatsAppConfigured();
-  const configured = settings.provider === "meta" ? metaConfigured : brevoConfigured;
+  // Separate from metaConfigured (send credentials) — this is specifically
+  // whether the webhook GET verification handshake can succeed at all (see
+  // app/api/webhooks/meta-whatsapp/route.ts).
+  const webhookVerifyTokenConfigured = Boolean(process.env.META_WHATSAPP_WEBHOOK_VERIFY_TOKEN);
+  const configured = metaConfigured;
   const activeTemplateCount = templates.filter((t) => t.isActive).length;
 
   return (
@@ -42,7 +52,7 @@ export default async function AdminWhatsAppPage() {
         <div>
           <h1 className="font-heading text-2xl">WhatsApp</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Order updates, notifications, and message templates via Brevo.
+            Order updates, notifications, and message templates via Meta Cloud API.
           </p>
         </div>
         <WhatsAppTestDialog />
@@ -72,7 +82,7 @@ export default async function AdminWhatsAppPage() {
               </span>
             </div>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              Provider: {settings.provider === "meta" ? "Meta Cloud API" : "Brevo"} &middot; Sender:{" "}
+              Provider: Meta Cloud API &middot; Sender:{" "}
               {settings.senderLabel ? (
                 <span className="font-medium text-foreground">{settings.senderLabel}</span>
               ) : (
@@ -108,8 +118,8 @@ export default async function AdminWhatsAppPage() {
         <TabsContent value="settings" className="mt-4">
           <WhatsAppSettingsForm
             initialSettings={settings}
-            isBrevoConfigured={brevoConfigured}
             isMetaConfigured={metaConfigured}
+            isWebhookVerifyTokenConfigured={webhookVerifyTokenConfigured}
           />
         </TabsContent>
 

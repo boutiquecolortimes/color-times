@@ -179,32 +179,6 @@ export function WhatsAppTemplateFormDialog({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="brevoTemplateId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Brevo Template ID</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      value={field.value ? field.value : ""}
-                      onChange={(event) =>
-                        field.onChange(
-                          event.target.value === "" ? undefined : Number(event.target.value)
-                        )
-                      }
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Fill this in if sending via Brevo. The numeric ID of the approved WhatsApp
-                    template from your Brevo dashboard.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_110px]">
               <FormField
                 control={form.control}
@@ -216,8 +190,7 @@ export function WhatsAppTemplateFormDialog({
                       <Input placeholder="booking_confirmed" {...field} />
                     </FormControl>
                     <FormDescription>
-                      Fill this in if sending via Meta Cloud API — the exact template name
-                      approved in Meta Business Manager.
+                      The exact template name approved in Meta Business Manager.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -253,7 +226,7 @@ export function WhatsAppTemplateFormDialog({
                   </FormControl>
                   <FormDescription>
                     For your reference and the activity log only — this should match what the
-                    approved Brevo template actually says. Available variables:{" "}
+                    approved Meta template actually says. Available variables:{" "}
                     {availableVariables.map((v) => `{{${v}}}`).join(", ")}
                   </FormDescription>
                   <FormMessage />

@@ -32,7 +32,11 @@ export async function PATCH(request: NextRequest): Promise<Response> {
 
   try {
     const body = await request.json();
-    const input = whatsAppSettingsSchema.parse(body);
+    const parsed = whatsAppSettingsSchema.parse(body);
+    // Meta Cloud API is the only provider wired up in the admin UI — force
+    // it here too (not just hide the picker) so this route can never
+    // persist "brevo" again, from this form or a stray direct API call.
+    const input = { ...parsed, provider: "meta" as const };
 
     await connectToDatabase();
 

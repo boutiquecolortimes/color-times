@@ -32,7 +32,13 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
 
     const settingsDoc = await Settings.findOne({ module: "whatsapp" }).lean();
-    const settings = (settingsDoc?.data as WhatsAppSettingsInput) ?? DEFAULT_WHATSAPP_SETTINGS;
+    // Meta Cloud API is the only provider wired up in the admin UI — force
+    // it here too so a settings document saved back when Brevo was still
+    // selectable doesn't silently send test messages through Brevo.
+    const settings: WhatsAppSettingsInput = {
+      ...((settingsDoc?.data as WhatsAppSettingsInput) ?? DEFAULT_WHATSAPP_SETTINGS),
+      provider: "meta",
+    };
 
     let result: { success: boolean; messageId?: string; error?: string };
     if (settings.provider === "meta") {

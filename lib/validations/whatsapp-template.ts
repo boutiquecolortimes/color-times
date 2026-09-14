@@ -16,10 +16,14 @@ export const whatsAppTemplateSchema = z
     isActive: z.boolean(),
   })
   .refine(
+    // brevoTemplateId alone still satisfies this for templates created back
+    // when Brevo was wired up in the UI — the admin template form no longer
+    // exposes that field, but existing Brevo-configured templates must stay
+    // editable without being forced to also fill in a Meta template name.
     (data) => Boolean(data.brevoTemplateId) || Boolean(data.metaTemplateName?.trim()),
     {
-      message: "Enter a Brevo Template ID or a Meta Template Name",
-      path: ["brevoTemplateId"],
+      message: "Enter a Meta Template Name",
+      path: ["metaTemplateName"],
     }
   );
 

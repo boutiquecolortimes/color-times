@@ -99,7 +99,12 @@ async function sendTemplatedNotification(
 async function loadSettings(): Promise<WhatsAppSettingsInput> {
   await connectToDatabase();
   const settingsDoc = await Settings.findOne({ module: SETTINGS_MODULE }).lean();
-  return (settingsDoc?.data as WhatsAppSettingsInput) ?? DEFAULT_WHATSAPP_SETTINGS;
+  const settings = (settingsDoc?.data as WhatsAppSettingsInput) ?? DEFAULT_WHATSAPP_SETTINGS;
+  // Meta Cloud API is the only provider wired up in the admin UI — force it
+  // here too so a settings document saved back when Brevo was still
+  // selectable doesn't silently route real auto-notifications through
+  // Brevo again.
+  return { ...settings, provider: "meta" };
 }
 
 async function dispatchAutoWhatsAppEvent(
