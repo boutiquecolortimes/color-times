@@ -46,6 +46,12 @@ export async function POST(request: NextRequest): Promise<Response> {
     if (!booking) {
       return apiError("Booking not found", 404);
     }
+    // Invoice.customer is required — a booking whose customer record was
+    // since deleted would otherwise fail deep inside Mongoose with an
+    // opaque validation error instead of a clear message here.
+    if (!booking.customer) {
+      return apiError("This booking's customer record no longer exists — can't generate an invoice for it.", 422);
+    }
 
     const existing = await Invoice.findOne({
       booking: bookingId,
@@ -54,15 +60,26 @@ export async function POST(request: NextRequest): Promise<Response> {
     }).lean();
 
     const isReturned = booking.status === "returned";
-    const dateRange = `${formatDate(booking.rentalStartDate)} to ${formatDate(booking.rentalEndDate)}`;
+    // A handful of bookings were bulk-imported straight into MongoDB rather
+    // than created through this app, so fields the schema marks "required"
+    // (rentalStartDate/rentalEndDate/securityDeposit, per-item quantity and
+    // rentalFee) can still be missing on the stored document — a plain
+    // .lean() read doesn't backfill schema defaults. Falling back here keeps
+    // invoice generation working for those records instead of throwing.
+    const rentalStartDate = booking.rentalStartDate ?? booking.createdAt ?? new Date();
+    const rentalEndDate = booking.rentalEndDate ?? booking.createdAt ?? new Date();
+    const dateRange = `${formatDate(rentalStartDate)} to ${formatDate(rentalEndDate)}`;
+    const securityDeposit = booking.securityDeposit ?? 0;
     const lineItems = booking.items.map((item) => {
       const productName = (item.product as unknown as { name: string } | null)?.name ?? "Rental";
-      const unitPrice = item.rentalFee / item.quantity;
+      const quantity = item.quantity && item.quantity > 0 ? item.quantity : 1;
+      const rentalFee = item.rentalFee ?? 0;
+      const unitPrice = rentalFee / quantity;
       return {
-        description: `Rental — ${productName} (${item.size}), ${dateRange}`,
-        quantity: item.quantity,
+        description: `Rental — ${productName} (${item.size ?? "—"}), ${dateRange}`,
+        quantity,
         unitPrice,
-        amount: item.rentalFee,
+        amount: rentalFee,
       };
     });
     const damageCharges = isReturned ? (booking.damageCharges ?? 0) : 0;
@@ -84,7 +101,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     // is just for whatever's still outstanding: rent + damage, minus the
     // advance and whatever portion of the deposit was applied.
     const depositRefundAmount = isReturned ? (booking.depositRefundAmount ?? 0) : 0;
-    const depositApplied = isReturned ? Math.max(0, booking.securityDeposit - depositRefundAmount) : 0;
+    const depositApplied = isReturned ? Math.max(0, securityDeposit - depositRefundAmount) : 0;
 
     if (existing) {
       // A booking generates/refreshes its invoice at more than one lifecycle
@@ -102,7 +119,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       const taxableAmount = subtotal - discountAmount;
       const taxAmount = ((existing.taxRate ?? 0) * taxableAmount) / 100;
       const total =
-        (isReturned ? subtotal : subtotal + booking.securityDeposit) - discountAmount + taxAmount;
+        (isReturned ? subtotal : subtotal + securityDeposit) - discountAmount + taxAmount;
 
       const computedPaid = isReturned
         ? Math.min(total, Math.max(0, advancePaid + depositApplied))
@@ -118,7 +135,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         {
           lineItems,
           subtotal,
-          securityDeposit: booking.securityDeposit,
+          securityDeposit,
           depositRefunded: isReturned ? Boolean(booking.depositRefunded) : existing.depositRefunded,
           total,
           amountPaid,
@@ -153,7 +170,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       return apiSuccess({ invoice: updated });
     }
 
-    const total = isReturned ? subtotal : subtotal + booking.securityDeposit;
+    const total = isReturned ? subtotal : subtotal + securityDeposit;
     // Not-yet-returned invoices (generated at Confirm or Pickup time) used
     // to hardcode this to 0, which ignored any advance/pickup payment
     // already recorded on the booking — an invoice generated right after
@@ -174,7 +191,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       discountAmount: 0,
       taxRate: 0,
       taxAmount: 0,
-      securityDeposit: booking.securityDeposit,
+      securityDeposit,
       depositRefunded: isReturned ? Boolean(booking.depositRefunded) : false,
       total,
       amountPaid,

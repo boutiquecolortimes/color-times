@@ -1,0 +1,62 @@
+import fs from "node:fs";
+import mongoose from "mongoose";
+
+const envText = fs.readFileSync(new URL("../.env.local", import.meta.url), "utf8");
+const match = envText.match(/^MONGODB_URI\s*=\s*(.+)$/m);
+if (!match) {
+  console.error("MONGODB_URI not found in .env.local");
+  process.exit(1);
+}
+let uri = match[1].trim();
+uri = uri.replace(/^["']|["']$/g, "");
+
+const bookingId = process.argv[2];
+if (!bookingId) {
+  console.error("Usage: node diag.mjs <bookingId>");
+  process.exit(1);
+}
+
+await mongoose.connect(uri);
+const db = mongoose.connection.db;
+
+const booking = await db.collection("bookings").findOne({ _id: new mongoose.Types.ObjectId(bookingId) });
+if (!booking) {
+  console.log("Booking not found");
+  process.exit(0);
+}
+
+console.log("=== booking top-level keys & types ===");
+for (const [k, v] of Object.entries(booking)) {
+  console.log(k, "=>", Array.isArray(v) ? `array(${v.length})` : typeof v, JSON.stringify(v)?.slice(0, 120));
+}
+
+console.log("\n=== items ===");
+(booking.items || []).forEach((item, i) => {
+  console.log(`item[${i}]`, JSON.stringify(item));
+});
+
+if (booking.customer) {
+  const customer = await db.collection("users").findOne({ _id: booking.customer });
+  console.log("\n=== customer ===");
+  console.log(customer ? JSON.stringify(customer) : "NOT FOUND (dangling ref!)");
+} else {
+  console.log("\n=== customer === MISSING ON BOOKING");
+}
+
+if (booking.items) {
+  for (const item of booking.items) {
+    if (item.product) {
+      const product = await db.collection("products").findOne({ _id: item.product });
+      console.log("\n=== product", String(item.product), "===");
+      console.log(product ? `found: ${product.name}` : "NOT FOUND (dangling ref!)");
+    } else {
+      console.log("\n=== item has no product ref ===", JSON.stringify(item));
+    }
+  }
+}
+
+console.log("\n=== existing invoice for this booking ===");
+const invoice = await db.collection("invoices").findOne({ booking: booking._id });
+console.log(invoice ? JSON.stringify(invoice) : "none");
+
+await mongoose.disconnect();
