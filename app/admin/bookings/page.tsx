@@ -18,13 +18,13 @@ export default async function AdminBookingsPage() {
   await connectToDatabase();
 
   const [bookings, total, summaryAgg, statusAgg] = await Promise.all([
-    // Matches the client's default sort (soonest-upcoming rental first) so
+    // Matches the client's default sort (most-recently-booked first) so
     // the server-rendered first page doesn't flash a different order before
     // the client takes over.
     Booking.find({ deletedAt: null })
       .populate("customer", "name email phone")
       .populate("items.product", "name images")
-      .sort({ rentalStartDate: 1 })
+      .sort({ bookingDate: -1, createdAt: -1 })
       .limit(PAGE_SIZE)
       .lean(),
     Booking.countDocuments({ deletedAt: null }),

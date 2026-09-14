@@ -211,11 +211,10 @@ export function BookingsClient({
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [search, setSearch] = useState("");
-  // Default to soonest-upcoming rental first (not newest-created) — a
-  // handful of bookings starting tomorrow matter more at a glance than
-  // whichever was entered into the system most recently.
-  const [sortBy, setSortBy] = useState("rentalStartDate");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  // Default to most-recently-booked first, so the newest bookings are
+  // always visible at the top of the list.
+  const [sortBy, setSortBy] = useState("bookingDate");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [view, setView] = useState<"table" | "card" | "calendar">("table");
   const [trashView, setTrashView] = useState<"active" | "trash">("active");
   const [returnDialogBookingId, setReturnDialogBookingId] = useState<string | null>(null);
@@ -231,8 +230,8 @@ export function BookingsClient({
     from === "" &&
     to === "" &&
     search === "" &&
-    sortBy === "rentalStartDate" &&
-    sortDir === "asc" &&
+    sortBy === "bookingDate" &&
+    sortDir === "desc" &&
     trashView === "active";
 
   function toggleSort(field: string) {

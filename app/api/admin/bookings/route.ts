@@ -26,10 +26,10 @@ export async function GET(request: NextRequest): Promise<Response> {
   const from = searchParams.get("from");
   const to = searchParams.get("to");
   const search = searchParams.get("search")?.trim();
-  // Defaults to soonest-upcoming rental first when the caller doesn't
+  // Defaults to most-recently-booked first when the caller doesn't
   // specify — matches the admin list's own default (see bookings-client.tsx).
-  const sortBy = searchParams.get("sortBy") || "rentalStartDate";
-  const sortDir = searchParams.get("sortDir") === "desc" ? -1 : 1;
+  const sortBy = searchParams.get("sortBy") || "bookingDate";
+  const sortDir = searchParams.get("sortDir") === "asc" ? 1 : -1;
   // "view" (trash/active) is intentionally separate from "status" above —
   // status is the booking lifecycle (inquiry/confirmed/...), this is purely
   // whether the booking has been moved to Trash.
