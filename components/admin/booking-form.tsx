@@ -117,7 +117,7 @@ function findStockViolation(
     if (!product) continue;
     const totalStock = product.variants.reduce((sum, variant) => sum + variant.quantityInStock, 0);
     if (count > totalStock) {
-      return `"${product.name}" is added ${count} times in this booking, but only ${totalStock} unit(s) are in stock. Remove the extra item(s) or choose a different dress.`;
+      return `"${product.name}" is added ${count} times in this booking, but only ${totalStock} unit(s) are in stock. Remove the extra item(s) or choose a different item.`;
     }
   }
   return null;
@@ -230,7 +230,7 @@ function BookingItemRow({
           name={`items.${index}.product`}
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Dress</FormLabel>
+              <FormLabel>Item</FormLabel>
               <FormControl>
                 <SearchableSelect
                   value={field.value}
@@ -238,9 +238,9 @@ function BookingItemRow({
                     field.onChange(value);
                     onProductChange(index);
                   }}
-                  placeholder="Select dress"
+                  placeholder="Select item"
                   searchPlaceholder="Search by name, code, or color..."
-                  emptyText="No dresses found."
+                  emptyText="No items found."
                   options={products.map((product) => {
                     const isBooked =
                       bookedProductIds.has(product._id) && product._id !== field.value;
@@ -339,11 +339,11 @@ function BookingItemRow({
         <div className="mt-2 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <p>
-            This dress is already booked for an overlapping date range
+            This item is already booked for an overlapping date range
             {availabilityQuery.data?.conflicts[0]
               ? ` (${availabilityQuery.data.conflicts[0].bookingNumber})`
               : ""}
-            . Choose different dates or a different dress.
+            . Choose different dates or a different item.
           </p>
         </div>
       )}
@@ -357,7 +357,7 @@ function BookingItemRow({
               <FormLabel className="text-xs">Wearer Name (optional)</FormLabel>
               <FormControl>
                 <Input
-                  placeholder="Who's wearing this dress? e.g. Priya, Guest 2"
+                  placeholder="Who's wearing this item? e.g. Priya, Guest 2"
                   value={(field.value as string | undefined) ?? ""}
                   onChange={(event) => field.onChange(event.target.value)}
                 />
@@ -367,7 +367,7 @@ function BookingItemRow({
         />
 
         <p className="mt-3 text-xs font-medium text-muted-foreground">
-          Measurements for this dress (in inches, optional)
+          Measurements for this item (in inches, optional)
         </p>
         <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
           {BOOKING_MEASUREMENT_FIELDS.map(({ key, label }) => (
@@ -407,7 +407,7 @@ function BookingItemRow({
               <FormControl>
                 <Textarea
                   rows={2}
-                  placeholder="Any other measurement notes for this dress"
+                  placeholder="Any other measurement notes for this item"
                   value={(field.value as string | undefined) ?? ""}
                   onChange={(event) => field.onChange(event.target.value)}
                 />
@@ -774,7 +774,7 @@ export function BookingForm({
               name="advancePaid"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Advance Amount (&#8377;)</FormLabel>
+                  <FormLabel>Paid Amount (&#8377;)</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -821,7 +821,7 @@ export function BookingForm({
           </div>
 
           <div className="mt-2 flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Due Amount (total &minus; advance)</span>
+            <span className="text-sm text-muted-foreground">Due Amount (total &minus; paid)</span>
             <span className="font-heading text-xl text-accent">{formatCurrency(dueAmount)}</span>
           </div>
         </section>

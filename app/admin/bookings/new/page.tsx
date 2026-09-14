@@ -39,7 +39,7 @@ export default async function NewBookingPage() {
       <div>
         <h1 className="font-heading text-2xl">New Booking</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Book a dress for a customer. Overlapping dates are blocked automatically.
+          Book an item for a customer. Overlapping dates are blocked automatically.
         </p>
       </div>
 

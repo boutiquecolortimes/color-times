@@ -104,7 +104,15 @@ function DatePicker({ value, onChange, placeholder = "Select date", className }:
     setOpen(nextOpen)
   }
 
-  function applyTypedValue() {
+  // `closeOnSuccess` is false for the plain blur case: the popover's first
+  // focusable element is this input, so simply moving focus off it — e.g.
+  // by clicking a day in the calendar grid, or the month/year selects, or
+  // the prev/next-month buttons — fires this same blur handler before the
+  // click itself is handled. Auto-closing on every blur used to win that
+  // race and dismiss the popover before the click could land, which made
+  // the calendar look unclickable any time the field already held a valid
+  // date (only Enter, from the text field, should force a close).
+  function applyTypedValue(options?: { closeOnSuccess?: boolean }) {
     const parsed = parseTypedDate(typedValue)
     if (!parsed) {
       if (typedValue.trim()) setTypedError(true)
@@ -113,7 +121,7 @@ function DatePicker({ value, onChange, placeholder = "Select date", className }:
     setTypedError(false)
     onChange(toIsoDate(parsed))
     setCursor(new Date(parsed.getFullYear(), parsed.getMonth(), 1))
-    setOpen(false)
+    if (options?.closeOnSuccess) setOpen(false)
   }
 
   // Bounded around today, but stretched to always include whatever year is
@@ -180,10 +188,10 @@ function DatePicker({ value, onChange, placeholder = "Select date", className }:
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault()
-                    applyTypedValue()
+                    applyTypedValue({ closeOnSuccess: true })
                   }
                 }}
-                onBlur={applyTypedValue}
+                onBlur={() => applyTypedValue()}
                 className={cn(
                   "h-8 w-full rounded-md border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
                   typedError && "border-destructive focus-visible:ring-destructive/30"
