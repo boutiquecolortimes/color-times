@@ -54,8 +54,11 @@ export default async function AdminSalesPage() {
       : null,
     details: sale.details,
     totalAmount: sale.totalAmount,
-    advancePayment: sale.advancePayment,
-    dueAmount: sale.dueAmount,
+    // Sales created before advancePayment/dueAmount existed on the schema
+    // don't have these stored on the document — .lean() reads don't
+    // backfill schema defaults, so fall back the same way bookings do.
+    advancePayment: sale.advancePayment ?? 0,
+    dueAmount: sale.dueAmount ?? 0,
   }));
 
   return (

@@ -40,7 +40,15 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
     return apiError("Sale not found", 404);
   }
 
-  return apiSuccess({ sale });
+  // Same missing-field fallback as the list route — older sales don't have
+  // advancePayment/dueAmount stored.
+  return apiSuccess({
+    sale: {
+      ...sale,
+      advancePayment: sale.advancePayment ?? 0,
+      dueAmount: sale.dueAmount ?? 0,
+    },
+  });
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams): Promise<Response> {
@@ -88,8 +96,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
 
     if (input.totalAmount !== undefined || input.advancePayment !== undefined) {
       update.dueAmount = computeSaleDue({
-        totalAmount: input.totalAmount ?? before.totalAmount,
-        advancePayment: input.advancePayment ?? before.advancePayment,
+        totalAmount: input.totalAmount ?? before.totalAmount ?? 0,
+        advancePayment: input.advancePayment ?? before.advancePayment ?? 0,
       });
     }
 

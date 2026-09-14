@@ -66,7 +66,7 @@ export default async function EditSalePage({
     product: String(sale.product),
     details: sale.details ?? "",
     totalAmount: sale.totalAmount,
-    advancePayment: sale.advancePayment,
+    advancePayment: sale.advancePayment ?? 0,
   };
 
   return (

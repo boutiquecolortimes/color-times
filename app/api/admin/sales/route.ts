@@ -54,8 +54,18 @@ export async function GET(request: NextRequest): Promise<Response> {
     Sale.countDocuments(filter),
   ]);
 
+  // Sales created before advancePayment/dueAmount existed on the schema
+  // don't have these stored on the document — .lean() reads don't backfill
+  // schema defaults, so normalize here instead of letting every consumer
+  // (and formatCurrency) choke on undefined.
+  const normalizedSales = sales.map((sale) => ({
+    ...sale,
+    advancePayment: sale.advancePayment ?? 0,
+    dueAmount: sale.dueAmount ?? 0,
+  }));
+
   return apiSuccess({
-    sales,
+    sales: normalizedSales,
     pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
   });
 }
