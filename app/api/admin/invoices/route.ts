@@ -49,8 +49,25 @@ export async function GET(request: NextRequest): Promise<Response> {
     Invoice.countDocuments(filter),
   ]);
 
+  // A handful of invoices predate later schema additions or were inserted
+  // outside the app (bulk import) — a plain .lean() read doesn't backfill
+  // schema defaults, so numeric/date fields the schema marks "required" can
+  // still come back missing and crash a naive .toLocaleString()/.toISOString()
+  // downstream. Normalize here the same way bookings/sales already do.
+  const normalizedInvoices = invoices.map((invoice) => ({
+    ...invoice,
+    subtotal: invoice.subtotal ?? 0,
+    discountAmount: invoice.discountAmount ?? 0,
+    taxAmount: invoice.taxAmount ?? 0,
+    securityDeposit: invoice.securityDeposit ?? 0,
+    total: invoice.total ?? 0,
+    amountPaid: invoice.amountPaid ?? 0,
+    amountDue: invoice.amountDue ?? 0,
+    dueDate: invoice.dueDate ?? invoice.createdAt ?? new Date(),
+  }));
+
   return apiSuccess({
-    invoices,
+    invoices: normalizedInvoices,
     pagination: all
       ? { page: 1, pageSize: total || 1, total, totalPages: 1 }
       : { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },

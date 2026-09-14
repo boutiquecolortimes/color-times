@@ -30,7 +30,25 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
     return apiError("Invoice not found", 404);
   }
 
-  return apiSuccess({ invoice });
+  // Same legacy/bulk-import data gap as the list route — normalize before
+  // handing this to the client so a missing field can't crash the detail
+  // page's currency/date formatting.
+  const normalizedInvoice = {
+    ...invoice,
+    lineItems: invoice.lineItems ?? [],
+    subtotal: invoice.subtotal ?? 0,
+    discountAmount: invoice.discountAmount ?? 0,
+    taxRate: invoice.taxRate ?? 0,
+    taxAmount: invoice.taxAmount ?? 0,
+    securityDeposit: invoice.securityDeposit ?? 0,
+    total: invoice.total ?? 0,
+    amountPaid: invoice.amountPaid ?? 0,
+    amountDue: invoice.amountDue ?? 0,
+    payments: invoice.payments ?? [],
+    dueDate: invoice.dueDate ?? invoice.createdAt ?? new Date(),
+  };
+
+  return apiSuccess({ invoice: normalizedInvoice });
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams): Promise<Response> {

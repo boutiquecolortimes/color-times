@@ -32,22 +32,29 @@ export async function GET(
       return new Response("This invoice's customer record is missing.", { status: 422 });
     }
 
+    // A handful of invoices predate later schema additions or were
+    // inserted outside the app (bulk import), so numeric/date fields the
+    // schema marks "required" can still be missing on the stored document —
+    // formatCurrency()'s .toLocaleString() call would throw on undefined
+    // (the same crash class that hit the Sale list page earlier), so
+    // normalize before generating rather than let a bad legacy record 500
+    // the one link that's shared straight to a customer.
     const buffer = await generateInvoicePdfBuffer({
       invoiceNumber: invoice.invoiceNumber,
       status: invoice.status,
-      createdAt: invoice.createdAt,
-      dueDate: invoice.dueDate,
+      createdAt: invoice.createdAt ?? new Date(),
+      dueDate: invoice.dueDate ?? invoice.createdAt ?? new Date(),
       customer: { name: customer.name, email: customer.email, phone: customer.phone },
-      lineItems: invoice.lineItems,
-      subtotal: invoice.subtotal,
-      discountAmount: invoice.discountAmount,
-      taxRate: invoice.taxRate,
-      taxAmount: invoice.taxAmount,
-      securityDeposit: invoice.securityDeposit,
-      total: invoice.total,
-      amountPaid: invoice.amountPaid,
-      amountDue: invoice.amountDue,
-      payments: invoice.payments,
+      lineItems: invoice.lineItems ?? [],
+      subtotal: invoice.subtotal ?? 0,
+      discountAmount: invoice.discountAmount ?? 0,
+      taxRate: invoice.taxRate ?? 0,
+      taxAmount: invoice.taxAmount ?? 0,
+      securityDeposit: invoice.securityDeposit ?? 0,
+      total: invoice.total ?? 0,
+      amountPaid: invoice.amountPaid ?? 0,
+      amountDue: invoice.amountDue ?? 0,
+      payments: invoice.payments ?? [],
       notes: invoice.notes,
     });
 

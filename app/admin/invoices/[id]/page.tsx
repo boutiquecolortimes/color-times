@@ -52,21 +52,24 @@ export default async function InvoiceDetailPage({
           booking: invoice.booking
             ? { bookingNumber: (invoice.booking as unknown as { bookingNumber: string }).bookingNumber }
             : null,
-          lineItems: invoice.lineItems,
-          subtotal: invoice.subtotal,
-          discountAmount: invoice.discountAmount,
-          taxRate: invoice.taxRate,
-          taxAmount: invoice.taxAmount,
-          securityDeposit: invoice.securityDeposit,
-          depositRefunded: invoice.depositRefunded,
-          total: invoice.total,
-          amountPaid: invoice.amountPaid,
-          amountDue: invoice.amountDue,
-          dueDate: invoice.dueDate.toISOString(),
+          // A handful of invoices predate later schema additions or were
+          // bulk-imported outside the app — .lean() doesn't backfill schema
+          // defaults, so these can still be missing on the stored document.
+          lineItems: invoice.lineItems ?? [],
+          subtotal: invoice.subtotal ?? 0,
+          discountAmount: invoice.discountAmount ?? 0,
+          taxRate: invoice.taxRate ?? 0,
+          taxAmount: invoice.taxAmount ?? 0,
+          securityDeposit: invoice.securityDeposit ?? 0,
+          depositRefunded: invoice.depositRefunded ?? false,
+          total: invoice.total ?? 0,
+          amountPaid: invoice.amountPaid ?? 0,
+          amountDue: invoice.amountDue ?? 0,
+          dueDate: (invoice.dueDate ?? invoice.createdAt ?? new Date()).toISOString(),
           issuedAt: invoice.issuedAt ? invoice.issuedAt.toISOString() : null,
-          createdAt: invoice.createdAt.toISOString(),
+          createdAt: (invoice.createdAt ?? new Date()).toISOString(),
           notes: invoice.notes,
-          payments: invoice.payments.map((payment) => ({
+          payments: (invoice.payments ?? []).map((payment) => ({
             _id: String(payment._id),
             amount: payment.amount,
             method: payment.method,
