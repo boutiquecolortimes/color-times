@@ -14,6 +14,11 @@ interface SendMetaWhatsAppMessageParams {
   to: string;
   templateName: string;
   languageCode: string;
+  // Ordered values for the approved template's {{1}}, {{2}}, ... body
+  // placeholders — count and order must match exactly what Meta approved
+  // (see lib/notifications/trigger-events.ts TRIGGER_EVENT_VARIABLES), or
+  // the send is rejected. Omit/empty only for a template with no variables.
+  parameters?: string[];
 }
 
 interface SendMetaWhatsAppMessageResult {
@@ -51,6 +56,16 @@ export async function sendMetaWhatsAppMessage(
           template: {
             name: params.templateName,
             language: { code: params.languageCode },
+            ...(params.parameters && params.parameters.length > 0
+              ? {
+                  components: [
+                    {
+                      type: "body",
+                      parameters: params.parameters.map((text) => ({ type: "text", text })),
+                    },
+                  ],
+                }
+              : {}),
           },
         }),
       }

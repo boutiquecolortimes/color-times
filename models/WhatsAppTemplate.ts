@@ -9,6 +9,8 @@ export interface IWhatsAppTemplate extends Document {
   brevoTemplateId?: number;
   metaTemplateName?: string;
   metaLanguageCode?: string;
+  metaTemplateId?: string;
+  metaStatus?: string;
   previewBody: string;
   isActive: boolean;
   createdAt: Date;
@@ -27,6 +29,8 @@ const whatsAppTemplateSchema = new Schema<IWhatsAppTemplate>(
     brevoTemplateId: { type: Number },
     metaTemplateName: { type: String, trim: true },
     metaLanguageCode: { type: String, trim: true, default: "en_US" },
+    metaTemplateId: { type: String, trim: true },
+    metaStatus: { type: String, trim: true },
     previewBody: { type: String, required: true, trim: true },
     isActive: { type: Boolean, default: false },
   },

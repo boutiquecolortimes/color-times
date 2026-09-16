@@ -8,6 +8,12 @@ export const whatsAppTemplateSchema = z
     brevoTemplateId: z.number().int().min(0).optional(),
     metaTemplateName: z.string().trim().max(512).optional().or(z.literal("")),
     metaLanguageCode: z.string().trim().max(35).optional().or(z.literal("")),
+    // Meta's own numeric template ID and its status/quality display (e.g.
+    // "Active - Quality pending"), copied from Meta Business Manager once
+    // the template is approved there. Free text — Meta's status wording
+    // isn't a fixed set we should try to enumerate.
+    metaTemplateId: z.string().trim().max(64).optional().or(z.literal("")),
+    metaStatus: z.string().trim().max(120).optional().or(z.literal("")),
     previewBody: z
       .string()
       .trim()

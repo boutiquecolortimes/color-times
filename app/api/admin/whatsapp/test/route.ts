@@ -8,12 +8,18 @@ import { requireApiRole } from "@/lib/api/require-role";
 import { SETTINGS_ROLES } from "@/lib/auth/roles";
 import { sendWhatsAppMessage } from "@/lib/notifications/brevo-whatsapp";
 import { sendMetaWhatsAppMessage } from "@/lib/notifications/meta-whatsapp";
+import { renderTemplate } from "@/lib/notifications/render-template";
+import { TRIGGER_EVENT_VARIABLES } from "@/lib/notifications/trigger-events";
 import { DEFAULT_WHATSAPP_SETTINGS, type WhatsAppSettingsInput } from "@/lib/validations/whatsapp-settings";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 
 const testMessageSchema = z.object({
   phone: z.string().trim().min(6, "Enter a valid phone number"),
   templateId: z.string().min(1, "Select a template"),
+  // Sample values for the template's variables, keyed by name (customerName,
+  // bookingNumber, ...) — see TRIGGER_EVENT_VARIABLES. Optional so older
+  // callers/templates with no variables still work.
+  variables: z.record(z.string(), z.string()).optional(),
 });
 
 export async function POST(request: NextRequest): Promise<Response> {
@@ -40,6 +46,15 @@ export async function POST(request: NextRequest): Promise<Response> {
       provider: "meta",
     };
 
+    // Same positional mapping the real auto-send path uses — Meta templates
+    // take ordered {{1}}, {{2}}, ... values, not the named placeholders the
+    // preview text uses.
+    const allVariables: Record<string, string> = { customerName: "Test recipient", ...input.variables };
+    const orderedParameters = (TRIGGER_EVENT_VARIABLES[template.triggerEvent] ?? ["customerName"]).map(
+      (key) => allVariables[key] ?? ""
+    );
+    const renderedMessage = renderTemplate(template.previewBody, allVariables);
+
     let result: { success: boolean; messageId?: string; error?: string };
     if (settings.provider === "meta") {
       if (!template.metaTemplateName) {
@@ -49,6 +64,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         to: input.phone,
         templateName: template.metaTemplateName,
         languageCode: template.metaLanguageCode || "en_US",
+        parameters: orderedParameters,
       });
     } else {
       if (!settings.senderLabel) {
@@ -71,7 +87,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       templateId: template._id,
       templateName: template.name,
       triggerEvent: "test",
-      message: template.previewBody,
+      message: renderedMessage,
       status: result.success ? "sent" : "failed",
       providerMessageId: result.messageId,
       errorMessage: result.error,

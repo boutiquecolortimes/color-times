@@ -52,6 +52,8 @@ export interface WhatsAppTemplateRow {
   brevoTemplateId?: number;
   metaTemplateName?: string;
   metaLanguageCode?: string;
+  metaTemplateId?: string;
+  metaStatus?: string;
   previewBody: string;
   isActive: boolean;
 }
@@ -62,6 +64,8 @@ const EMPTY_VALUES: WhatsAppTemplateInput = {
   brevoTemplateId: undefined,
   metaTemplateName: "",
   metaLanguageCode: "en_US",
+  metaTemplateId: "",
+  metaStatus: "",
   previewBody: "",
   isActive: false,
 };
@@ -92,6 +96,8 @@ export function WhatsAppTemplateFormDialog({
               brevoTemplateId: editingTemplate.brevoTemplateId,
               metaTemplateName: editingTemplate.metaTemplateName ?? "",
               metaLanguageCode: editingTemplate.metaLanguageCode || "en_US",
+              metaTemplateId: editingTemplate.metaTemplateId ?? "",
+              metaStatus: editingTemplate.metaStatus ?? "",
               previewBody: editingTemplate.previewBody,
               isActive: editingTemplate.isActive,
             }
@@ -205,6 +211,41 @@ export function WhatsAppTemplateFormDialog({
                     <FormControl>
                       <Input placeholder="en_US" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr]">
+              <FormField
+                control={form.control}
+                name="metaTemplateId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Meta Template ID</FormLabel>
+                    <FormControl>
+                      <Input placeholder="1032276876527843" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      The numeric ID Meta assigns once the template is approved.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="metaStatus"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Meta Status</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Active - Quality pending" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Copy the status shown for this template in Meta Business Manager.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

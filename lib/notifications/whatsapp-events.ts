@@ -6,6 +6,7 @@ import { NotificationLog } from "@/models/NotificationLog";
 import { sendWhatsAppMessage } from "@/lib/notifications/brevo-whatsapp";
 import { sendMetaWhatsAppMessage } from "@/lib/notifications/meta-whatsapp";
 import { renderTemplate } from "@/lib/notifications/render-template";
+import { TRIGGER_EVENT_VARIABLES } from "@/lib/notifications/trigger-events";
 import {
   DEFAULT_WHATSAPP_SETTINGS,
   type WhatsAppSettingsInput,
@@ -39,10 +40,19 @@ async function sendTemplatedNotification(
     const template = await WhatsAppTemplate.findOne({ triggerEvent, isActive: true }).lean();
     if (!template) return;
 
-    const renderedPreview = renderTemplate(template.previewBody, {
+    const allVariables: Record<string, string> = {
       customerName: context.customerName,
       ...context.variables,
-    });
+    };
+    const renderedPreview = renderTemplate(template.previewBody, allVariables);
+    // Meta templates use positional {{1}}, {{2}}, ... placeholders, not the
+    // named {{customerName}}-style ones used in the staff-facing preview —
+    // TRIGGER_EVENT_VARIABLES is the source of truth for which value goes
+    // in which position (it's also what the templates reference doc was
+    // generated from, so it matches what's actually approved in Meta).
+    const orderedParameters = (TRIGGER_EVENT_VARIABLES[triggerEvent] ?? ["customerName"]).map(
+      (key) => allVariables[key] ?? ""
+    );
 
     if (!context.customerPhone) {
       await NotificationLog.create({
@@ -67,6 +77,7 @@ async function sendTemplatedNotification(
               to: context.customerPhone,
               templateName: template.metaTemplateName,
               languageCode: template.metaLanguageCode || "en_US",
+              parameters: orderedParameters,
             })
           : { success: false, error: "Template has no Meta Template Name configured" }
         : template.brevoTemplateId

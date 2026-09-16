@@ -91,7 +91,11 @@ export function WhatsAppTemplatesClient({
               {template.brevoTemplateId && `Brevo Template ID ${template.brevoTemplateId}`}
               {template.brevoTemplateId && template.metaTemplateName && " · "}
               {template.metaTemplateName && `Meta: ${template.metaTemplateName}`}
+              {template.metaTemplateId && ` (ID ${template.metaTemplateId})`}
             </p>
+            {template.metaStatus && (
+              <p className="mt-1 text-xs text-muted-foreground">{template.metaStatus}</p>
+            )}
             <div className="mt-3 flex justify-end gap-1">
             <Button
               variant="ghost"
@@ -184,6 +188,9 @@ export function WhatsAppTemplatesClient({
                     : template.metaTemplateName
                       ? `Meta: ${template.metaTemplateName}`
                       : "—"}
+                  {template.metaTemplateId && (
+                    <div className="text-xs">ID {template.metaTemplateId}</div>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <Badge
@@ -195,6 +202,9 @@ export function WhatsAppTemplatesClient({
                   >
                     {template.isActive ? "Active" : "Inactive"}
                   </Badge>
+                  {template.metaStatus && (
+                    <div className="mt-1 text-xs text-muted-foreground">{template.metaStatus}</div>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-1">
