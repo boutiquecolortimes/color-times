@@ -74,8 +74,20 @@ export async function sendMetaWhatsAppMessage(
     const json = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      const error =
-        typeof json?.error?.message === "string" ? json.error.message : `Meta API error (${response.status})`;
+      // Meta's top-level error.message is often a vague generic string (e.g.
+      // "An unknown error has occurred.") — log the full error object
+      // server-side (code/type/fbtrace_id) so a failure is actually
+      // debuggable from Vercel's runtime logs, and surface the error code
+      // in the message we hand back since that's usually the real signal
+      // (190 = bad/expired token, 100 = bad parameter, 10/200-series =
+      // permission issues, 131xxx = messaging-specific failures).
+      console.error("Meta WhatsApp API error:", JSON.stringify(json?.error ?? json));
+      const metaError = json?.error;
+      const baseMessage =
+        typeof metaError?.message === "string" ? metaError.message : `Meta API error (${response.status})`;
+      const error = metaError?.code
+        ? `${baseMessage} (code ${metaError.code}${metaError.error_subcode ? `/${metaError.error_subcode}` : ""})`
+        : baseMessage;
       return { success: false, error };
     }
 

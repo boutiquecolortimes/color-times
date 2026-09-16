@@ -132,6 +132,8 @@ export default async function AdminWhatsAppPage() {
               brevoTemplateId: template.brevoTemplateId,
               metaTemplateName: template.metaTemplateName,
               metaLanguageCode: template.metaLanguageCode,
+              metaTemplateId: template.metaTemplateId,
+              metaStatus: template.metaStatus,
               previewBody: template.previewBody,
               isActive: template.isActive,
             }))}

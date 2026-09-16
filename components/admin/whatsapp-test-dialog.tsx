@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Send } from "lucide-react";
+import { AlertTriangle, Loader2, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -73,6 +73,10 @@ export function WhatsAppTestDialog() {
   const [phone, setPhone] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [variables, setVariables] = useState<Record<string, string>>({});
+  // Kept visible in the dialog (not just a toast) until the next attempt —
+  // Meta's error text is often long (now includes the error code), and a
+  // toast that auto-dismisses in a few seconds is too easy to miss.
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const { data: templates = [], isLoading: isLoadingTemplates } = useQuery({
     queryKey: ["admin", "whatsapp", "templates"],
@@ -98,6 +102,7 @@ export function WhatsAppTestDialog() {
 
   const mutation = useMutation({
     mutationFn: async () => {
+      setSendError(null);
       const res = await fetch("/api/admin/whatsapp/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -112,7 +117,10 @@ export function WhatsAppTestDialog() {
       queryClient.invalidateQueries({ queryKey: ["admin", "whatsapp", "logs"] });
       setOpen(false);
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => {
+      toast.error("Test message failed");
+      setSendError(error.message);
+    },
   });
 
   return (
@@ -120,7 +128,13 @@ export function WhatsAppTestDialog() {
       <Button variant="outline" onClick={() => setOpen(true)}>
         <Send className="h-4 w-4" /> Send Test Message
       </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) setSendError(null);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Send Test WhatsApp Message</DialogTitle>
@@ -182,6 +196,21 @@ export function WhatsAppTestDialog() {
                     />
                   </div>
                 ))}
+              </div>
+            )}
+
+            {sendError && (
+              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                <p className="flex-1 text-sm break-words text-destructive">{sendError}</p>
+                <button
+                  type="button"
+                  onClick={() => setSendError(null)}
+                  className="shrink-0 text-destructive/70 hover:text-destructive"
+                  aria-label="Dismiss error"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
             )}
           </div>
