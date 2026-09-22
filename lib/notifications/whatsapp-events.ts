@@ -29,6 +29,13 @@ interface NotifyContext {
   relatedEntityType: "Booking" | "Invoice" | "CustomisationOrder" | "Sale";
   relatedEntityId: string;
   variables: Record<string, string>;
+  // Public URL Meta's servers can fetch (bill/invoice/booking-confirmation
+  // PDF) — only used when the active template for this trigger event has
+  // metaHeaderType "document". Sending that kind of template without this
+  // is what previously made real/test sends fail even though a manual
+  // Graph API call with a header attached by hand worked fine.
+  documentUrl?: string;
+  documentFilename?: string;
 }
 
 async function sendTemplatedNotification(
@@ -70,14 +77,30 @@ async function sendTemplatedNotification(
       return;
     }
 
-    const result =
-      settings.provider === "meta"
+    const headerType = template.metaHeaderType ?? "none";
+    // Fail fast with a clear reason instead of letting Meta reject the whole
+    // message — a template that needs a document header but has no URL to
+    // send is a config gap (or a missing PDF generator), not a transient
+    // send error.
+    const missingRequiredDocument = headerType === "document" && !context.documentUrl;
+
+    const result: { success: boolean; messageId?: string; error?: string } = missingRequiredDocument
+      ? {
+          success: false,
+          error:
+            "This template requires a document header (PDF), but no document URL was available for this event.",
+        }
+      : settings.provider === "meta"
         ? template.metaTemplateName
           ? await sendMetaWhatsAppMessage({
               to: context.customerPhone,
               templateName: template.metaTemplateName,
               languageCode: template.metaLanguageCode || "en_US",
               parameters: orderedParameters,
+              headerDocument:
+                headerType === "document"
+                  ? { link: context.documentUrl!, filename: context.documentFilename }
+                  : undefined,
             })
           : { success: false, error: "Template has no Meta Template Name configured" }
         : template.brevoTemplateId

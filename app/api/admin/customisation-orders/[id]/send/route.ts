@@ -29,12 +29,17 @@ export async function POST(
       customerPhone: order.customerPhone,
       relatedEntityType: "CustomisationOrder",
       relatedEntityId: id,
+      // Public, unauthenticated route — Meta's servers can fetch it
+      // directly as the template's document header. Only actually sent
+      // to Meta when the active customisation_bill_sent template has
+      // metaHeaderType "document" (see lib/notifications/whatsapp-events.ts).
+      documentUrl: `${siteConfig.url}/api/customisation-orders/${id}/pdf`,
+      documentFilename: `${order.billNumber}.pdf`,
       variables: {
         billNumber: order.billNumber,
         totalAmount: String(order.totalAmount),
         advancePayment: String(order.advancePayment),
         dueAmount: String(order.dueAmount),
-        billPdfUrl: `${siteConfig.url}/api/customisation-orders/${id}/pdf`,
       },
     });
     void notifyAccounts(ADMIN_ROLES, {

@@ -134,6 +134,7 @@ export default async function AdminWhatsAppPage() {
               metaLanguageCode: template.metaLanguageCode,
               metaTemplateId: template.metaTemplateId,
               metaStatus: template.metaStatus,
+              metaHeaderType: template.metaHeaderType,
               previewBody: template.previewBody,
               isActive: template.isActive,
             }))}

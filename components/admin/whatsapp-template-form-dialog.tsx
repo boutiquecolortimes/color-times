@@ -43,6 +43,7 @@ import {
   TRIGGER_EVENT_VARIABLES,
   type WhatsAppTriggerEvent,
 } from "@/lib/notifications/trigger-events";
+import type { WhatsAppHeaderType } from "@/models/WhatsAppTemplate";
 import { WhatsAppChatBubble } from "@/components/admin/whatsapp-chat-preview";
 
 export interface WhatsAppTemplateRow {
@@ -54,6 +55,7 @@ export interface WhatsAppTemplateRow {
   metaLanguageCode?: string;
   metaTemplateId?: string;
   metaStatus?: string;
+  metaHeaderType?: WhatsAppHeaderType;
   previewBody: string;
   isActive: boolean;
 }
@@ -66,6 +68,7 @@ const EMPTY_VALUES: WhatsAppTemplateInput = {
   metaLanguageCode: "en_US",
   metaTemplateId: "",
   metaStatus: "",
+  metaHeaderType: "none",
   previewBody: "",
   isActive: false,
 };
@@ -98,6 +101,7 @@ export function WhatsAppTemplateFormDialog({
               metaLanguageCode: editingTemplate.metaLanguageCode || "en_US",
               metaTemplateId: editingTemplate.metaTemplateId ?? "",
               metaStatus: editingTemplate.metaStatus ?? "",
+              metaHeaderType: editingTemplate.metaHeaderType ?? "none",
               previewBody: editingTemplate.previewBody,
               isActive: editingTemplate.isActive,
             }
@@ -251,6 +255,35 @@ export function WhatsAppTemplateFormDialog({
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="metaHeaderType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Header</FormLabel>
+                  <Select value={field.value ?? "none"} onValueChange={(value) => field.onChange(value)}>
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">No document header</SelectItem>
+                      <SelectItem value="document">Document header (PDF)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Set this to &ldquo;Document header&rdquo; only if the template is approved in
+                    Meta Business Manager with a HEADER of format DOCUMENT (bill, invoice or
+                    booking-confirmation PDFs). Every send for this template will then need a
+                    document URL, or Meta rejects the whole message — check the exact component
+                    layout on the template in Meta Business Manager if you&rsquo;re unsure.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

@@ -19,6 +19,15 @@ interface SendMetaWhatsAppMessageParams {
   // (see lib/notifications/trigger-events.ts TRIGGER_EVENT_VARIABLES), or
   // the send is rejected. Omit/empty only for a template with no variables.
   parameters?: string[];
+  // Set only when the approved template's first component is a HEADER of
+  // format DOCUMENT (bill/invoice/booking-confirmation PDFs). Meta requires
+  // this component to be present — with a URL its servers can actually
+  // fetch — whenever the template was approved with one; sending the body
+  // alone gets the whole message rejected, which is the gap that made
+  // templates like sale_bill_sent / customisation_bill_sent fail from the
+  // admin panel while a manual Graph API test (with a header attached by
+  // hand) went through fine.
+  headerDocument?: { link: string; filename?: string };
 }
 
 interface SendMetaWhatsAppMessageResult {
@@ -40,6 +49,33 @@ export async function sendMetaWhatsAppMessage(
     };
   }
 
+  // Components must be in the same order Meta approved them in: HEADER
+  // before BODY. Skipping a component the template doesn't have is fine;
+  // skipping one it does have is what gets the send rejected.
+  const components: Record<string, unknown>[] = [];
+
+  if (params.headerDocument) {
+    components.push({
+      type: "header",
+      parameters: [
+        {
+          type: "document",
+          document: {
+            link: params.headerDocument.link,
+            ...(params.headerDocument.filename ? { filename: params.headerDocument.filename } : {}),
+          },
+        },
+      ],
+    });
+  }
+
+  if (params.parameters && params.parameters.length > 0) {
+    components.push({
+      type: "body",
+      parameters: params.parameters.map((text) => ({ type: "text", text })),
+    });
+  }
+
   try {
     const response = await fetch(
       `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
@@ -56,16 +92,7 @@ export async function sendMetaWhatsAppMessage(
           template: {
             name: params.templateName,
             language: { code: params.languageCode },
-            ...(params.parameters && params.parameters.length > 0
-              ? {
-                  components: [
-                    {
-                      type: "body",
-                      parameters: params.parameters.map((text) => ({ type: "text", text })),
-                    },
-                  ],
-                }
-              : {}),
+            ...(components.length > 0 ? { components } : {}),
           },
         }),
       }
@@ -80,7 +107,9 @@ export async function sendMetaWhatsAppMessage(
       // debuggable from Vercel's runtime logs, and surface the error code
       // in the message we hand back since that's usually the real signal
       // (190 = bad/expired token, 100 = bad parameter, 10/200-series =
-      // permission issues, 131xxx = messaging-specific failures).
+      // permission issues, 131xxx = messaging-specific failures, 132000 =
+      // component/parameter count mismatch — e.g. a header the template
+      // needs wasn't sent, 132001 = template name/language not found).
       console.error("Meta WhatsApp API error:", JSON.stringify(json?.error ?? json));
       const metaError = json?.error;
       const baseMessage =

@@ -96,6 +96,11 @@ export function WhatsAppTemplatesClient({
             {template.metaStatus && (
               <p className="mt-1 text-xs text-muted-foreground">{template.metaStatus}</p>
             )}
+            {template.metaHeaderType === "document" && (
+              <Badge className="mt-2 rounded-full border-none bg-sky-100 font-medium text-sky-800">
+                Needs document
+              </Badge>
+            )}
             <div className="mt-3 flex justify-end gap-1">
             <Button
               variant="ghost"
@@ -193,15 +198,22 @@ export function WhatsAppTemplatesClient({
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  <Badge
-                    className={
-                      template.isActive
-                        ? "rounded-full border-none bg-emerald-100 font-medium text-emerald-800"
-                        : "rounded-full border-none bg-secondary font-medium text-foreground"
-                    }
-                  >
-                    {template.isActive ? "Active" : "Inactive"}
-                  </Badge>
+                  <div className="flex flex-wrap gap-1">
+                    <Badge
+                      className={
+                        template.isActive
+                          ? "rounded-full border-none bg-emerald-100 font-medium text-emerald-800"
+                          : "rounded-full border-none bg-secondary font-medium text-foreground"
+                      }
+                    >
+                      {template.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                    {template.metaHeaderType === "document" && (
+                      <Badge className="rounded-full border-none bg-sky-100 font-medium text-sky-800">
+                        Needs document
+                      </Badge>
+                    )}
+                  </div>
                   {template.metaStatus && (
                     <div className="mt-1 text-xs text-muted-foreground">{template.metaStatus}</div>
                   )}

@@ -20,6 +20,10 @@ const testMessageSchema = z.object({
   // bookingNumber, ...) — see TRIGGER_EVENT_VARIABLES. Optional so older
   // callers/templates with no variables still work.
   variables: z.record(z.string(), z.string()).optional(),
+  // Required only when the selected template has metaHeaderType "document"
+  // — a URL Meta's servers can fetch (the real bill/invoice PDF link, or
+  // any public PDF for a quick test).
+  documentUrl: z.string().trim().url("Enter a valid document URL").optional().or(z.literal("")),
 });
 
 export async function POST(request: NextRequest): Promise<Response> {
@@ -46,6 +50,14 @@ export async function POST(request: NextRequest): Promise<Response> {
       provider: "meta",
     };
 
+    const headerType = template.metaHeaderType ?? "none";
+    if (headerType === "document" && !input.documentUrl) {
+      return apiError(
+        "This template needs a document (PDF) URL to send — add one below and try again.",
+        422
+      );
+    }
+
     // Same positional mapping the real auto-send path uses — Meta templates
     // take ordered {{1}}, {{2}}, ... values, not the named placeholders the
     // preview text uses.
@@ -65,6 +77,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         templateName: template.metaTemplateName,
         languageCode: template.metaLanguageCode || "en_US",
         parameters: orderedParameters,
+        headerDocument: headerType === "document" ? { link: input.documentUrl! } : undefined,
       });
     } else {
       if (!settings.senderLabel) {

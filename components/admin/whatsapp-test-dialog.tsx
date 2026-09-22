@@ -67,12 +67,18 @@ const SAMPLE_DEFAULTS: Record<string, string> = {
   advancePayment: "2,000",
 };
 
+// Any small, public, real PDF — good enough to prove a document-header send
+// actually goes through before pointing this field at a real bill/invoice
+// link from the app.
+const SAMPLE_DOCUMENT_URL = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
+
 export function WhatsAppTestDialog() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [phone, setPhone] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [variables, setVariables] = useState<Record<string, string>>({});
+  const [documentUrl, setDocumentUrl] = useState("");
   // Kept visible in the dialog (not just a toast) until the next attempt —
   // Meta's error text is often long (now includes the error code), and a
   // toast that auto-dismisses in a few seconds is too easy to miss.
@@ -88,6 +94,7 @@ export function WhatsAppTestDialog() {
   const variableKeys = selectedTemplate
     ? (TRIGGER_EVENT_VARIABLES[selectedTemplate.triggerEvent] ?? [])
     : [];
+  const needsDocument = selectedTemplate?.metaHeaderType === "document";
 
   // Re-seed sample values whenever a different template is picked, so
   // switching templates doesn't carry over the wrong fields (or leave a
@@ -98,6 +105,7 @@ export function WhatsAppTestDialog() {
     const next = templates.find((t) => t._id === nextTemplateId);
     const keys = next ? (TRIGGER_EVENT_VARIABLES[next.triggerEvent] ?? []) : [];
     setVariables(Object.fromEntries(keys.map((key) => [key, SAMPLE_DEFAULTS[key] ?? ""])));
+    setDocumentUrl(next?.metaHeaderType === "document" ? SAMPLE_DOCUMENT_URL : "");
   }
 
   const mutation = useMutation({
@@ -106,7 +114,12 @@ export function WhatsAppTestDialog() {
       const res = await fetch("/api/admin/whatsapp/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, templateId, variables }),
+        body: JSON.stringify({
+          phone,
+          templateId,
+          variables,
+          documentUrl: needsDocument ? documentUrl : undefined,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
@@ -176,6 +189,23 @@ export function WhatsAppTestDialog() {
               )}
             </div>
 
+            {needsDocument && (
+              <div>
+                <label className="text-sm font-medium">Document URL</label>
+                <Input
+                  className="mt-2"
+                  placeholder="https://your-site.com/api/invoices/.../pdf"
+                  value={documentUrl}
+                  onChange={(event) => setDocumentUrl(event.target.value)}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  This template has a document header — Meta will reject the send without a
+                  document URL it can fetch. Pre-filled with a sample PDF; swap in a real
+                  bill/invoice link to test the actual document.
+                </p>
+              </div>
+            )}
+
             {variableKeys.length > 0 && (
               <div className="space-y-3 rounded-lg border border-border bg-muted/40 p-3">
                 <p className="text-xs text-muted-foreground">
@@ -216,7 +246,13 @@ export function WhatsAppTestDialog() {
           </div>
           <DialogFooter>
             <Button
-              disabled={!phone || !templateId || mutation.isPending || isLoadingTemplates}
+              disabled={
+                !phone ||
+                !templateId ||
+                (needsDocument && !documentUrl) ||
+                mutation.isPending ||
+                isLoadingTemplates
+              }
               onClick={() => mutation.mutate()}
             >
               {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}

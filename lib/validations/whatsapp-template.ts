@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TRIGGER_EVENTS } from "@/lib/notifications/trigger-events";
+import { WHATSAPP_HEADER_TYPES } from "@/models/WhatsAppTemplate";
 
 export const whatsAppTemplateSchema = z
   .object({
@@ -14,6 +15,10 @@ export const whatsAppTemplateSchema = z
     // isn't a fixed set we should try to enumerate.
     metaTemplateId: z.string().trim().max(64).optional().or(z.literal("")),
     metaStatus: z.string().trim().max(120).optional().or(z.literal("")),
+    // Whether the approved template's first component is a HEADER of format
+    // DOCUMENT — when set, every send (test or real) must supply a fetchable
+    // document URL or Meta rejects the whole message, not just the header.
+    metaHeaderType: z.enum(WHATSAPP_HEADER_TYPES).default("none"),
     previewBody: z
       .string()
       .trim()

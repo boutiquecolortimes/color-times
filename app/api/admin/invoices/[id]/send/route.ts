@@ -51,12 +51,17 @@ export async function POST(
         customerPhone: customer?.phone,
         relatedEntityType: "Invoice",
         relatedEntityId: id,
+        // Public, unauthenticated route — Meta's servers can fetch it
+        // directly as the template's document header. Only actually sent
+        // to Meta when the active invoice_sent template has
+        // metaHeaderType "document" (see lib/notifications/whatsapp-events.ts).
+        documentUrl: `${siteConfig.url}/api/invoices/${id}/pdf`,
+        documentFilename: `${invoice.invoiceNumber}.pdf`,
         variables: {
           invoiceNumber: invoice.invoiceNumber,
           totalAmount: String(invoice.total),
           amountDue: String(invoice.amountDue),
           dueDate: formatDate(invoice.dueDate),
-          invoicePdfUrl: `${siteConfig.url}/api/invoices/${id}/pdf`,
         },
       });
       void notifyAccounts(ADMIN_ROLES, {
