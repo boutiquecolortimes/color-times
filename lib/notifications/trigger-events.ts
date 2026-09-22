@@ -49,3 +49,21 @@ export const TRIGGER_EVENT_VARIABLES: Record<WhatsAppTriggerEvent, string[]> = {
   sale_bill_sent: ["customerName", "billNumber", "totalAmount"],
   custom: ["customerName"],
 };
+
+// "document" means the approved Meta template starts with a HEADER
+// component of format DOCUMENT (a bill/invoice/booking-confirmation PDF) —
+// Meta rejects the send if that component is missing, even when the body
+// parameters are otherwise correct. "none" means the template has no
+// header at all (a plain TEXT header, if any, needs no runtime parameter).
+//
+// This lives here — a plain constants file with no framework imports —
+// rather than on the WhatsAppTemplate model itself. That model file pulls
+// in mongoose, and lib/validations/whatsapp-template.ts (which needs this
+// enum to build its zod schema) is imported by a "use client" form dialog.
+// Importing a *value* like this straight from the model would drag the
+// whole mongoose/mongodb dependency tree into the browser bundle, which is
+// exactly what broke the production build (mongodb needs Node's tls/net/fs
+// modules, which don't exist client-side). TRIGGER_EVENTS above follows
+// this same neutral-file pattern for the same reason.
+export const WHATSAPP_HEADER_TYPES = ["none", "document"] as const;
+export type WhatsAppHeaderType = (typeof WHATSAPP_HEADER_TYPES)[number];

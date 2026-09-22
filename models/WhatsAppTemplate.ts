@@ -1,15 +1,18 @@
 import { Schema, model, models, type Document, type Model } from "mongoose";
-import { TRIGGER_EVENTS, type WhatsAppTriggerEvent } from "@/lib/notifications/trigger-events";
+import {
+  TRIGGER_EVENTS,
+  WHATSAPP_HEADER_TYPES,
+  type WhatsAppTriggerEvent,
+  type WhatsAppHeaderType,
+} from "@/lib/notifications/trigger-events";
 
-export type { WhatsAppTriggerEvent };
-
-// "document" means the approved Meta template starts with a HEADER component
-// of format DOCUMENT (a bill/invoice/booking-confirmation PDF) — Meta
-// rejects the send if that component is missing, even when the body
-// parameters are otherwise correct. "none" means the template has no header
-// at all (a plain TEXT header, if any, needs no runtime parameter).
-export const WHATSAPP_HEADER_TYPES = ["none", "document"] as const;
-export type WhatsAppHeaderType = (typeof WHATSAPP_HEADER_TYPES)[number];
+// Re-exported for convenience so existing server-side imports from this
+// model path keep working. Client-reachable code (validations, form
+// components) should import these straight from
+// @/lib/notifications/trigger-events instead — see the comment there for
+// why importing them as values from *this* file broke the build.
+export type { WhatsAppTriggerEvent, WhatsAppHeaderType };
+export { WHATSAPP_HEADER_TYPES };
 
 export interface IWhatsAppTemplate extends Document {
   name: string;

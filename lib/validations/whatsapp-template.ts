@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { TRIGGER_EVENTS } from "@/lib/notifications/trigger-events";
-import { WHATSAPP_HEADER_TYPES } from "@/models/WhatsAppTemplate";
+import { TRIGGER_EVENTS, WHATSAPP_HEADER_TYPES } from "@/lib/notifications/trigger-events";
 
 export const whatsAppTemplateSchema = z
   .object({

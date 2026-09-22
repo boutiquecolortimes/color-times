@@ -42,8 +42,8 @@ import {
   TRIGGER_EVENT_LABELS,
   TRIGGER_EVENT_VARIABLES,
   type WhatsAppTriggerEvent,
+  type WhatsAppHeaderType,
 } from "@/lib/notifications/trigger-events";
-import type { WhatsAppHeaderType } from "@/models/WhatsAppTemplate";
 import { WhatsAppChatBubble } from "@/components/admin/whatsapp-chat-preview";
 
 export interface WhatsAppTemplateRow {
