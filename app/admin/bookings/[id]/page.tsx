@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Booking } from "@/models/Booking";
 import { Invoice } from "@/models/Invoice";
+import { BookingReview } from "@/models/BookingReview";
 import "@/models/User";
 import "@/models/Product";
 import { BookingDetailClient } from "@/components/admin/booking-detail-client";
@@ -19,7 +20,7 @@ export default async function BookingDetailPage({
   const { id } = await params;
   await connectToDatabase();
 
-  const [booking, invoice] = await Promise.all([
+  const [booking, invoice, review] = await Promise.all([
     Booking.findById(id)
       .populate("customer", "name email phone")
       .populate("items.product", "name images sku")
@@ -27,6 +28,7 @@ export default async function BookingDetailPage({
     Invoice.findOne({ booking: id, deletedAt: null })
       .select("_id invoiceNumber status total amountDue")
       .lean(),
+    BookingReview.findOne({ booking: id }).lean(),
   ]);
 
   if (!booking) {
@@ -93,6 +95,10 @@ export default async function BookingDetailPage({
           depositRefunded: booking.depositRefunded,
           depositRefundAmount: booking.depositRefundAmount,
           finalSettlementAmount: booking.finalSettlementAmount,
+          reviewToken: booking.reviewToken,
+          reviewRequestedAt: booking.reviewRequestedAt
+            ? booking.reviewRequestedAt.toISOString()
+            : null,
           createdAt: booking.createdAt.toISOString(),
         }}
         invoice={
@@ -103,6 +109,18 @@ export default async function BookingDetailPage({
                 status: invoice.status,
                 total: invoice.total,
                 amountDue: invoice.amountDue,
+              }
+            : null
+        }
+        review={
+          review
+            ? {
+                _id: String(review._id),
+                customerName: review.customerName,
+                rating: review.rating,
+                comment: review.comment,
+                images: review.images,
+                createdAt: review.createdAt.toISOString(),
               }
             : null
         }

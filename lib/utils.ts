@@ -64,3 +64,20 @@ export function daysBetween(from: string | Date, to: string | Date): number {
   const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
   return Math.max(1, diff + 1)
 }
+
+/**
+ * Normalizes a customer's phone number (stored bare, e.g. "9876543210")
+ * into the digits-only international format wa.me links require, e.g.
+ * "919876543210". Also accepts numbers that already carry the "91" country
+ * code or a leading "0", and strips any spaces/dashes/plus sign first.
+ * Returns null when the number doesn't look like a valid Indian mobile
+ * number, so callers can fall back to copying the link instead.
+ */
+export function toWhatsAppNumber(phone?: string | null): string | null {
+  if (!phone) return null
+  const digits = phone.replace(/\D/g, "")
+  if (digits.length === 10) return `91${digits}`
+  if (digits.length === 12 && digits.startsWith("91")) return digits
+  if (digits.length === 11 && digits.startsWith("0")) return `91${digits.slice(1)}`
+  return null
+}

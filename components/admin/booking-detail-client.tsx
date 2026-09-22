@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Bell, FileText, Loader2, Pencil, Printer, Sparkles } from "lucide-react";
+import { Bell, FileText, Loader2, Pencil, Printer, Sparkles, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,7 +27,7 @@ import {
   type ServiceOrderInitialValues,
 } from "@/components/admin/service-order-form-dialog";
 import { useCanEdit } from "@/components/admin/current-user-context";
-import { formatDate, isWalkinEmail } from "@/lib/utils";
+import { cn, formatDate, isWalkinEmail } from "@/lib/utils";
 import type { BookingStatus, ReturnCondition } from "@/models/Booking";
 
 const REMINDABLE_STATUSES: BookingStatus[] = ["inquiry", "confirmed", "in_use"];
@@ -93,6 +93,11 @@ interface BookingDetail {
   depositRefunded?: boolean;
   depositRefundAmount?: number;
   finalSettlementAmount?: number;
+  // Public /review/[token] link state — reviewToken is only ever generated
+  // by the "Request Review" action below, so an older or never-requested
+  // booking simply has neither field set.
+  reviewToken?: string;
+  reviewRequestedAt?: string | null;
   createdAt: string;
 }
 
@@ -102,6 +107,15 @@ interface InvoiceSummary {
   status: string;
   total: number;
   amountDue: number;
+}
+
+interface ReviewSummary {
+  _id: string;
+  customerName: string;
+  rating: number;
+  comment?: string;
+  images: string[];
+  createdAt: string;
 }
 
 function formatCurrency(value: number): string {
@@ -118,9 +132,11 @@ async function fetchBooking(id: string): Promise<BookingDetail> {
 export function BookingDetailClient({
   initialBooking,
   invoice,
+  review,
 }: {
   initialBooking: BookingDetail;
   invoice?: InvoiceSummary | null;
+  review?: ReviewSummary | null;
 }) {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -132,6 +148,7 @@ export function BookingDetailClient({
   const [dryCleanDialogOpen, setDryCleanDialogOpen] = useState(false);
   const [previewItemIndex, setPreviewItemIndex] = useState<number | null>(null);
   const [previewImageIndex, setPreviewImageIndex] = useState(-1);
+  const [reviewPreviewIndex, setReviewPreviewIndex] = useState(-1);
 
   const { data: booking = initialBooking } = useQuery({
     queryKey: ["admin", "booking", initialBooking._id],
@@ -166,6 +183,32 @@ export function BookingDetailClient({
       return json.data;
     },
     onSuccess: () => toast.success("Reminder sent"),
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  // Generates (or reuses) the booking's review token, then either opens
+  // WhatsApp with the link pre-filled (wa.me deep-link — no Meta template
+  // approval needed) or falls back to copying the link when the customer
+  // has no phone number on file.
+  const reviewRequestMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/admin/bookings/${booking._id}/review-request`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data as { reviewUrl: string; whatsappUrl: string | null };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "booking", booking._id] });
+      if (data.whatsappUrl) {
+        window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
+        toast.success("Opening WhatsApp to send the review link");
+      } else {
+        navigator.clipboard?.writeText(data.reviewUrl).catch(() => {});
+        toast.success("Review link copied — no phone number on file to open WhatsApp with");
+      }
+    },
     onError: (error: Error) => toast.error(error.message),
   });
 
@@ -291,6 +334,23 @@ export function BookingDetailClient({
                 <Bell className="h-4 w-4" />
               )}
               {booking.status === "in_use" ? "Send Return Reminder" : "Send Reminder"}
+            </Button>
+          )}
+          {/* Only makes sense once the dress is actually back — that's the
+              experience being reviewed. */}
+          {canEdit && booking.status === "returned" && !review && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={reviewRequestMutation.isPending}
+              onClick={() => reviewRequestMutation.mutate()}
+            >
+              {reviewRequestMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Star className="h-4 w-4" />
+              )}
+              {booking.reviewRequestedAt ? "Resend Review Request" : "Request Review"}
             </Button>
           )}
           <Select
@@ -577,6 +637,55 @@ export function BookingDetailClient({
               </div>
             </div>
           )}
+
+          {(review || booking.reviewRequestedAt) && (
+            <div className="rounded-lg border border-border bg-card p-6">
+              <h2 className="font-heading text-lg">Customer Review</h2>
+              {review ? (
+                <div className="mt-2 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map((value) => (
+                        <Star
+                          key={value}
+                          className={cn(
+                            "h-4 w-4",
+                            value <= review.rating
+                              ? "fill-current text-accent"
+                              : "text-muted-foreground/40"
+                          )}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      by {review.customerName} · {formatDate(review.createdAt)}
+                    </span>
+                  </div>
+                  {review.comment && <p className="text-sm">{review.comment}</p>}
+                  {review.images.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {review.images.map((src, index) => (
+                        <button
+                          key={src}
+                          type="button"
+                          onClick={() => setReviewPreviewIndex(index)}
+                          className="relative h-16 w-16 shrink-0 cursor-zoom-in overflow-hidden rounded-md"
+                          aria-label={`Preview review photo ${index + 1}`}
+                        >
+                          <Image src={src} alt="" fill sizes="64px" className="object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Review requested on {formatDate(booking.reviewRequestedAt!)} — awaiting the
+                  customer&apos;s response.
+                </p>
+              )}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="activity" className="mt-4">
@@ -640,6 +749,16 @@ export function BookingDetailClient({
             }
           }}
           title={previewItem.product.name}
+        />
+      )}
+
+      {review && review.images.length > 0 && (
+        <ImagePreviewDialog
+          images={review.images}
+          index={reviewPreviewIndex}
+          onIndexChange={setReviewPreviewIndex}
+          onOpenChange={(open) => !open && setReviewPreviewIndex(-1)}
+          title="Customer Review Photos"
         />
       )}
     </div>

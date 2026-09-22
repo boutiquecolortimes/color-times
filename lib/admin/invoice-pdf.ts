@@ -2,7 +2,7 @@ import { jsPDF } from "jspdf";
 import autoTable, { type CellHookData } from "jspdf-autotable";
 import { siteConfig } from "@/lib/config/site";
 import { getInvoiceDueBreakdown } from "@/lib/admin/invoice-totals";
-import { TERMS_IMAGE_PATH, ownerDetailLines } from "@/lib/admin/pdf-footer";
+import { drawTermsAndConditions, ownerDetailLines } from "@/lib/admin/pdf-footer";
 import { EN_LABELS, loadHindiLabels, type HindiLabelMap, type LabelKey, type PdfLang } from "@/lib/admin/pdf-labels";
 import { formatDate, isWalkinEmail } from "@/lib/utils";
 import type { InvoiceLineItem, InvoiceStatus, PaymentMethod } from "@/models/Invoice";
@@ -281,16 +281,11 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
     cursorY += 8;
   }
 
-  const terms = await loadImageAsDataUrl(TERMS_IMAGE_PATH);
-  if (terms) {
-    const termsWidth = 182;
-    const termsHeight = termsWidth * terms.ratio;
-    if (cursorY + termsHeight > 280) {
-      doc.addPage();
-      cursorY = 20;
-    }
-    doc.addImage(terms.dataUrl, "PNG", 14, cursorY, termsWidth, termsHeight);
-  }
+  // Terms & Conditions is drawn as real (English) text regardless of `lang`
+  // — it previously used a hardcoded Hindi image on every download, which is
+  // what made an English-language invoice come out half English / half
+  // Hindi. See lib/admin/pdf-footer.ts.
+  drawTermsAndConditions(doc, 14, cursorY, 182);
 
   doc.save(`${invoice.invoiceNumber}${lang === "hi" ? "-hi" : ""}.pdf`);
 }

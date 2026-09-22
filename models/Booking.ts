@@ -64,6 +64,12 @@ export interface IBooking extends Document {
   depositRefunded?: boolean;
   finalSettlementAmount?: number;
   settledAt?: Date | null;
+  // Unguessable token for the public /review/[token] page — generated the
+  // first time staff sends a review request for this booking (see
+  // app/api/admin/bookings/[id]/review-request/route.ts). Left unset until
+  // then; a booking that never had a review requested has no token at all.
+  reviewToken?: string;
+  reviewRequestedAt?: Date | null;
   deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -130,6 +136,8 @@ const bookingSchema = new Schema<IBooking>(
     depositRefunded: { type: Boolean, default: false },
     finalSettlementAmount: { type: Number, default: 0 },
     settledAt: { type: Date, default: null },
+    reviewToken: { type: String, trim: true, unique: true, sparse: true },
+    reviewRequestedAt: { type: Date, default: null },
     deletedAt: { type: Date, default: null, index: true },
   },
   { timestamps: true }
