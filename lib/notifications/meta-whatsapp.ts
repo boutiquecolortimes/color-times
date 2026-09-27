@@ -34,6 +34,43 @@ interface SendMetaWhatsAppMessageResult {
   success: boolean;
   messageId?: string;
   error?: string;
+  // Meta's raw error object (code, error_subcode, error_data.details,
+  // fbtrace_id, ...) — passed through so the admin UI can show exactly what
+  // Meta said instead of only our one-line summary.
+  metaError?: unknown;
+}
+
+interface MetaApiError {
+  message?: string;
+  type?: string;
+  code?: number;
+  error_subcode?: number;
+  error_user_title?: string;
+  error_user_msg?: string;
+  error_data?: { details?: string; messaging_product?: string };
+  fbtrace_id?: string;
+}
+
+/**
+ * Builds a readable one-line summary from Meta's error. The top-level
+ * `message` is often generic ("(#132000) Number of parameters does not
+ * match..." or even "An unknown error has occurred."), while
+ * `error_data.details` / `error_user_msg` usually say what actually failed.
+ */
+function describeMetaError(metaError: MetaApiError | undefined, status: number): string {
+  if (!metaError) return `Meta API error (HTTP ${status})`;
+  const parts: string[] = [metaError.message ?? `Meta API error (HTTP ${status})`];
+  if (metaError.error_user_title || metaError.error_user_msg) {
+    parts.push([metaError.error_user_title, metaError.error_user_msg].filter(Boolean).join(": "));
+  }
+  if (metaError.error_data?.details) parts.push(`Details: ${metaError.error_data.details}`);
+  if (metaError.code) {
+    parts.push(
+      `Code ${metaError.code}${metaError.error_subcode ? `/${metaError.error_subcode}` : ""}`
+    );
+  }
+  if (metaError.fbtrace_id) parts.push(`fbtrace_id ${metaError.fbtrace_id}`);
+  return parts.join(" — ");
 }
 
 /** Sends a pre-approved WhatsApp template message via Meta's Cloud API directly (no BSP middleman). */
@@ -111,13 +148,12 @@ export async function sendMetaWhatsAppMessage(
       // component/parameter count mismatch — e.g. a header the template
       // needs wasn't sent, 132001 = template name/language not found).
       console.error("Meta WhatsApp API error:", JSON.stringify(json?.error ?? json));
-      const metaError = json?.error;
-      const baseMessage =
-        typeof metaError?.message === "string" ? metaError.message : `Meta API error (${response.status})`;
-      const error = metaError?.code
-        ? `${baseMessage} (code ${metaError.code}${metaError.error_subcode ? `/${metaError.error_subcode}` : ""})`
-        : baseMessage;
-      return { success: false, error };
+      const metaError = json?.error as MetaApiError | undefined;
+      return {
+        success: false,
+        error: describeMetaError(metaError, response.status),
+        metaError: json?.error ?? { httpStatus: response.status, body: json },
+      };
     }
 
     return { success: true, messageId: json?.messages?.[0]?.id };

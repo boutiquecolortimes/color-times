@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Settings } from "@/models/Settings";
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     );
     const renderedMessage = renderTemplate(template.previewBody, allVariables);
 
-    let result: { success: boolean; messageId?: string; error?: string };
+    let result: { success: boolean; messageId?: string; error?: string; metaError?: unknown };
     if (settings.provider === "meta") {
       if (!template.metaTemplateName) {
         return apiError("This template has no Meta Template Name configured", 422);
@@ -107,7 +107,16 @@ export async function POST(request: NextRequest): Promise<Response> {
     });
 
     if (!result.success) {
-      return apiError(result.error ?? "Failed to send test message", 502);
+      // Admin-only test endpoint: return Meta's raw error too, so the test
+      // dialog can show exactly what Meta sent back.
+      return NextResponse.json(
+        {
+          success: false,
+          error: result.error ?? "Failed to send test message",
+          metaError: result.metaError ?? null,
+        },
+        { status: 502 }
+      );
     }
 
     return apiSuccess({ messageId: result.messageId });

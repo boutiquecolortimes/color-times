@@ -24,6 +24,8 @@ import {
 import type { WhatsAppTemplateRow } from "@/components/admin/whatsapp-template-form-dialog";
 import { TRIGGER_EVENT_VARIABLES } from "@/lib/notifications/trigger-events";
 
+type SendError = Error & { metaError?: unknown };
+
 async function fetchTemplates(): Promise<WhatsAppTemplateRow[]> {
   const res = await fetch("/api/admin/whatsapp/templates");
   const json = await res.json();
@@ -83,6 +85,8 @@ export function WhatsAppTestDialog() {
   // Meta's error text is often long (now includes the error code), and a
   // toast that auto-dismisses in a few seconds is too easy to miss.
   const [sendError, setSendError] = useState<string | null>(null);
+  // Meta's raw error JSON, shown under the summary for debugging.
+  const [sendErrorDetails, setSendErrorDetails] = useState<string | null>(null);
 
   const { data: templates = [], isLoading: isLoadingTemplates } = useQuery({
     queryKey: ["admin", "whatsapp", "templates"],
@@ -111,6 +115,7 @@ export function WhatsAppTestDialog() {
   const mutation = useMutation({
     mutationFn: async () => {
       setSendError(null);
+      setSendErrorDetails(null);
       const res = await fetch("/api/admin/whatsapp/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -121,8 +126,16 @@ export function WhatsAppTestDialog() {
           documentUrl: needsDocument ? documentUrl : undefined,
         }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error);
+      // A platform timeout/crash can return HTML instead of JSON — don't let
+      // that hide the status code behind a JSON parse error.
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const error: SendError = new Error(
+          json.error ?? `Request failed with HTTP ${res.status} ${res.statusText}`
+        );
+        error.metaError = json.metaError;
+        throw error;
+      }
       return json.data;
     },
     onSuccess: () => {
@@ -130,9 +143,13 @@ export function WhatsAppTestDialog() {
       queryClient.invalidateQueries({ queryKey: ["admin", "whatsapp", "logs"] });
       setOpen(false);
     },
-    onError: (error: Error) => {
-      toast.error("Test message failed");
+    onError: (error: SendError) => {
+      toast.error("Test message failed", {
+        description: error.message,
+        duration: 15000,
+      });
       setSendError(error.message);
+      setSendErrorDetails(error.metaError ? JSON.stringify(error.metaError, null, 2) : null);
     },
   });
 
@@ -145,7 +162,10 @@ export function WhatsAppTestDialog() {
         open={open}
         onOpenChange={(next) => {
           setOpen(next);
-          if (!next) setSendError(null);
+          if (!next) {
+            setSendError(null);
+            setSendErrorDetails(null);
+          }
         }}
       >
         <DialogContent className="sm:max-w-md">
@@ -232,10 +252,25 @@ export function WhatsAppTestDialog() {
             {sendError && (
               <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                <p className="flex-1 text-sm break-words text-destructive">{sendError}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm break-words text-destructive">{sendError}</p>
+                  {sendErrorDetails && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xs text-destructive/80">
+                        Full response from Meta
+                      </summary>
+                      <pre className="mt-1 max-h-48 overflow-auto rounded bg-background/60 p-2 text-[11px] leading-snug whitespace-pre-wrap break-all text-foreground">
+                        {sendErrorDetails}
+                      </pre>
+                    </details>
+                  )}
+                </div>
                 <button
                   type="button"
-                  onClick={() => setSendError(null)}
+                  onClick={() => {
+                    setSendError(null);
+                    setSendErrorDetails(null);
+                  }}
                   className="shrink-0 text-destructive/70 hover:text-destructive"
                   aria-label="Dismiss error"
                 >
