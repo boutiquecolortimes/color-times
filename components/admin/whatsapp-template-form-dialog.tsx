@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
+import type { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -60,7 +61,12 @@ export interface WhatsAppTemplateRow {
   isActive: boolean;
 }
 
-const EMPTY_VALUES: WhatsAppTemplateInput = {
+// The schema gives metaHeaderType a default ("none"), so Zod's input type
+// marks it optional while the parsed output always has it. react-hook-form
+// needs both: form values use the input type, submitted values the output.
+type WhatsAppTemplateFormValues = z.input<typeof whatsAppTemplateSchema>;
+
+const EMPTY_VALUES: WhatsAppTemplateFormValues = {
   name: "",
   triggerEvent: "booking_confirmed",
   brevoTemplateId: undefined,
@@ -84,7 +90,7 @@ export function WhatsAppTemplateFormDialog({
 }) {
   const queryClient = useQueryClient();
 
-  const form = useForm<WhatsAppTemplateInput>({
+  const form = useForm<WhatsAppTemplateFormValues, unknown, WhatsAppTemplateInput>({
     resolver: zodResolver(whatsAppTemplateSchema),
     defaultValues: EMPTY_VALUES,
   });
