@@ -1,6 +1,7 @@
 import { connectToDatabase } from "@/lib/db/connect";
 import { NotificationLog } from "@/models/NotificationLog";
 import { WhatsAppMessage } from "@/models/WhatsAppMessage";
+import { WhatsAppWebhookEvent } from "@/models/WhatsAppWebhookEvent";
 import { requireApiRole } from "@/lib/api/require-role";
 import { SETTINGS_ROLES } from "@/lib/auth/roles";
 import { apiSuccess, apiErrorFromUnknown } from "@/lib/api/response";
@@ -41,6 +42,10 @@ export async function GET(): Promise<Response> {
       statusCounts,
       unreadInbound,
       inbound30d,
+      recentWebhookEvents,
+      lastVerify,
+      lastEvent,
+      lastInbound,
     ] = await Promise.all([
       getPhoneNumberInfo(),
       getBusinessProfile(),
@@ -55,6 +60,10 @@ export async function GET(): Promise<Response> {
       ]),
       WhatsAppMessage.countDocuments({ direction: "inbound", readByStaff: false }),
       WhatsAppMessage.countDocuments({ direction: "inbound", timestamp: { $gte: since } }),
+      WhatsAppWebhookEvent.find().sort({ createdAt: -1 }).limit(15).lean(),
+      WhatsAppWebhookEvent.findOne({ kind: "verify", ok: true }).sort({ createdAt: -1 }).lean(),
+      WhatsAppWebhookEvent.findOne({ kind: "event" }).sort({ createdAt: -1 }).lean(),
+      WhatsAppMessage.findOne({ direction: "inbound" }).sort({ timestamp: -1 }).select("timestamp").lean(),
     ]);
 
     const counts = Object.fromEntries(statusCounts.map((row) => [row._id, row.count]));
@@ -72,6 +81,17 @@ export async function GET(): Promise<Response> {
       analytics: unwrap(analytics),
       subscribedApps: unwrap(subscribedApps),
       commerce: unwrap(commerce),
+      webhook: {
+        lastVerifiedAt: lastVerify?.createdAt ?? null,
+        lastEventAt: lastEvent?.createdAt ?? null,
+        lastInboundAt: lastInbound?.timestamp ?? null,
+        recent: recentWebhookEvents.map((e) => ({
+          kind: e.kind,
+          ok: e.ok,
+          summary: e.summary,
+          createdAt: e.createdAt,
+        })),
+      },
       stats: {
         // every "delivered"/"read" row was also sent — report cumulative funnel numbers
         total: sent + delivered + read + failed,

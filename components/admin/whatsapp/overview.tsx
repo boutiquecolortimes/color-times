@@ -44,6 +44,12 @@ export interface OverviewData {
   analytics: Maybe<MetaAnalyticsPoint[]>;
   subscribedApps: Maybe<MetaSubscribedApp[]>;
   commerce: Maybe<MetaCommerceSettings>;
+  webhook: {
+    lastVerifiedAt: string | null;
+    lastEventAt: string | null;
+    lastInboundAt: string | null;
+    recent: { kind: "verify" | "event" | "rejected"; ok: boolean; summary: string; createdAt: string }[];
+  };
   stats: {
     total: number;
     sent: number;
@@ -144,6 +150,100 @@ function Stat({ label, value, hint }: { label: string; value: number | string; h
   );
 }
 
+function timeAgo(value: string): string {
+  const minutes = Math.round((Date.now() - new Date(value).getTime()) / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours} h ago`;
+  return `${Math.round(hours / 24)} days ago`;
+}
+
+function WebhookStatus({ webhook, verifyTokenSet }: { webhook: OverviewData["webhook"]; verifyTokenSet: boolean }) {
+  const callbackUrl =
+    (typeof window !== "undefined" ? window.location.origin : "") + "/api/webhooks/meta-whatsapp";
+  const latest = webhook.recent[0];
+
+  let tone: "ok" | "warn" | "bad";
+  let headline: string;
+  let detail: React.ReactNode;
+
+  if (latest && !latest.ok) {
+    tone = "bad";
+    headline = latest.kind === "verify" ? "Meta's verification failed" : "Meta is calling, but the call was rejected";
+    detail = latest.summary;
+  } else if (webhook.lastEventAt) {
+    tone = webhook.lastInboundAt ? "ok" : "warn";
+    headline = `Connected — last call from Meta ${timeAgo(webhook.lastEventAt)}`;
+    detail = webhook.lastInboundAt
+      ? `Last customer message received ${timeAgo(webhook.lastInboundAt)}.`
+      : "Delivery updates are arriving, but no customer message has come in yet. If a customer has written to you, subscribe the “messages” field in your Meta app’s webhook settings.";
+  } else if (webhook.lastVerifiedAt) {
+    tone = "warn";
+    headline = `Callback URL verified ${timeAgo(webhook.lastVerifiedAt)}, but no messages received yet`;
+    detail =
+      "Meta accepted the URL. Now subscribe the “messages” field, subscribe this app to your WhatsApp account (below), and make sure the Meta app is Live, not in Development.";
+  } else {
+    tone = "bad";
+    headline = "Meta hasn't called this webhook yet";
+    detail = verifyTokenSet
+      ? "Paste the callback URL below into your Meta app (WhatsApp → Configuration → Webhook → Edit) with your verify token, then click Verify and save."
+      : "META_WHATSAPP_WEBHOOK_VERIFY_TOKEN isn't set in Vercel yet — add it, redeploy, then paste the callback URL below into your Meta app.";
+  }
+
+  const toneClass = {
+    ok: "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200",
+    warn: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200",
+    bad: "border-red-200 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200",
+  }[tone];
+  const Icon = tone === "ok" ? CheckCircle2 : tone === "warn" ? AlertTriangle : XCircle;
+
+  return (
+    <div className="space-y-4">
+      <div className={cn("flex gap-3 rounded-lg border p-3", toneClass)}>
+        <Icon className="mt-0.5 h-5 w-5 shrink-0" />
+        <div>
+          <p className="font-medium">{headline}</p>
+          <p className="mt-0.5 text-sm opacity-90">{detail}</p>
+        </div>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Field
+          label="Callback URL"
+          value={<span className="break-all font-mono text-xs">{callbackUrl}</span>}
+        />
+        <Field label="Verify token on server" value={verifyTokenSet ? "Set" : "Missing"} />
+        <Field
+          label="Fields to subscribe in Meta"
+          value={<span className="font-mono text-xs">messages, message_template_status_update</span>}
+        />
+      </div>
+      <div>
+        <p className="mb-1.5 text-xs uppercase tracking-wide text-muted-foreground">
+          Recent calls from Meta (last 7 days)
+        </p>
+        {webhook.recent.length === 0 ? (
+          <p className="text-sm text-muted-foreground">None recorded yet.</p>
+        ) : (
+          <ul className="divide-y divide-border rounded-md border border-border text-sm">
+            {webhook.recent.map((e, i) => (
+              <li key={i} className="flex items-start gap-2 px-3 py-2">
+                {e.ok ? (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                ) : (
+                  <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+                )}
+                <span className="flex-1">{e.summary}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{timeAgo(e.createdAt)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function rate(part: number, whole: number): string {
   return whole > 0 ? `${Math.round((part / whole) * 100)}%` : "—";
 }
@@ -152,7 +252,7 @@ export function WhatsAppOverview() {
   const queryClient = useQueryClient();
   const [profileOpen, setProfileOpen] = useState(false);
 
-  const { data, isLoading, isFetching, refetch } = useQuery({
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["admin", "whatsapp", "overview"],
     queryFn: () => whatsappApi<OverviewData>("/api/admin/whatsapp/overview"),
   });
@@ -166,6 +266,20 @@ export function WhatsAppOverview() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  if (error && !data) {
+    return (
+      <div className="flex flex-col items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+        <p className="flex gap-2">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> Couldn&apos;t load the overview:{" "}
+          {(error as Error).message}
+        </p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>
+          <RefreshCw className="h-4 w-4" /> Try again
+        </Button>
+      </div>
+    );
+  }
+
   if (isLoading || !data) {
     return (
       <div className="grid gap-4 md:grid-cols-2">
@@ -176,7 +290,7 @@ export function WhatsAppOverview() {
     );
   }
 
-  const { phone, profile, waba, phoneNumbers, analytics, subscribedApps, commerce, stats, config } = data;
+  const { phone, profile, waba, phoneNumbers, analytics, subscribedApps, commerce, stats, config, webhook } = data;
   const chartData = (analytics.data ?? []).map((point) => ({
     label: new Date(point.start * 1000).toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
     sent: point.sent,
@@ -281,6 +395,10 @@ export function WhatsAppOverview() {
           )}
         </Card>
       </div>
+
+      <Card title="Webhook status">
+        <WebhookStatus webhook={webhook} verifyTokenSet={config.webhookVerifyToken} />
+      </Card>
 
       <Card
         title="Business profile"
@@ -440,7 +558,7 @@ export function WhatsAppOverview() {
           </ul>
         </Card>
 
-        <Card title="Webhooks & commerce">
+        <Card title="App subscription & commerce">
           <div className="space-y-4">
             <div>
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Subscribed apps</p>
