@@ -10,6 +10,7 @@ import { sendWhatsAppMessage } from "@/lib/notifications/brevo-whatsapp";
 import { sendMetaWhatsAppMessage } from "@/lib/notifications/meta-whatsapp";
 import { renderTemplate } from "@/lib/notifications/render-template";
 import { TRIGGER_EVENT_VARIABLES } from "@/lib/notifications/trigger-events";
+import { recordOutboundMessage } from "@/lib/whatsapp/messages";
 import { DEFAULT_WHATSAPP_SETTINGS, type WhatsAppSettingsInput } from "@/lib/validations/whatsapp-settings";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 
@@ -67,7 +68,13 @@ export async function POST(request: NextRequest): Promise<Response> {
     );
     const renderedMessage = renderTemplate(template.previewBody, allVariables);
 
-    let result: { success: boolean; messageId?: string; error?: string; metaError?: unknown };
+    let result: {
+      success: boolean;
+      messageId?: string;
+      waId?: string;
+      error?: string;
+      metaError?: unknown;
+    };
     if (settings.provider === "meta") {
       if (!template.metaTemplateName) {
         return apiError("This template has no Meta Template Name configured", 422);
@@ -104,6 +111,19 @@ export async function POST(request: NextRequest): Promise<Response> {
       status: result.success ? "sent" : "failed",
       providerMessageId: result.messageId,
       errorMessage: result.error,
+    });
+
+    await recordOutboundMessage({
+      waId: result.waId,
+      phone: input.phone,
+      contactName: "Test recipient",
+      waMessageId: result.messageId,
+      type: "template",
+      text: renderedMessage,
+      templateName: template.metaTemplateName ?? template.name,
+      status: result.success ? "sent" : "failed",
+      errorMessage: result.error,
+      sentBy: auth.user.sub,
     });
 
     if (!result.success) {

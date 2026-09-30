@@ -23,9 +23,31 @@ interface NotificationLogRow {
   templateName: string;
   triggerEvent: string;
   message: string;
-  status: "sent" | "failed";
+  status: "sent" | "delivered" | "read" | "failed";
   errorMessage?: string;
+  deliveredAt?: string;
+  readAt?: string;
   createdAt: string;
+}
+
+const STATUS_BADGE: Record<NotificationLogRow["status"], { label: string; className: string }> = {
+  sent: { label: "Sent", className: "bg-secondary text-foreground" },
+  delivered: { label: "Delivered", className: "bg-sky-100 text-sky-800" },
+  read: { label: "Read", className: "bg-emerald-100 text-emerald-800" },
+  failed: { label: "Failed", className: "bg-red-100 text-red-800" },
+};
+
+function StatusBadge({ log }: { log: NotificationLogRow }) {
+  const badge = STATUS_BADGE[log.status] ?? STATUS_BADGE.sent;
+  const at = log.status === "read" ? log.readAt : log.status === "delivered" ? log.deliveredAt : undefined;
+  return (
+    <Badge
+      className={cn("rounded-full border-none font-medium", badge.className)}
+      title={at ? formatDateTime(at) : undefined}
+    >
+      {badge.label}
+    </Badge>
+  );
 }
 
 interface Pagination {
@@ -88,13 +110,17 @@ export function WhatsAppLogList() {
           <SelectTrigger className="w-40">
             <SelectValue>
               {(value: string) =>
-                value === "all" ? "All Statuses" : value === "sent" ? "Sent" : "Failed"
+                value === "all"
+                  ? "All Statuses"
+                  : (STATUS_BADGE[value as NotificationLogRow["status"]]?.label ?? value)
               }
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="sent">Sent</SelectItem>
+            <SelectItem value="sent">Sent (not yet delivered)</SelectItem>
+            <SelectItem value="delivered">Delivered</SelectItem>
+            <SelectItem value="read">Read</SelectItem>
             <SelectItem value="failed">Failed</SelectItem>
           </SelectContent>
         </Select>
@@ -108,16 +134,7 @@ export function WhatsAppLogList() {
                 <p className="font-medium">{log.recipientName}</p>
                 <p className="text-xs text-muted-foreground">{log.recipientPhone ?? "—"}</p>
               </div>
-              <Badge
-                className={cn(
-                  "rounded-full border-none font-medium",
-                  log.status === "sent"
-                    ? "bg-emerald-100 text-emerald-800"
-                    : "bg-red-100 text-red-800"
-                )}
-              >
-                {log.status === "sent" ? "Sent" : "Failed"}
-              </Badge>
+              <StatusBadge log={log} />
             </div>
             <p className="mt-2 text-sm text-muted-foreground">{log.templateName}</p>
             <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{log.message}</p>
@@ -158,16 +175,7 @@ export function WhatsAppLogList() {
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  <Badge
-                    className={cn(
-                      "rounded-full border-none font-medium",
-                      log.status === "sent"
-                        ? "bg-emerald-100 text-emerald-800"
-                        : "bg-red-100 text-red-800"
-                    )}
-                  >
-                    {log.status === "sent" ? "Sent" : "Failed"}
-                  </Badge>
+                  <StatusBadge log={log} />
                 </td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {formatDateTime(log.createdAt)}

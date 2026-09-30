@@ -11,6 +11,11 @@ import { WhatsAppSettingsForm } from "@/components/admin/whatsapp-settings-form"
 import { WhatsAppTemplatesClient } from "@/components/admin/whatsapp-templates-client";
 import { WhatsAppLogList } from "@/components/admin/whatsapp-log-list";
 import { WhatsAppTestDialog } from "@/components/admin/whatsapp-test-dialog";
+import { WhatsAppOverview } from "@/components/admin/whatsapp/overview";
+import { WhatsAppMetaTemplates } from "@/components/admin/whatsapp/meta-templates";
+import { WhatsAppInbox } from "@/components/admin/whatsapp/inbox";
+import { WhatsAppSendTab } from "@/components/admin/whatsapp/send-tab";
+import { WhatsAppQrCodes } from "@/components/admin/whatsapp/qr-codes";
 import { isMetaWhatsAppConfigured } from "@/lib/notifications/meta-whatsapp";
 import { DEFAULT_WHATSAPP_SETTINGS, type WhatsAppSettingsInput } from "@/lib/validations/whatsapp-settings";
 
@@ -47,12 +52,13 @@ export default async function AdminWhatsAppPage() {
   const activeTemplateCount = templates.filter((t) => t.isActive).length;
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="max-w-6xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-heading text-2xl">WhatsApp</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Order updates, notifications, and message templates via Meta Cloud API.
+            Your WhatsApp Business account, templates, customer chats and message delivery — live
+            from Meta.
           </p>
         </div>
         <WhatsAppTestDialog />
@@ -108,22 +114,42 @@ export default async function AdminWhatsAppPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="settings">
-        <TabsList>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-          <TabsTrigger value="templates">Templates</TabsTrigger>
-          <TabsTrigger value="log">Message Log</TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="overview">
+        <div className="-mx-1 overflow-x-auto px-1 pb-1">
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="inbox">Inbox</TabsTrigger>
+            <TabsTrigger value="send">Send</TabsTrigger>
+            <TabsTrigger value="meta-templates">WhatsApp Templates</TabsTrigger>
+            <TabsTrigger value="templates">Auto-Send Mapping</TabsTrigger>
+            <TabsTrigger value="log">Message Log</TabsTrigger>
+            <TabsTrigger value="qr">QR Codes</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="settings" className="mt-4">
-          <WhatsAppSettingsForm
-            initialSettings={settings}
-            isMetaConfigured={metaConfigured}
-            isWebhookVerifyTokenConfigured={webhookVerifyTokenConfigured}
-          />
+        <TabsContent value="overview" className="mt-4">
+          <WhatsAppOverview />
+        </TabsContent>
+
+        <TabsContent value="inbox" className="mt-4">
+          <WhatsAppInbox />
+        </TabsContent>
+
+        <TabsContent value="send" className="mt-4">
+          <WhatsAppSendTab />
+        </TabsContent>
+
+        <TabsContent value="meta-templates" className="mt-4">
+          <WhatsAppMetaTemplates />
         </TabsContent>
 
         <TabsContent value="templates" className="mt-4">
+          <p className="mb-3 text-sm text-muted-foreground">
+            Which WhatsApp template the app sends automatically for each event (booking confirmed,
+            bill sent, payment received…). Use &ldquo;Sync to app triggers&rdquo; on the WhatsApp
+            Templates tab to fill this from Meta.
+          </p>
           <WhatsAppTemplatesClient
             initialTemplates={templates.map((template) => ({
               _id: String(template._id),
@@ -143,6 +169,18 @@ export default async function AdminWhatsAppPage() {
 
         <TabsContent value="log" className="mt-4">
           <WhatsAppLogList />
+        </TabsContent>
+
+        <TabsContent value="qr" className="mt-4">
+          <WhatsAppQrCodes />
+        </TabsContent>
+
+        <TabsContent value="settings" className="mt-4">
+          <WhatsAppSettingsForm
+            initialSettings={settings}
+            isMetaConfigured={metaConfigured}
+            isWebhookVerifyTokenConfigured={webhookVerifyTokenConfigured}
+          />
         </TabsContent>
       </Tabs>
     </div>

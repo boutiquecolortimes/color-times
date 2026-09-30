@@ -2,7 +2,8 @@ import { Schema, model, models, type Document, type Model, type Types } from "mo
 import type { WhatsAppTriggerEvent } from "@/models/WhatsAppTemplate";
 
 export type NotificationChannel = "whatsapp" | "email" | "sms" | "push";
-export type NotificationStatus = "sent" | "failed";
+// "delivered" / "read" are advanced by Meta webhook status callbacks.
+export type NotificationStatus = "sent" | "delivered" | "read" | "failed";
 
 export interface INotificationLog extends Document {
   channel: NotificationChannel;
@@ -15,6 +16,8 @@ export interface INotificationLog extends Document {
   status: NotificationStatus;
   providerMessageId?: string;
   errorMessage?: string;
+  deliveredAt?: Date;
+  readAt?: Date;
   relatedEntityType?: string;
   relatedEntityId?: string;
   createdAt: Date;
@@ -29,8 +32,15 @@ const notificationLogSchema = new Schema<INotificationLog>(
     templateName: { type: String, required: true, trim: true },
     triggerEvent: { type: String, required: true },
     message: { type: String, required: true },
-    status: { type: String, enum: ["sent", "failed"], required: true, index: true },
-    providerMessageId: { type: String },
+    status: {
+      type: String,
+      enum: ["sent", "delivered", "read", "failed"],
+      required: true,
+      index: true,
+    },
+    providerMessageId: { type: String, index: true },
+    deliveredAt: { type: Date },
+    readAt: { type: Date },
     errorMessage: { type: String },
     relatedEntityType: { type: String },
     relatedEntityId: { type: String },

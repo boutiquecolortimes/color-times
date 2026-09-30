@@ -7,6 +7,7 @@ import { sendWhatsAppMessage } from "@/lib/notifications/brevo-whatsapp";
 import { sendMetaWhatsAppMessage } from "@/lib/notifications/meta-whatsapp";
 import { renderTemplate } from "@/lib/notifications/render-template";
 import { TRIGGER_EVENT_VARIABLES } from "@/lib/notifications/trigger-events";
+import { recordOutboundMessage } from "@/lib/whatsapp/messages";
 import {
   DEFAULT_WHATSAPP_SETTINGS,
   type WhatsAppSettingsInput,
@@ -84,7 +85,8 @@ async function sendTemplatedNotification(
     // send error.
     const missingRequiredDocument = headerType === "document" && !context.documentUrl;
 
-    const result: { success: boolean; messageId?: string; error?: string } = missingRequiredDocument
+    const result: { success: boolean; messageId?: string; waId?: string; error?: string } =
+      missingRequiredDocument
       ? {
           success: false,
           error:
@@ -124,6 +126,18 @@ async function sendTemplatedNotification(
       errorMessage: result.error,
       relatedEntityType: context.relatedEntityType,
       relatedEntityId: context.relatedEntityId,
+    });
+
+    await recordOutboundMessage({
+      waId: result.waId,
+      phone: context.customerPhone,
+      contactName: context.customerName,
+      waMessageId: result.messageId,
+      type: "template",
+      text: renderedPreview,
+      templateName: template.metaTemplateName ?? template.name,
+      status: result.success ? "sent" : "failed",
+      errorMessage: result.error,
     });
   } catch {
     // Notifications must never break the calling request/route.

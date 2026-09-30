@@ -1,13 +1,22 @@
 import "server-only";
 
-const GRAPH_API_VERSION = "v21.0";
+export const GRAPH_API_VERSION = "v21.0";
 
 export function isMetaWhatsAppConfigured(): boolean {
   return Boolean(process.env.META_WHATSAPP_ACCESS_TOKEN && process.env.META_WHATSAPP_PHONE_NUMBER_ID);
 }
 
-function normalizePhoneNumber(phone: string): string {
-  return phone.replace(/\D/g, "");
+/**
+ * Meta needs the full international number (country code, digits only).
+ * Numbers in the app are mostly stored as plain 10-digit Indian mobiles, so
+ * prefix 91 for those — sending "9876543210" as-is makes Meta read the
+ * leading digits as a country code and the message goes nowhere.
+ */
+export function normalizePhoneNumber(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 10) return `91${digits}`;
+  if (digits.length === 11 && digits.startsWith("0")) return `91${digits.slice(1)}`;
+  return digits;
 }
 
 interface SendMetaWhatsAppMessageParams {
@@ -33,6 +42,9 @@ interface SendMetaWhatsAppMessageParams {
 interface SendMetaWhatsAppMessageResult {
   success: boolean;
   messageId?: string;
+  // Meta's canonical WhatsApp ID for the recipient (country code + number)
+  // — used as the conversation key in the Inbox.
+  waId?: string;
   error?: string;
   // Meta's raw error object (code, error_subcode, error_data.details,
   // fbtrace_id, ...) — passed through so the admin UI can show exactly what
@@ -40,7 +52,7 @@ interface SendMetaWhatsAppMessageResult {
   metaError?: unknown;
 }
 
-interface MetaApiError {
+export interface MetaApiError {
   message?: string;
   type?: string;
   code?: number;
@@ -57,7 +69,7 @@ interface MetaApiError {
  * match..." or even "An unknown error has occurred."), while
  * `error_data.details` / `error_user_msg` usually say what actually failed.
  */
-function describeMetaError(metaError: MetaApiError | undefined, status: number): string {
+export function describeMetaError(metaError: MetaApiError | undefined, status: number): string {
   if (!metaError) return `Meta API error (HTTP ${status})`;
   const parts: string[] = [metaError.message ?? `Meta API error (HTTP ${status})`];
   if (metaError.error_user_title || metaError.error_user_msg) {
@@ -156,7 +168,11 @@ export async function sendMetaWhatsAppMessage(
       };
     }
 
-    return { success: true, messageId: json?.messages?.[0]?.id };
+    return {
+      success: true,
+      messageId: json?.messages?.[0]?.id,
+      waId: json?.contacts?.[0]?.wa_id ?? normalizePhoneNumber(params.to),
+    };
   } catch (error) {
     return {
       success: false,
