@@ -204,6 +204,38 @@ export function SaleForm({
           className="space-y-6"
         >
           <section className="space-y-4 rounded-lg border border-border bg-card p-6">
+            <h2 className="font-heading text-lg">Bill</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="billNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bill Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Manual bill/register no." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="saleDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sale Date</FormLabel>
+                    <FormControl>
+                      <DatePicker value={field.value} onChange={field.onChange} className="w-full" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </section>
+
+          <section className="space-y-4 rounded-lg border border-border bg-card p-6">
             <h2 className="font-heading text-lg">Customer</h2>
 
             <FormItem>
@@ -327,34 +359,6 @@ export function SaleForm({
               )}
             />
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="billNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Bill Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Manual bill/register no." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="saleDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sale Date</FormLabel>
-                    <FormControl>
-                      <DatePicker value={field.value} onChange={field.onChange} className="w-full" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
           </section>
 
           <section className="space-y-4 rounded-lg border border-border bg-card p-6">
