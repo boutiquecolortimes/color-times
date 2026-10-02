@@ -31,9 +31,18 @@ interface InvoicePdfData {
   total: number;
   amountPaid: number;
   amountDue: number;
+  pickupPaid?: number;
   payments: InvoicePdfPayment[];
   notes?: string;
 }
+
+const PAYMENT_METHOD_EN: Record<PaymentMethod, string> = {
+  cash: "Cash",
+  card: "Card",
+  upi: "UPI",
+  bank_transfer: "Bank Transfer",
+  other: "Other",
+};
 
 function formatCurrency(value: number): string {
   return `Rs. ${value.toLocaleString("en-IN")}`;
@@ -75,9 +84,9 @@ export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise
   doc.text("INVOICE", 196, 18, { align: "right" });
   doc.setFontSize(10);
   doc.text(invoice.invoiceNumber, 196, 24, { align: "right" });
-  doc.text(`Issued: ${formatDate(invoice.createdAt)}`, 196, 29, { align: "right" });
-  doc.text(`Due: ${formatDate(invoice.dueDate)}`, 196, 34, { align: "right" });
-  doc.text(`Status: ${invoice.status.replace("_", " ").toUpperCase()}`, 196, 39, { align: "right" });
+  doc.text(`Issued On: ${formatDate(invoice.createdAt)}`, 196, 29, { align: "right" });
+  doc.text(`Due Date: ${formatDate(invoice.dueDate)}`, 196, 34, { align: "right" });
+  doc.text(`Status: ${invoice.status.replace(/_/g, " ").toUpperCase()}`, 196, 39, { align: "right" });
 
   // Walk-in customers get a generated placeholder email just to satisfy the
   // account system's unique/required email field (e.g.
@@ -93,7 +102,7 @@ export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise
   if (invoice.customer.phone) doc.text(invoice.customer.phone, 14, showEmail ? 61 : 56);
 
   autoTable(doc, {
-    head: [["Description", "Qty", "Unit Price", "Amount"]],
+    head: [["Description", "Quantity", "Unit Price", "Amount"]],
     body: invoice.lineItems.map((item) => [
       item.description,
       String(item.quantity),
@@ -116,11 +125,11 @@ export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise
     ["Rent", formatCurrency(invoice.subtotal)],
     ["Discount", `-${formatCurrency(invoice.discountAmount)}`],
     [`Tax (${invoice.taxRate}%)`, formatCurrency(invoice.taxAmount)],
-    ["Security Deposit", formatCurrency(invoice.securityDeposit)],
-    ["Total", formatCurrency(invoice.total)],
-    ["Amount Paid", formatCurrency(invoice.amountPaid)],
-    ["Rent Due", formatCurrency(due.rentDue)],
-    ...(due.securityHeld > 0 ? [["Security Held", formatCurrency(due.securityHeld)]] : []),
+    ["Advance Paid", formatCurrency(due.advancePaid)],
+    ["Due Paid", formatCurrency(due.duePaid)],
+    ["Total Rent", formatCurrency(due.rentTotal)],
+    ["Security Paid", formatCurrency(invoice.securityDeposit)],
+    ["Remaining Due", formatCurrency(due.rentDue)],
   ];
 
   autoTable(doc, {
@@ -141,7 +150,7 @@ export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise
       head: [["Date", "Method", "Amount", "Reference"]],
       body: invoice.payments.map((payment) => [
         formatDate(payment.paidAt),
-        payment.method.replace("_", " "),
+        PAYMENT_METHOD_EN[payment.method] ?? payment.method,
         formatCurrency(payment.amount),
         payment.reference ?? "—",
       ]),

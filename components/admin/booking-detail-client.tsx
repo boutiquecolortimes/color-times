@@ -20,6 +20,7 @@ import { BookingStatusBadge, STATUS_LABELS } from "@/components/admin/booking-st
 import { ReturnBookingDialog } from "@/components/admin/return-booking-dialog";
 import { ConfirmBookingDialog } from "@/components/admin/confirm-booking-dialog";
 import { PickupBookingDialog } from "@/components/admin/pickup-booking-dialog";
+import { CancelBookingDialog } from "@/components/admin/cancel-booking-dialog";
 import { AuditLogList } from "@/components/admin/audit-log-list";
 import { ImagePreviewDialog } from "@/components/admin/image-preview-dialog";
 import {
@@ -80,6 +81,7 @@ interface BookingDetail {
   securityDeposit: number;
   totalAmount: number;
   advancePaid?: number;
+  pickupPaid?: number;
   advancePaymentMethod?: string;
   deliveryAddress?: string;
   notes?: string;
@@ -144,6 +146,7 @@ export function BookingDetailClient({
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [pickupDialogOpen, setPickupDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [dryCleanValues, setDryCleanValues] = useState<ServiceOrderInitialValues | null>(null);
   const [dryCleanDialogOpen, setDryCleanDialogOpen] = useState(false);
   const [previewItemIndex, setPreviewItemIndex] = useState<number | null>(null);
@@ -254,7 +257,12 @@ export function BookingDetailClient({
   const rentTotal = Math.max(0, booking.totalAmount - booking.securityDeposit);
   const paidTowardRent = Math.min(Math.max(0, booking.advancePaid ?? 0), rentTotal);
   const rentDue = Math.max(0, rentTotal - paidTowardRent);
-  const securityHeld = booking.depositRefunded ? 0 : booking.securityDeposit;
+  // advancePaid is the running total of everything paid on the booking;
+  // pickupPaid is the part collected at pickup. Split it back out so the
+  // billing card reads Advance Paid (before pickup) and Due Paid (at pickup).
+  const totalPaid = Math.max(0, booking.advancePaid ?? 0);
+  const duePaid = Math.min(totalPaid, Math.max(0, booking.pickupPaid ?? 0));
+  const advanceOnly = totalPaid - duePaid;
 
   return (
     <div className="space-y-6">
@@ -367,6 +375,10 @@ export function BookingDetailClient({
               }
               if (value === "in_use") {
                 setPickupDialogOpen(true);
+                return;
+              }
+              if (value === "cancelled") {
+                setCancelDialogOpen(true);
                 return;
               }
               updateStatusMutation.mutate(value as BookingStatus);
@@ -521,36 +533,32 @@ export function BookingDetailClient({
                     <span>{formatCurrency(item.rentalFee)}</span>
                   </p>
                 ))}
+                <p className="flex justify-between border-t border-border pt-2">
+                  <span className="text-muted-foreground">
+                    Advance Paid
+                    {booking.advancePaymentMethod ? ` (${booking.advancePaymentMethod})` : ""}
+                  </span>
+                  <span>{formatCurrency(advanceOnly)}</span>
+                </p>
                 <p className="flex justify-between">
-                  <span className="text-muted-foreground">Security To Be Returned</span>
+                  <span className="text-muted-foreground">Due Paid</span>
+                  <span>{formatCurrency(duePaid)}</span>
+                </p>
+                <p className="flex justify-between font-medium">
+                  <span>Total Rent</span>
+                  <span>{formatCurrency(rentTotal)}</span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-muted-foreground">Security Paid</span>
                   <span>
                     {formatCurrency(booking.securityDeposit)}
                     {booking.depositRefunded && " (Refunded)"}
                   </span>
                 </p>
-                <p className="flex justify-between font-medium">
-                  <span>Total</span>
-                  <span>{formatCurrency(booking.totalAmount)}</span>
-                </p>
-                {Boolean(booking.advancePaid) && (
-                  <p className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      Advance Paid
-                      {booking.advancePaymentMethod ? ` (${booking.advancePaymentMethod})` : ""}
-                    </span>
-                    <span>{formatCurrency(booking.advancePaid ?? 0)}</span>
-                  </p>
-                )}
                 <p className="flex justify-between border-t border-border pt-2 font-medium">
-                  <span>Rent Due</span>
+                  <span>Remaining Due</span>
                   <span className="text-accent">{formatCurrency(rentDue)}</span>
                 </p>
-                {securityHeld > 0 && (
-                  <p className="flex justify-between">
-                    <span className="text-muted-foreground">Security Held</span>
-                    <span>{formatCurrency(securityHeld)}</span>
-                  </p>
-                )}
               </div>
             </div>
           </div>
@@ -710,6 +718,18 @@ export function BookingDetailClient({
         }}
         open={confirmDialogOpen}
         onOpenChange={setConfirmDialogOpen}
+      />
+
+      <CancelBookingDialog
+        open={cancelDialogOpen}
+        onOpenChange={setCancelDialogOpen}
+        bookingNumber={booking.bookingNumber}
+        customerName={booking.customer?.name}
+        advancePaid={booking.advancePaid ?? 0}
+        isLoading={updateStatusMutation.isPending}
+        onConfirm={() =>
+          updateStatusMutation.mutate("cancelled", { onSuccess: () => setCancelDialogOpen(false) })
+        }
       />
 
       <PickupBookingDialog

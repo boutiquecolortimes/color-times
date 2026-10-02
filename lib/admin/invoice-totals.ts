@@ -20,6 +20,10 @@ export interface InvoiceDueBreakdownInput {
   securityDeposit: number;
   total: number;
   amountPaid: number;
+  /** Amount collected at pickup on the linked booking (Booking.pickupPaid). */
+  pickupPaid?: number;
+  /** Payments logged directly on the invoice after it was issued. */
+  payments?: { amount: number }[];
 }
 
 export interface InvoiceDueBreakdown {
@@ -40,6 +44,10 @@ export interface InvoiceDueBreakdown {
    * call sites read "held", not "due", at the point of use.
    */
   securityHeld: number;
+  /** Paid before pickup (booking advance). */
+  advancePaid: number;
+  /** Paid at/after pickup — the pickup collection plus payments logged on the invoice. */
+  duePaid: number;
 }
 
 export function getInvoiceDueBreakdown(invoice: InvoiceDueBreakdownInput): InvoiceDueBreakdown {
@@ -47,5 +55,16 @@ export function getInvoiceDueBreakdown(invoice: InvoiceDueBreakdownInput): Invoi
   const securityInTotal = Math.max(0, invoice.total - rentTotal);
   const paidTowardRent = Math.min(Math.max(0, invoice.amountPaid), rentTotal);
   const rentDue = Math.max(0, rentTotal - paidTowardRent);
-  return { rentTotal, securityInTotal, rentDue, securityHeld: securityInTotal };
+  const amountPaid = Math.max(0, invoice.amountPaid);
+  const loggedPayments = (invoice.payments ?? []).reduce((sum, p) => sum + (p.amount ?? 0), 0);
+  const duePaid = Math.min(amountPaid, Math.max(0, invoice.pickupPaid ?? 0) + loggedPayments);
+  const advancePaid = amountPaid - duePaid;
+  return {
+    rentTotal,
+    securityInTotal,
+    rentDue,
+    securityHeld: securityInTotal,
+    advancePaid,
+    duePaid,
+  };
 }

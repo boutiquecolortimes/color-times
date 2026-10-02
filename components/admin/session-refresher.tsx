@@ -5,11 +5,10 @@ import { useRouter } from "next/navigation";
 
 // Keep the (short-lived) access token topped up while the admin is active...
 const REFRESH_INTERVAL_MS = 10 * 60 * 1000;
-// ...but stop doing that — and sign out — after this much inactivity. Chosen
-// as a balance for a shop admin panel: short enough to matter on a shared
-// counter PC, long enough not to interrupt someone mid-task who steps away
-// briefly.
-const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+// ...but stop doing that — and sign out — after this much inactivity. Set to
+// a full working day so staff aren't signed out between customers. Keep in
+// step with the access cookie's maxAge in lib/auth/cookies.ts.
+const IDLE_TIMEOUT_MS = 8 * 60 * 60 * 1000;
 const IDLE_CHECK_INTERVAL_MS = 60 * 1000;
 
 const ACTIVITY_EVENTS = ["mousedown", "mousemove", "keydown", "scroll", "touchstart"] as const;
@@ -56,8 +55,7 @@ export function SessionRefresher() {
       return Date.now() - lastActivityRef.current < IDLE_TIMEOUT_MS;
     }
 
-    // Covers idle timeout, a password change/reset elsewhere, a login on
-    // another device (only one session is allowed per account), or an
+    // Covers idle timeout, a password change/reset elsewhere, or an
     // admin deactivating the account — all of these make the refresh token
     // stop working, and all of them should land the admin back on /login
     // with a clear reason instead of a confusing stuck screen.
@@ -73,6 +71,20 @@ export function SessionRefresher() {
         void forceLogout("idle");
       }
     }, IDLE_CHECK_INTERVAL_MS);
+
+    // Coming back to the tab (or waking the laptop) — timers may have been
+    // paused, so renew right away while still inside the idle window.
+    function handleVisibility() {
+      if (document.visibilityState !== "visible") return;
+      if (!isWithinIdleWindow()) {
+        void forceLogout("idle");
+        return;
+      }
+      void refreshSession().then((ok) => {
+        if (!ok) void forceLogout("session-ended");
+      });
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
 
     const refreshInterval = setInterval(() => {
       if (!isWithinIdleWindow()) return;
@@ -120,6 +132,7 @@ export function SessionRefresher() {
       ACTIVITY_EVENTS.forEach((event) => window.removeEventListener(event, markActive));
       clearInterval(idleCheckInterval);
       clearInterval(refreshInterval);
+      document.removeEventListener("visibilitychange", handleVisibility);
       window.fetch = originalFetch;
     };
   }, [router]);

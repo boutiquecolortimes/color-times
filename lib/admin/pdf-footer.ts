@@ -1,28 +1,30 @@
 import type { jsPDF } from "jspdf";
 import { siteConfig } from "@/lib/config/site";
 
-// English terms & conditions text, matched to the boutique's printed Hindi
-// booking slip. Drawn as real jsPDF text rather than a pre-rendered image —
-// jsPDF's built-in fonts render Latin text fine (it's Devanagari glyph
-// shaping it can't do), so there's no reason to pay the image-rendering
-// complexity/risk here. This also fixes the bug where every generated
-// bill/invoice/PDF carried this block in Hindi regardless of the rest of
-// the document being in English — real text can't silently drift into the
-// wrong language the way a hardcoded image could.
-//
-// NOTE: line 5 below is a best-effort reading of the printed slip — that
-// part of the photo was partly covered by a thumb. Confirm the exact
-// wording and I'll adjust it (now a one-line text edit, not a re-rendered
-// image).
+// Terms & conditions, word-for-word from the boutique's booking slip.
+// English is drawn as real jsPDF text (Latin renders fine). The Hindi
+// version can't be — jsPDF doesn't do Devanagari glyph shaping — so the
+// Hindi invoice download renders TERMS_AND_CONDITIONS_HI through a browser
+// canvas instead (see lib/admin/hindi-canvas.ts). Keep both lists in step.
 export const TERMS_AND_CONDITIONS: string[] = [
-  "Booking is confirmed 100% only once the advance amount has been paid.",
-  "A booked dress cannot be cancelled. If cancelled, the advance amount already paid will not be refunded.",
-  "The date of a booked dress cannot be changed once booked.",
-  "If the dress is returned late, or is found stained or torn, extra charges will be deducted from the security deposit.",
-  "The full security deposit must be paid before the dress is taken away.",
-  "Please check the dress's condition, stitching and fitting carefully before taking it — report any issue before it leaves the store.",
-  "All disputes are subject to the jurisdiction of Phalodi.",
+  "The booking will be 100% confirmed only after the customer deposits the advance amount.",
+  "Once the dress is booked, it cannot be cancelled. If cancelled, the advance deposit will not be refunded.",
+  "Once the dress is booked, no changes can be made to the dress or the date.",
+  "If the customer returns the dress late, or if the dress is stained or torn, an extra amount will be deducted from the security deposit.",
+  "The full rent and security deposit must be paid before taking the dress, and the dress and fitting must be checked before taking it. The jurisdiction of all matters will be Phalodi.",
 ];
+
+export const TERMS_AND_CONDITIONS_HEADING = "Terms and Conditions";
+
+export const TERMS_AND_CONDITIONS_HI: string[] = [
+  "ग्राहक द्वारा एडवांस रुपये जमा करवाने पर ही बुकिंग 100% कंफर्म होगी ।",
+  "ड्रेस बुक हो जाने के बाद उसे कैंसिल नहीं किया जाएगा यदि कैंसिल किया जाता है तो एडवांस जमा रुपये वापस नहीं होगें।",
+  "ड्रेस बुक हो जाने के बाद ड्रेस और तारीख में कोई बदलाव नहीं किया जाएगा ।",
+  "ग्राहक द्वारा ड्रेस लेट पहुंचाने पर या ड्रेस पर दाग या कटी फटी करने पर जमा सिक्योरिटी रुपये से एक्स्ट्रा रुपये काट लिए जाएगें ।",
+  "ड्रेस ले जाने से पहले पूरा किराया और सिक्योरिटी देनी होगी एवं ड्रेस ले जाने से पहले ड्रेस व फिटिंग जरूर जाँच कर लेवें। सभी प्रसंगों का न्याय क्षेत्र फलोदी होगा।",
+];
+
+export const TERMS_AND_CONDITIONS_HEADING_HI = "नियम एवं शर्तें";
 
 /**
  * Draws the "Terms & Conditions" block as wrapped text starting at (x, y),
@@ -51,7 +53,7 @@ export function drawTermsAndConditions(doc: jsPDF, x: number, y: number, maxWidt
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "bold");
-  doc.text("Terms & Conditions", x, cursorY);
+  doc.text(TERMS_AND_CONDITIONS_HEADING, x, cursorY);
   cursorY += headingHeight;
 
   doc.setFontSize(bodyFontSize);
@@ -79,5 +81,15 @@ export function ownerDetailLines(): string[] {
     proprietor.printTagline,
     `By: ${proprietor.name}   Mobile: ${proprietor.phones.join(", ")}`,
     `Instagram: ${proprietor.instagramHandle}`,
+  ];
+}
+
+/** Hindi version of ownerDetailLines(), for the Hindi invoice download. */
+export function ownerDetailLinesHi(): string[] {
+  const { proprietor } = siteConfig;
+  return [
+    "आप चुनें, हम डिज़ाइन करें",
+    `द्वारा: ${proprietor.nameHi ?? proprietor.name}   मोबाइल: ${proprietor.phones.join(", ")}`,
+    `इंस्टाग्राम: ${proprietor.instagramHandle}`,
   ];
 }

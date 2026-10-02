@@ -18,7 +18,10 @@ export async function GET(
   try {
     await connectToDatabase();
 
-    const invoice = await Invoice.findById(id).populate("customer", "name email phone").lean();
+    const invoice = await Invoice.findById(id)
+      .populate("customer", "name email phone")
+      .populate("booking", "pickupPaid")
+      .lean();
     if (!invoice || invoice.deletedAt) {
       return new Response("Not found", { status: 404 });
     }
@@ -54,6 +57,7 @@ export async function GET(
       total: invoice.total ?? 0,
       amountPaid: invoice.amountPaid ?? 0,
       amountDue: invoice.amountDue ?? 0,
+      pickupPaid: (invoice.booking as unknown as { pickupPaid?: number } | null)?.pickupPaid ?? 0,
       payments: invoice.payments ?? [],
       notes: invoice.notes,
     });

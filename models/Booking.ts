@@ -46,6 +46,11 @@ export interface IBooking extends Document {
   securityDeposit: number;
   totalAmount: number;
   advancePaid: number;
+  // Portion of advancePaid that was collected at pickup (the "due paid").
+  // advancePaid stays the running total of everything paid so all existing
+  // balance math keeps working; this lets screens split it back into
+  // Advance Paid (before pickup) vs Due Paid (at pickup).
+  pickupPaid?: number;
   // Free text, not an enum — matches the admin-editable payment methods
   // list (Settings module "payment-methods"), so new options don't need a
   // schema change.
@@ -121,6 +126,7 @@ const bookingSchema = new Schema<IBooking>(
     securityDeposit: { type: Number, required: true, min: 0 },
     totalAmount: { type: Number, required: true, min: 0 },
     advancePaid: { type: Number, required: true, min: 0, default: 0 },
+    pickupPaid: { type: Number, min: 0, default: 0 },
     advancePaymentMethod: { type: String, trim: true },
     measurements: { type: measurementsSchema, default: undefined },
     deliveryAddress: { type: String, trim: true },

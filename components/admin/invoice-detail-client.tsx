@@ -37,7 +37,7 @@ interface InvoiceDetail {
   invoiceNumber: string;
   status: InvoiceStatus;
   customer: { name: string; email: string; phone?: string };
-  booking: { bookingNumber: string } | null;
+  booking: { bookingNumber: string; pickupPaid?: number } | null;
   lineItems: InvoiceLineItem[];
   subtotal: number;
   discountAmount: number;
@@ -116,7 +116,7 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
   // what's logged as an invoice payment, so a single "Due" figure that
   // includes it reads as if the deposit is still owed even once it's
   // sitting in hand. Split it out so rent and deposit show separately.
-  const due = getInvoiceDueBreakdown(invoice);
+  const due = getInvoiceDueBreakdown({ ...invoice, pickupPaid: invoice.booking?.pickupPaid ?? 0 });
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["admin", "invoice", initialInvoice._id] });
@@ -197,6 +197,7 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
         total: invoice.total,
         amountPaid: invoice.amountPaid,
         amountDue: invoice.amountDue,
+        pickupPaid: invoice.booking?.pickupPaid ?? 0,
         payments: invoice.payments,
         notes: invoice.notes,
       },
@@ -328,35 +329,29 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
                   <span className="text-muted-foreground">Tax ({invoice.taxRate}%)</span>
                   <span>{formatCurrency(invoice.taxAmount)}</span>
                 </p>
-                <p className="flex justify-between">
-                  <span className="text-muted-foreground">Security To Be Returned</span>
-                  <span>
-                    {formatCurrency(invoice.securityDeposit)}
-                    {invoice.depositRefunded
-                      ? " (Refunded)"
-                      : invoice.securityDeposit <= 0
-                        ? ""
-                        : " (held)"}
-                  </span>
-                </p>
-                <p className="flex justify-between font-medium">
-                  <span>Total</span>
-                  <span>{formatCurrency(invoice.total)}</span>
+                <p className="flex justify-between border-t border-border pt-2 text-emerald-700">
+                  <span>Advance Paid</span>
+                  <span>{formatCurrency(due.advancePaid)}</span>
                 </p>
                 <p className="flex justify-between text-emerald-700">
-                  <span>Paid</span>
-                  <span>{formatCurrency(invoice.amountPaid)}</span>
+                  <span>Due Paid</span>
+                  <span>{formatCurrency(due.duePaid)}</span>
                 </p>
-                <p className="flex justify-between font-medium text-red-700">
-                  <span>Rent Due</span>
+                <p className="flex justify-between font-medium">
+                  <span>Total Rent</span>
+                  <span>{formatCurrency(due.rentTotal)}</span>
+                </p>
+                <p className="flex justify-between text-blue-700">
+                  <span>Security Paid</span>
+                  <span>
+                    {formatCurrency(invoice.securityDeposit)}
+                    {invoice.depositRefunded ? " (Refunded)" : ""}
+                  </span>
+                </p>
+                <p className="flex justify-between border-t border-border pt-2 font-medium text-red-700">
+                  <span>Remaining Due</span>
                   <span>{formatCurrency(due.rentDue)}</span>
                 </p>
-                {due.securityHeld > 0 && !invoice.depositRefunded && (
-                  <p className="flex justify-between font-medium text-blue-700">
-                    <span>Security Held</span>
-                    <span>{formatCurrency(due.securityHeld)}</span>
-                  </p>
-                )}
               </div>
             </div>
           </div>

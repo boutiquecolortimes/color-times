@@ -101,8 +101,8 @@ export function PickupBookingDialog({
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const advanceAfter = summary.advancePaid + paymentAmount;
-  const remainingAfter = Math.max(0, totalAmount - advanceAfter);
+  // Remaining Due = (Total Rent + Security) − (Advance Paid + Due Paid now).
+  const remainingAfter = Math.max(0, totalAmount - summary.advancePaid - paymentAmount);
 
   return (
     <Dialog open={open} onOpenChange={(next) => !mutation.isPending && onOpenChange(next)}>
@@ -157,23 +157,23 @@ export function PickupBookingDialog({
 
           <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Total amount</span>
-              <span>{formatCurrency(totalAmount)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Security deposit</span>
-              <span>{formatCurrency(securityDeposit)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Paid so far</span>
+              <span className="text-muted-foreground">Advance Paid</span>
               <span>{formatCurrency(summary.advancePaid)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Paid after pickup</span>
-              <span>{formatCurrency(advanceAfter)}</span>
+              <span className="text-muted-foreground">Due Paid</span>
+              <span>{formatCurrency(paymentAmount)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Total Rent</span>
+              <span>{formatCurrency(rentalFeesTotal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Security Paid</span>
+              <span>{formatCurrency(securityDeposit)}</span>
             </div>
             <div className="mt-2 flex justify-between border-t border-border pt-2 font-medium">
-              <span>Remaining due</span>
+              <span>Remaining Due</span>
               <span className="text-accent">{formatCurrency(remainingAfter)}</span>
             </div>
           </div>

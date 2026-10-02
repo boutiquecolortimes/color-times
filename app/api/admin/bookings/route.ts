@@ -106,7 +106,21 @@ export async function GET(request: NextRequest): Promise<Response> {
     // filter (not just the current page) so it reflects the store's real
     // totals, not just what's visible in the table.
     Booking.aggregate([
-      { $match: filter },
+      {
+        $match: {
+          ...filter,
+          // An inquiry (or legacy pending_payment) booking isn't earnings
+          // until the customer actually pays — leave it out of the summary
+          // tiles until an advance is recorded. Once any payment is in, it
+          // counts like any other booking.
+          $nor: [
+            {
+              status: { $in: ["inquiry", "pending_payment"] },
+              $or: [{ advancePaid: { $exists: false } }, { advancePaid: { $lte: 0 } }],
+            },
+          ],
+        },
+      },
       {
         $group: {
           _id: null,

@@ -27,6 +27,7 @@ const nav: NavItem[] = [
 
 export const siteConfig = {
   name: "Color Times Boutique",
+  nameHi: "कलर टाइम्स बुटीक",
   shortName: "Color Times",
   tagline: "Wear the Moment",
   description:
@@ -47,6 +48,7 @@ export const siteConfig = {
     whatsapp: "+91 98765 43210",
     email: "hello@colortimesboutique.com",
     address: "Balaji Market, Main Pathar Road, Phalodi (Raj.) 342301",
+    addressHi: "बालाजी मार्केट, मेन पाथर रोड, फलोदी (राज.) 342301",
   },
   social: {
     instagram: "https://www.instagram.com/color_times_boutique/",
@@ -59,6 +61,7 @@ export const siteConfig = {
   // owner's real details without touching website copy.
   proprietor: {
     name: "Neelam Soni",
+    nameHi: "नीलम सोनी",
     printTagline: "You Choose, We Design",
     phones: ["7891919789", "9509786777"],
     instagramHandle: "Color_times_boutique",

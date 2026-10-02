@@ -191,6 +191,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       // typically brings advancePaid up to totalAmount.
       if (input.pickupPaymentAmount) {
         update.advancePaid = (before.advancePaid ?? 0) + input.pickupPaymentAmount;
+        update.pickupPaid = (before.pickupPaid ?? 0) + input.pickupPaymentAmount;
       }
 
       // Security deposit can also be corrected right here at handover (e.g.

@@ -6,7 +6,12 @@ export const accessTokenCookieOptions = {
   secure: process.env.NODE_ENV === "production",
   sameSite: "lax" as const,
   path: "/",
-  maxAge: 60 * 15, // 15 minutes
+  // The JWT inside still expires after 15 minutes; the cookie is kept for
+  // 8 hours (the admin idle timeout in session-refresher.tsx). If a page is
+  // opened with an expired token still in the cookie, the user was active
+  // within that window, so proxy.ts silently renews the session instead of
+  // bouncing to /login. Cookie gone = idle for 8+ hours → login.
+  maxAge: 60 * 60 * 8, // 8 hours
 };
 
 export const refreshTokenCookieOptions = {

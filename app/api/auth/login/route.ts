@@ -59,11 +59,10 @@ export async function POST(request: NextRequest): Promise<Response> {
       return apiError("This account has been deactivated. Contact an administrator.", 403);
     }
 
-    // One active session per account: bumping tokenVersion on every login
-    // invalidates whatever refresh token an earlier session on another
-    // device/browser was holding, so it gets signed out on its next silent
-    // refresh (at most ~15 min later, when its access token runs out).
-    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+    // Multiple devices are allowed — the counter PC and the owner's phone can
+    // stay signed in to the same account together, so login no longer bumps
+    // tokenVersion. A password change/reset still does, which signs out
+    // every device at once.
     user.failedLoginAttempts = 0;
     user.lockedUntil = undefined;
     await user.save();

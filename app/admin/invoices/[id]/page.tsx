@@ -20,7 +20,7 @@ export default async function InvoiceDetailPage({
 
   const invoice = await Invoice.findById(id)
     .populate("customer", "name email phone")
-    .populate("booking", "bookingNumber rentalStartDate rentalEndDate")
+    .populate("booking", "bookingNumber rentalStartDate rentalEndDate pickupPaid")
     .populate("payments.recordedBy", "name")
     .lean();
 
@@ -50,7 +50,10 @@ export default async function InvoiceDetailPage({
               }
             : { name: "—", email: "—" },
           booking: invoice.booking
-            ? { bookingNumber: (invoice.booking as unknown as { bookingNumber: string }).bookingNumber }
+            ? {
+                bookingNumber: (invoice.booking as unknown as { bookingNumber: string }).bookingNumber,
+                pickupPaid: (invoice.booking as unknown as { pickupPaid?: number }).pickupPaid ?? 0,
+              }
             : null,
           // A handful of invoices predate later schema additions or were
           // bulk-imported outside the app — .lean() doesn't backfill schema

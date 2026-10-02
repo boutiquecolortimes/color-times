@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { ACCESS_TOKEN_COOKIE } from "@/lib/auth/cookies";
+import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "@/lib/auth/cookies";
 import { verifyAccessToken } from "@/lib/auth/tokens";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 
@@ -23,6 +23,23 @@ function redirectToLogin(request: NextRequest, pathname: string): NextResponse {
   const loginUrl = new URL("/login", request.url);
   loginUrl.searchParams.set("next", pathname);
   return NextResponse.redirect(loginUrl);
+}
+
+// The access cookie outlives its 15-minute token for the 30-minute idle
+// window (see lib/auth/cookies.ts), so an expired token that's still in the
+// cookie means the user was active recently — renew silently and come
+// straight back, rather than logging them out mid-task.
+function redirectToRenew(request: NextRequest): NextResponse {
+  const { pathname, search } = request.nextUrl;
+  const renewUrl = new URL("/api/auth/refresh", request.url);
+  renewUrl.searchParams.set("next", `${pathname}${search}`);
+  return NextResponse.redirect(renewUrl);
+}
+
+function canRenew(request: NextRequest): boolean {
+  return Boolean(
+    request.cookies.get(ACCESS_TOKEN_COOKIE)?.value && request.cookies.get(REFRESH_TOKEN_COOKIE)?.value
+  );
 }
 
 function redirectToSiteLock(request: NextRequest): NextResponse {
@@ -81,6 +98,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.next();
   } catch {
+    if (canRenew(request)) return redirectToRenew(request);
     return redirectToLogin(request, pathname);
   }
 }

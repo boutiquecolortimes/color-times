@@ -33,9 +33,9 @@ export function LoginForm() {
   useEffect(() => {
     const reason = searchParams.get("reason");
     if (reason === "idle") {
-      toast.info("You were signed out after 30 minutes of inactivity.");
+      toast.info("You were signed out after 8 hours of inactivity.");
     } else if (reason === "session-ended") {
-      toast.info("You were signed out — your account may have signed in elsewhere, or your session ended.");
+      toast.info("You were signed out — your password may have been changed, or your session ended.");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

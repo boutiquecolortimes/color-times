@@ -49,6 +49,7 @@ import { BookingCalendar } from "@/components/admin/booking-calendar";
 import { ReturnBookingDialog } from "@/components/admin/return-booking-dialog";
 import { ConfirmBookingDialog } from "@/components/admin/confirm-booking-dialog";
 import { PickupBookingDialog } from "@/components/admin/pickup-booking-dialog";
+import { CancelBookingDialog } from "@/components/admin/cancel-booking-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -68,6 +69,7 @@ interface BookingRow {
   totalAmount: number;
   securityDeposit: number;
   advancePaid: number;
+  pickupPaid?: number;
   customer: { name: string; email: string; phone?: string } | null;
   items: { product: { name: string } | null }[];
 }
@@ -105,6 +107,21 @@ function formatINR(value: number): string {
 // so folding it into "Due" makes it read as money the customer still owes.
 // Same split used on invoices/booking detail: only the unpaid rent counts
 // as due — the deposit is shown in its own "Security" column instead.
+// advancePaid is the running total paid; pickupPaid is the part collected
+// at pickup. Split back into Advance Paid vs Due Paid for display.
+function bookingPaidSplit(booking: { advancePaid: number; pickupPaid?: number }): {
+  advance: number;
+  due: number;
+} {
+  const total = Math.max(0, booking.advancePaid);
+  const due = Math.min(total, Math.max(0, booking.pickupPaid ?? 0));
+  return { advance: total - due, due };
+}
+
+function bookingRentTotal(booking: { totalAmount: number; securityDeposit: number }): number {
+  return Math.max(0, booking.totalAmount - booking.securityDeposit);
+}
+
 function bookingDueAmount(booking: { totalAmount: number; securityDeposit: number; advancePaid: number }): number {
   const rentTotal = Math.max(0, booking.totalAmount - booking.securityDeposit);
   return Math.max(0, rentTotal - booking.advancePaid);
@@ -219,6 +236,7 @@ export function BookingsClient({
   const [trashView, setTrashView] = useState<"active" | "trash">("active");
   const [returnDialogBookingId, setReturnDialogBookingId] = useState<string | null>(null);
   const [confirmDialogBooking, setConfirmDialogBooking] = useState<BookingRow | null>(null);
+  const [cancelDialogBooking, setCancelDialogBooking] = useState<BookingRow | null>(null);
   const [pickupDialogBooking, setPickupDialogBooking] = useState<BookingRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BookingRow | null>(null);
   const [permanentDeleteTarget, setPermanentDeleteTarget] = useState<BookingRow | null>(null);
@@ -340,10 +358,11 @@ export function BookingsClient({
     "Product",
     "Rental Start",
     "Rental End",
-    "Total",
-    "Security",
-    "Advance",
-    "Due",
+    "Advance Paid",
+    "Due Paid",
+    "Total Rent",
+    "Security Paid",
+    "Remaining Due",
     "Status",
   ];
 
@@ -358,9 +377,10 @@ export function BookingsClient({
       productSummary(booking.items),
       formatDate(booking.rentalStartDate),
       formatDate(booking.rentalEndDate),
-      booking.totalAmount,
+      bookingPaidSplit(booking).advance,
+      bookingPaidSplit(booking).due,
+      bookingRentTotal(booking),
       booking.securityDeposit,
-      booking.advancePaid,
       bookingDueAmount(booking),
       STATUS_LABELS[booking.status],
     ]);
@@ -377,9 +397,10 @@ export function BookingsClient({
       "",
       "",
       "",
-      rows.reduce((sum, b) => sum + b.totalAmount, 0),
+      rows.reduce((sum, b) => sum + bookingPaidSplit(b).advance, 0),
+      rows.reduce((sum, b) => sum + bookingPaidSplit(b).due, 0),
+      rows.reduce((sum, b) => sum + bookingRentTotal(b), 0),
       rows.reduce((sum, b) => sum + b.securityDeposit, 0),
-      rows.reduce((sum, b) => sum + b.advancePaid, 0),
       rows.reduce((sum, b) => sum + bookingDueAmount(b), 0),
       "",
     ];
@@ -466,15 +487,17 @@ export function BookingsClient({
             {formatDate(booking.rentalStartDate)} &rarr; {formatDate(booking.rentalEndDate)}
           </p>
           <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <span>Total</span>
+            <span>Advance Paid</span>
+            <span className="text-right">{formatINR(bookingPaidSplit(booking).advance)}</span>
+            <span>Due Paid</span>
+            <span className="text-right">{formatINR(bookingPaidSplit(booking).due)}</span>
+            <span>Total Rent</span>
             <span className="text-right font-medium text-foreground">
-              {formatINR(booking.totalAmount)}
+              {formatINR(bookingRentTotal(booking))}
             </span>
-            <span>Security</span>
+            <span>Security Paid</span>
             <span className="text-right">{formatINR(booking.securityDeposit)}</span>
-            <span>Advance</span>
-            <span className="text-right">{formatINR(booking.advancePaid)}</span>
-            <span>Due</span>
+            <span>Remaining Due</span>
             <span className="text-right font-medium text-accent">
               {formatINR(bookingDueAmount(booking))}
             </span>
@@ -545,6 +568,10 @@ export function BookingsClient({
                     }
                     if (value === "in_use") {
                       setPickupDialogBooking(booking);
+                      return;
+                    }
+                    if (value === "cancelled") {
+                      setCancelDialogBooking(booking);
                       return;
                     }
                     updateStatusMutation.mutate({
@@ -865,9 +892,19 @@ export function BookingsClient({
                     <button
                       type="button"
                       className="flex items-center gap-1 hover:text-foreground"
+                      onClick={() => toggleSort("advancePaid")}
+                    >
+                      Advance Paid <SortIcon field="advancePaid" sortBy={sortBy} sortDir={sortDir} />
+                    </button>
+                  </th>
+                  <th className="px-4 py-3">Due Paid</th>
+                  <th className="px-4 py-3">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-foreground"
                       onClick={() => toggleSort("totalAmount")}
                     >
-                      Total <SortIcon field="totalAmount" sortBy={sortBy} sortDir={sortDir} />
+                      Total Rent <SortIcon field="totalAmount" sortBy={sortBy} sortDir={sortDir} />
                     </button>
                   </th>
                   <th className="px-4 py-3">
@@ -876,19 +913,10 @@ export function BookingsClient({
                       className="flex items-center gap-1 hover:text-foreground"
                       onClick={() => toggleSort("securityDeposit")}
                     >
-                      Security <SortIcon field="securityDeposit" sortBy={sortBy} sortDir={sortDir} />
+                      Security Paid <SortIcon field="securityDeposit" sortBy={sortBy} sortDir={sortDir} />
                     </button>
                   </th>
-                  <th className="px-4 py-3">
-                    <button
-                      type="button"
-                      className="flex items-center gap-1 hover:text-foreground"
-                      onClick={() => toggleSort("advancePaid")}
-                    >
-                      Advance <SortIcon field="advancePaid" sortBy={sortBy} sortDir={sortDir} />
-                    </button>
-                  </th>
-                  <th className="px-4 py-3">Due</th>
+                  <th className="px-4 py-3">Remaining Due</th>
                   <th className="px-4 py-3">
                     <button
                       type="button"
@@ -942,14 +970,17 @@ export function BookingsClient({
                       {formatDate(booking.rentalStartDate)} &rarr;{" "}
                       {formatDate(booking.rentalEndDate)}
                     </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {formatINR(bookingPaidSplit(booking).advance)}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {formatINR(bookingPaidSplit(booking).due)}
+                    </td>
                     <td className="px-4 py-3 font-medium">
-                      {formatINR(booking.totalAmount)}
+                      {formatINR(bookingRentTotal(booking))}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {formatINR(booking.securityDeposit)}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {formatINR(booking.advancePaid)}
                     </td>
                     <td className="px-4 py-3 font-medium text-accent">
                       {formatINR(bookingDueAmount(booking))}
@@ -985,6 +1016,10 @@ export function BookingsClient({
                             }
                             if (value === "in_use") {
                               setPickupDialogBooking(booking);
+                              return;
+                            }
+                            if (value === "cancelled") {
+                              setCancelDialogBooking(booking);
                               return;
                             }
                             updateStatusMutation.mutate({
@@ -1065,7 +1100,7 @@ export function BookingsClient({
                 {bookings.length === 0 && (
                   <tr>
                     <td
-                      colSpan={14}
+                      colSpan={15}
                       className="px-4 py-10 text-center text-muted-foreground"
                     >
                       No bookings found.
@@ -1116,6 +1151,23 @@ export function BookingsClient({
           }}
           open={pickupDialogBooking !== null}
           onOpenChange={(open) => !open && setPickupDialogBooking(null)}
+        />
+      )}
+
+      {cancelDialogBooking && (
+        <CancelBookingDialog
+          open={cancelDialogBooking !== null}
+          onOpenChange={(open) => !open && setCancelDialogBooking(null)}
+          bookingNumber={cancelDialogBooking.bookingNumber}
+          customerName={cancelDialogBooking.customer?.name}
+          advancePaid={cancelDialogBooking.advancePaid}
+          isLoading={updateStatusMutation.isPending}
+          onConfirm={() =>
+            updateStatusMutation.mutate(
+              { id: cancelDialogBooking._id, status: "cancelled" },
+              { onSuccess: () => setCancelDialogBooking(null) }
+            )
+          }
         />
       )}
 

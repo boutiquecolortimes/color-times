@@ -337,7 +337,7 @@ export function InvoicesClient({
       "Customer",
       "Total",
       "Paid",
-      "Rent Due",
+      "Remaining Due",
       "Security Held",
       "Status",
       "Due Date",
@@ -410,7 +410,7 @@ export function InvoicesClient({
               <p className="text-emerald-700">{formatCurrency(invoice.amountPaid)}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Rent Due</p>
+              <p className="text-xs text-muted-foreground">Remaining Due</p>
               <p className={due.rentDue > 0 ? "text-red-700" : undefined}>
                 {formatCurrency(due.rentDue)}
               </p>
@@ -695,7 +695,7 @@ export function InvoicesClient({
               </th>
               <th className="px-4 py-3">
                 <button className="flex items-center gap-1" onClick={() => toggleSort("amountDue")}>
-                  Rent Due <SortIcon field="amountDue" sortBy={sortBy} sortDir={sortDir} />
+                  Remaining Due <SortIcon field="amountDue" sortBy={sortBy} sortDir={sortDir} />
                 </button>
               </th>
               <th className="px-4 py-3">
