@@ -8,8 +8,6 @@ import {
   Pencil,
   Trash2,
   Send,
-  Grid3x3,
-  List,
   Eye,
   RotateCcw,
   ArrowDown,
@@ -18,18 +16,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import type { SaleRow, CustomerOption } from "@/components/admin/sale-form-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { useCanEdit } from "@/components/admin/current-user-context";
+import { ListToolbar, StatusTabs, SummaryTiles } from "@/components/admin/list-toolbar";
+import type { MoneySummary } from "@/lib/admin/list-summaries";
+import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 import { formatDate } from "@/lib/utils";
 
 interface ProductOption {
@@ -62,30 +56,53 @@ function SortIcon({
   return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
 }
 
+type PaymentCounts = { all: number; due: number; paid: number };
+
+interface SalesResult {
+  sales: SaleRow[];
+  pagination: Pagination;
+  summary: MoneySummary;
+  paymentCounts: PaymentCounts;
+}
+
 async function fetchSales(params: {
   page: number;
   view: string;
+  payment: string;
+  search: string;
+  from: string;
+  to: string;
   sortBy?: string;
   sortDir?: "asc" | "desc";
-}): Promise<{ sales: SaleRow[]; pagination: Pagination }> {
+  all?: boolean;
+}): Promise<SalesResult> {
   const searchParams = new URLSearchParams({ page: String(params.page), view: params.view });
+  if (params.payment !== "all") searchParams.set("payment", params.payment);
+  if (params.search) searchParams.set("search", params.search);
+  if (params.from) searchParams.set("from", params.from);
+  if (params.to) searchParams.set("to", params.to);
   if (params.sortBy) searchParams.set("sortBy", params.sortBy);
   if (params.sortDir) searchParams.set("sortDir", params.sortDir);
+  if (params.all) searchParams.set("all", "true");
 
   const res = await fetch(`/api/admin/sales?${searchParams.toString()}`);
   const json = await res.json();
   if (!res.ok) throw new Error(json.error);
-  return { sales: json.data.sales, pagination: json.data.pagination };
+  return json.data;
 }
 
 export function SalesClient({
   initialSales,
   initialPagination,
+  initialSummary,
+  initialPaymentCounts,
   products,
   customers,
 }: {
   initialSales: SaleRow[];
   initialPagination: Pagination;
+  initialSummary: MoneySummary;
+  initialPaymentCounts: PaymentCounts;
   products: ProductOption[];
   customers: CustomerOption[];
 }) {
@@ -102,8 +119,27 @@ export function SalesClient({
     null
   );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [payment, setPayment] = useState("all");
+  const [search, setSearch] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
 
-  const isDefaultQuery = page === 1 && view === "active" && sortBy === "createdAt" && sortDir === "desc";
+  const isDefaultQuery =
+    page === 1 &&
+    view === "active" &&
+    payment === "all" &&
+    search === "" &&
+    from === "" &&
+    to === "" &&
+    sortBy === "createdAt" &&
+    sortDir === "desc";
+
+  // Any filter change goes back to page 1 and clears the selection.
+  function resetPaging() {
+    setPage(1);
+    setSelectedIds(new Set());
+  }
 
   function toggleSort(field: string) {
     if (sortBy === field) {
@@ -112,6 +148,7 @@ export function SalesClient({
       setSortBy(field);
       setSortDir("asc");
     }
+    setPage(1);
   }
 
   function changeView(next: "active" | "trash") {
@@ -134,15 +171,74 @@ export function SalesClient({
   }
 
   const { data } = useQuery({
-    queryKey: ["admin", "sales", { page, view, sortBy, sortDir }],
-    queryFn: () => fetchSales({ page, view, sortBy, sortDir }),
+    queryKey: ["admin", "sales", { page, view, payment, search, from, to, sortBy, sortDir }],
+    queryFn: () => fetchSales({ page, view, payment, search, from, to, sortBy, sortDir }),
     initialData: isDefaultQuery
-      ? { sales: initialSales, pagination: initialPagination }
+      ? {
+          sales: initialSales,
+          pagination: initialPagination,
+          summary: initialSummary,
+          paymentCounts: initialPaymentCounts,
+        }
       : undefined,
   });
 
   const sales = data?.sales ?? [];
   const pagination = data?.pagination ?? initialPagination;
+  const summary = data?.summary ?? initialSummary;
+  const paymentCounts = data?.paymentCounts ?? initialPaymentCounts;
+
+  const exportHeaders = ["Sr No", "Bill #", "Customer", "Phone", "Dress", "Total", "Advance", "Due", "Sale Date"];
+
+  function salesToRows(rows: SaleRow[]): (string | number)[][] {
+    return rows.map((sale, index) => [
+      index + 1,
+      sale.billNumber,
+      sale.customerName,
+      sale.customerPhone,
+      sale.product ? `${sale.product.name} (${sale.product.sku})` : "—",
+      sale.totalAmount,
+      sale.advancePayment,
+      sale.dueAmount,
+      formatDate(sale.saleDate),
+    ]);
+  }
+
+  function salesTotals(rows: SaleRow[]): (string | number)[] {
+    return [
+      "",
+      "TOTAL",
+      "",
+      "",
+      "",
+      rows.reduce((sum, s) => sum + s.totalAmount, 0),
+      rows.reduce((sum, s) => sum + s.advancePayment, 0),
+      rows.reduce((sum, s) => sum + s.dueAmount, 0),
+      "",
+    ];
+  }
+
+  async function withExportGuard(action: (rows: SaleRow[]) => Promise<void>): Promise<void> {
+    setIsExporting(true);
+    try {
+      const result = await fetchSales({
+        page: 1,
+        view,
+        payment,
+        search,
+        from,
+        to,
+        sortBy,
+        sortDir,
+        all: true,
+      });
+      await action(result.sales);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Export failed");
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["admin", "sales"] });
@@ -358,38 +454,67 @@ export function SalesClient({
         </ButtonLink>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Select
-          value={view}
-          onValueChange={(value) => changeView((value as "active" | "trash") ?? "active")}
-        >
-          <SelectTrigger className="w-36">
-            <SelectValue>{(value: string) => (value === "active" ? "Active" : "Trash")}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="trash">Trash</SelectItem>
-          </SelectContent>
-        </Select>
-        <div className="hidden items-center gap-1 rounded-md border border-border p-1 lg:flex">
-          <Button
-            variant={layout === "table" ? "secondary" : "ghost"}
-            size="icon-sm"
-            onClick={() => setLayout("table")}
-            aria-label="Table view"
-          >
-            <List className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={layout === "card" ? "secondary" : "ghost"}
-            size="icon-sm"
-            onClick={() => setLayout("card")}
-            aria-label="Card view"
-          >
-            <Grid3x3 className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+      <SummaryTiles
+        tiles={[
+          { label: "Total Sales", value: formatCurrency(summary.totalAmount) },
+          { label: "Advance Collected", value: formatCurrency(summary.advancePayment) },
+          { label: "Due Amount", value: formatCurrency(summary.dueAmount), accent: true },
+        ]}
+      />
+
+      <StatusTabs
+        value={payment}
+        onChange={(value) => {
+          setPayment(value);
+          resetPaging();
+        }}
+        tabs={[
+          { value: "all", label: "All", count: paymentCounts.all },
+          { value: "due", label: "Payment Due", count: paymentCounts.due },
+          { value: "paid", label: "Fully Paid", count: paymentCounts.paid },
+        ]}
+      />
+
+      <ListToolbar
+        search={search}
+        onSearchChange={(value) => {
+          setSearch(value);
+          resetPaging();
+        }}
+        searchPlaceholder="Search bill #, customer, phone, or dress..."
+        trashView={view}
+        onTrashViewChange={changeView}
+        from={from}
+        to={to}
+        onFromChange={(value) => {
+          setFrom(value);
+          resetPaging();
+        }}
+        onToChange={(value) => {
+          setTo(value);
+          resetPaging();
+        }}
+        onClearDates={() => {
+          setFrom("");
+          setTo("");
+          resetPaging();
+        }}
+        layout={layout}
+        onLayoutChange={setLayout}
+        countLabel={`${pagination.total} sales`}
+        isExporting={isExporting}
+        onExportExcel={() =>
+          void withExportGuard((rows) =>
+            downloadExcel("sales", "Sales", exportHeaders, salesToRows(rows), salesTotals(rows))
+          )
+        }
+        onExportPdf={() =>
+          void withExportGuard((rows) =>
+            downloadPdf("sales", "Sales", exportHeaders, salesToRows(rows), salesTotals(rows))
+          )
+        }
+        onPrint={() => window.print()}
+      />
 
       {selectedIds.size > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2.5">

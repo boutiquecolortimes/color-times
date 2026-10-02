@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { CustomisationOrder } from "@/models/CustomisationOrder";
 import { User } from "@/models/User";
 import { CustomisationClient } from "@/components/admin/customisation-client";
+import { getCustomisationListSummary } from "@/lib/admin/list-summaries";
 
 export const metadata: Metadata = { title: "Customisation" };
 
@@ -13,7 +14,7 @@ export default async function AdminCustomisationPage() {
 
   const activeFilter = { deletedAt: null };
 
-  const [orders, total, customers] = await Promise.all([
+  const [orders, total, customers, listSummary] = await Promise.all([
     CustomisationOrder.find(activeFilter)
       .sort({ createdAt: -1 })
       .limit(PAGE_SIZE)
@@ -24,6 +25,7 @@ export default async function AdminCustomisationPage() {
       .sort({ name: 1 })
       .limit(500)
       .lean(),
+    getCustomisationListSummary(activeFilter, activeFilter),
   ]);
 
   const initialOrders = orders.map((order) => ({
@@ -46,6 +48,8 @@ export default async function AdminCustomisationPage() {
   return (
     <CustomisationClient
       initialOrders={initialOrders}
+      initialSummary={listSummary.summary}
+      initialStatusCounts={listSummary.statusCounts}
       initialPagination={{
         page: 1,
         pageSize: PAGE_SIZE,

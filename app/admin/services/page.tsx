@@ -24,7 +24,7 @@ export default async function AdminServicesPage() {
     ServiceOrder.countDocuments(activeFilter),
     Product.find({ deletedAt: null })
       .sort({ name: 1 })
-      .select("name sku")
+      .select("name sku color status")
       .limit(500)
       .lean(),
   ]);
@@ -66,6 +66,8 @@ export default async function AdminServicesPage() {
         _id: String(product._id),
         name: product.name,
         sku: product.sku,
+        color: product.color ?? "",
+        status: product.status,
       }))}
     />
   );

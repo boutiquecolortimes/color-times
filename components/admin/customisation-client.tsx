@@ -7,16 +7,9 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
-  ChevronDown,
-  Download,
-  FileDown,
-  Grid3x3,
-  List,
   Pencil,
   Plus,
-  Printer,
   Send,
-  Table2,
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,18 +21,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { CustomisationStatusBadge } from "@/components/admin/customisation-status-badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { useCanEdit } from "@/components/admin/current-user-context";
 import type { CustomisationOrderRow, CustomerOption } from "@/components/admin/customisation-form-dialog";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
+import { ListToolbar, StatusTabs, SummaryTiles } from "@/components/admin/list-toolbar";
+import type { MoneySummary } from "@/lib/admin/list-summaries";
 import { formatDate } from "@/lib/utils";
 import type { CustomisationOrderStatus } from "@/models/CustomisationOrder";
 
@@ -62,16 +51,37 @@ function formatCurrency(value: number): string {
   return `₹${value.toLocaleString("en-IN")}`;
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  in_progress: "In Progress",
+  ready: "Ready",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
+
+interface OrdersResult {
+  orders: CustomisationOrderRow[];
+  pagination: Pagination;
+  summary: MoneySummary;
+  statusCounts: Record<string, number>;
+}
+
 async function fetchOrders(params: {
   page: number;
   status: string;
   view: string;
+  search: string;
+  from: string;
+  to: string;
   sortBy?: string;
   sortDir?: "asc" | "desc";
   all?: boolean;
-}): Promise<{ orders: CustomisationOrderRow[]; pagination: Pagination }> {
+}): Promise<OrdersResult> {
   const searchParams = new URLSearchParams({ page: String(params.page), view: params.view });
   if (params.status !== "all") searchParams.set("status", params.status);
+  if (params.search) searchParams.set("search", params.search);
+  if (params.from) searchParams.set("from", params.from);
+  if (params.to) searchParams.set("to", params.to);
   if (params.sortBy) searchParams.set("sortBy", params.sortBy);
   if (params.sortDir) searchParams.set("sortDir", params.sortDir);
   if (params.all) searchParams.set("all", "true");
@@ -98,10 +108,14 @@ function SortIcon({
 export function CustomisationClient({
   initialOrders,
   initialPagination,
+  initialSummary,
+  initialStatusCounts,
   customers,
 }: {
   initialOrders: CustomisationOrderRow[];
   initialPagination: Pagination;
+  initialSummary: MoneySummary;
+  initialStatusCounts: Record<string, number>;
   customers: CustomerOption[];
 }) {
   const queryClient = useQueryClient();
@@ -114,9 +128,19 @@ export function CustomisationClient({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [search, setSearch] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
 
   const isDefaultQuery =
-    page === 1 && status === "all" && view === "active" && sortBy === "createdAt" && sortDir === "desc";
+    page === 1 &&
+    status === "all" &&
+    view === "active" &&
+    search === "" &&
+    from === "" &&
+    to === "" &&
+    sortBy === "createdAt" &&
+    sortDir === "desc";
 
   function toggleSort(field: string) {
     if (sortBy === field) {
@@ -129,15 +153,22 @@ export function CustomisationClient({
   }
 
   const { data } = useQuery({
-    queryKey: ["admin", "customisation-orders", { page, status, view, sortBy, sortDir }],
-    queryFn: () => fetchOrders({ page, status, view, sortBy, sortDir }),
+    queryKey: ["admin", "customisation-orders", { page, status, view, search, from, to, sortBy, sortDir }],
+    queryFn: () => fetchOrders({ page, status, view, search, from, to, sortBy, sortDir }),
     initialData: isDefaultQuery
-      ? { orders: initialOrders, pagination: initialPagination }
+      ? {
+          orders: initialOrders,
+          pagination: initialPagination,
+          summary: initialSummary,
+          statusCounts: initialStatusCounts,
+        }
       : undefined,
   });
 
   const orders = data?.orders ?? [];
   const pagination = data?.pagination ?? initialPagination;
+  const summary = data?.summary ?? initialSummary;
+  const statusCounts = data?.statusCounts ?? initialStatusCounts;
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["admin", "customisation-orders"] });
@@ -155,12 +186,27 @@ export function CustomisationClient({
       order.advancePayment,
       order.dueAmount,
       formatDate(order.orderDate),
-      order.status.replace("_", " "),
+      STATUS_LABELS[order.status] ?? order.status,
     ]);
   }
 
+  function totalsRow(rows: (string | number)[][]): (string | number)[] {
+    const sum = (col: number) => rows.reduce((acc, row) => acc + (Number(row[col]) || 0), 0);
+    return ["", "TOTAL", "", "", sum(4), sum(5), sum(6), "", ""];
+  }
+
   async function fetchAllOrdersForExport(): Promise<CustomisationOrderRow[]> {
-    const result = await fetchOrders({ page: 1, status, view, sortBy, sortDir, all: true });
+    const result = await fetchOrders({
+      page: 1,
+      status,
+      view,
+      search,
+      from,
+      to,
+      sortBy,
+      sortDir,
+      all: true,
+    });
     return result.orders;
   }
 
@@ -178,14 +224,14 @@ export function CustomisationClient({
   function handleExportExcel() {
     void withExportGuard(async () => {
       const rows = ordersToRows(await fetchAllOrdersForExport());
-      await downloadExcel("customisation-orders", "Customisation Orders", exportHeaders, rows);
+      await downloadExcel("customisation-orders", "Customisation Orders", exportHeaders, rows, totalsRow(rows));
     });
   }
 
   function handleExportPdf() {
     void withExportGuard(async () => {
       const rows = ordersToRows(await fetchAllOrdersForExport());
-      await downloadPdf("customisation-orders", "Customisation Orders", exportHeaders, rows);
+      await downloadPdf("customisation-orders", "Customisation Orders", exportHeaders, rows, totalsRow(rows));
     });
   }
 
@@ -276,12 +322,12 @@ export function CustomisationClient({
                 }}
               >
                 <SelectTrigger className="mt-3 w-full" size="sm">
-                  <SelectValue>{(value: string) => value.replace("_", " ")}</SelectValue>
+                  <SelectValue>{(value: string) => STATUS_LABELS[value] ?? value}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {STATUS_OPTIONS.map((option) => (
                     <SelectItem key={option} value={option}>
-                      {option.replace("_", " ")}
+                      {STATUS_LABELS[option]}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -345,83 +391,65 @@ export function CustomisationClient({
         </ButtonLink>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Select
-          value={status}
-          onValueChange={(value) => {
-            setStatus(value ?? "all");
-            setPage(1);
-          }}
-        >
-          <SelectTrigger className="w-44">
-            <SelectValue>
-              {(value: string) => (value === "all" ? "All Statuses" : value.replace("_", " "))}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            {STATUS_OPTIONS.map((option) => (
-              <SelectItem key={option} value={option}>
-                {option.replace("_", " ")}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={view}
-          onValueChange={(value) => {
-            setView((value as "active" | "trash") ?? "active");
-            setPage(1);
-          }}
-        >
-          <SelectTrigger className="w-36">
-            <SelectValue>{(value: string) => (value === "active" ? "Active" : "Trash")}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="trash">Trash</SelectItem>
-          </SelectContent>
-        </Select>
-        <div className="hidden items-center gap-1 rounded-md border border-border p-1 lg:flex">
-          <Button
-            variant={layout === "table" ? "secondary" : "ghost"}
-            size="icon-sm"
-            onClick={() => setLayout("table")}
-            aria-label="Table view"
-          >
-            <List className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={layout === "card" ? "secondary" : "ghost"}
-            size="icon-sm"
-            onClick={() => setLayout("card")}
-            aria-label="Card view"
-          >
-            <Grid3x3 className="h-4 w-4" />
-          </Button>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="outline" size="sm" disabled={isExporting} />}>
-            <Download className="h-4 w-4" />
-            Export
-            <ChevronDown className="h-3.5 w-3.5" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={handleExportExcel}>
-              <Table2 className="h-4 w-4" />
-              Excel
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleExportPdf}>
-              <FileDown className="h-4 w-4" />
-              PDF
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handlePrint}>
-              <Printer className="h-4 w-4" />
-              Print
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      <SummaryTiles
+        tiles={[
+          { label: "Total Orders Value", value: formatCurrency(summary.totalAmount) },
+          { label: "Advance Collected", value: formatCurrency(summary.advancePayment) },
+          { label: "Due Amount", value: formatCurrency(summary.dueAmount), accent: true },
+        ]}
+      />
+
+      <StatusTabs
+        value={status}
+        onChange={(value) => {
+          setStatus(value);
+          setPage(1);
+        }}
+        tabs={[
+          { value: "all", label: "All", count: statusCounts.all ?? 0 },
+          ...STATUS_OPTIONS.map((option) => ({
+            value: option,
+            label: STATUS_LABELS[option],
+            count: statusCounts[option] ?? 0,
+          })),
+        ]}
+      />
+
+      <ListToolbar
+        search={search}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
+        searchPlaceholder="Search bill #, customer, phone, or stitching type..."
+        trashView={view}
+        onTrashViewChange={(value) => {
+          setView(value);
+          setPage(1);
+        }}
+        from={from}
+        to={to}
+        onFromChange={(value) => {
+          setFrom(value);
+          setPage(1);
+        }}
+        onToChange={(value) => {
+          setTo(value);
+          setPage(1);
+        }}
+        onClearDates={() => {
+          setFrom("");
+          setTo("");
+          setPage(1);
+        }}
+        layout={layout}
+        onLayoutChange={setLayout}
+        countLabel={`${pagination.total} orders`}
+        isExporting={isExporting}
+        onExportExcel={handleExportExcel}
+        onExportPdf={handleExportPdf}
+        onPrint={handlePrint}
+      />
 
       <div className="lg:hidden">{cardGrid}</div>
 
@@ -517,7 +545,7 @@ export function CustomisationClient({
                       <SelectContent>
                         {STATUS_OPTIONS.map((option) => (
                           <SelectItem key={option} value={option}>
-                            {option.replace("_", " ")}
+                            {STATUS_LABELS[option]}
                           </SelectItem>
                         ))}
                       </SelectContent>

@@ -8,6 +8,8 @@ import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
+import { escapeRegex } from "@/lib/utils";
+import { getSalesListSummary } from "@/lib/admin/list-summaries";
 
 export async function GET(request: NextRequest): Promise<Response> {
   const auth = await requireApiRole(ADMIN_ROLES);
@@ -16,9 +18,15 @@ export async function GET(request: NextRequest): Promise<Response> {
   await connectToDatabase();
 
   const searchParams = request.nextUrl.searchParams;
+  const all = searchParams.get("all") === "true";
   const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
   const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize") ?? "5")));
   const view = searchParams.get("view") ?? "active";
+  // Payment tab: "due" (balance still owed) or "paid" (nothing owed).
+  const payment = searchParams.get("payment");
+  const search = searchParams.get("search")?.trim();
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
   const sortBy = searchParams.get("sortBy");
   const sortDir = searchParams.get("sortDir") === "asc" ? 1 : -1;
   const SORTABLE_FIELDS: Record<string, string> = {
@@ -31,26 +39,57 @@ export async function GET(request: NextRequest): Promise<Response> {
     createdAt: "createdAt",
   };
   const sort = sortBy && SORTABLE_FIELDS[sortBy]
-    ? { [SORTABLE_FIELDS[sortBy]]: sortDir as 1 | -1 }
+    ? { [SORTABLE_FIELDS[sortBy]]: sortDir as 1 | -1, createdAt: -1 as const }
     : { createdAt: -1 as const };
 
   // Auto-generated "source: booking" entries are a duplicate ledger record
   // for a booking's own settlement (see models/Sale.ts) — they'd otherwise
   // show up here looking like real outright sales, so they're excluded from
   // this list the same way they're excluded from the Sale report's totals.
-  const filter: Record<string, unknown> =
+  const baseFilter: Record<string, unknown> =
     view === "trash"
       ? { deletedAt: { $ne: null }, source: "manual" }
       : { deletedAt: null, source: "manual" };
 
-  const [sales, total] = await Promise.all([
-    Sale.find(filter)
-      .populate("product", "name images sku")
-      .sort(sort)
-      .skip((page - 1) * pageSize)
-      .limit(pageSize)
-      .lean(),
+  if (from || to) {
+    const range: Record<string, Date> = {};
+    if (from) range.$gte = new Date(from);
+    if (to) {
+      const end = new Date(to);
+      end.setHours(23, 59, 59, 999);
+      range.$lte = end;
+    }
+    baseFilter.saleDate = range;
+  }
+
+  if (search) {
+    // One box searches bill no., customer name/phone, details and the
+    // dress name/code — same idea as the Bookings search.
+    const regex = new RegExp(escapeRegex(search), "i");
+    const matchingProducts = await Product.find({ $or: [{ name: regex }, { sku: regex }] })
+      .select("_id")
+      .lean();
+    baseFilter.$or = [
+      { billNumber: regex },
+      { customerName: regex },
+      { customerPhone: regex },
+      { details: regex },
+      { product: { $in: matchingProducts.map((p) => p._id) } },
+    ];
+  }
+
+  // Tab counts and summary tiles ignore the payment tab itself so every tab
+  // shows its own count, but respect search/date/trash.
+  const filter: Record<string, unknown> = { ...baseFilter };
+  if (payment === "due") filter.dueAmount = { $gt: 0 };
+  if (payment === "paid") filter.$and = [{ $or: [{ dueAmount: { $lte: 0 } }, { dueAmount: null }] }];
+
+  const baseQuery = Sale.find(filter).populate("product", "name images sku").sort(sort);
+
+  const [sales, total, listSummary] = await Promise.all([
+    all ? baseQuery.lean() : baseQuery.skip((page - 1) * pageSize).limit(pageSize).lean(),
     Sale.countDocuments(filter),
+    getSalesListSummary(baseFilter),
   ]);
 
   // Sales created before advancePayment/dueAmount existed on the schema
@@ -65,7 +104,10 @@ export async function GET(request: NextRequest): Promise<Response> {
 
   return apiSuccess({
     sales: normalizedSales,
-    pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    pagination: all
+      ? { page: 1, pageSize: total || 1, total, totalPages: 1 }
+      : { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    ...listSummary,
   });
 }
 

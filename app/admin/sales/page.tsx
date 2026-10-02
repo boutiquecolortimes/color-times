@@ -4,6 +4,7 @@ import { Sale } from "@/models/Sale";
 import { Product } from "@/models/Product";
 import { User } from "@/models/User";
 import { SalesClient } from "@/components/admin/sales-client";
+import { getSalesListSummary } from "@/lib/admin/list-summaries";
 
 export const metadata: Metadata = { title: "Sale" };
 
@@ -12,9 +13,11 @@ const PAGE_SIZE = 5;
 export default async function AdminSalesPage() {
   await connectToDatabase();
 
-  const activeFilter = { deletedAt: null };
+  // Same filter as the list API: booking-settlement ledger entries
+  // (source "booking") aren't real outright sales and stay hidden.
+  const activeFilter = { deletedAt: null, source: "manual" as const };
 
-  const [sales, total, products, customers] = await Promise.all([
+  const [sales, total, products, customers, listSummary] = await Promise.all([
     Sale.find(activeFilter)
       .populate("product", "name images sku")
       .sort({ createdAt: -1 })
@@ -36,6 +39,7 @@ export default async function AdminSalesPage() {
       .sort({ name: 1 })
       .limit(500)
       .lean(),
+    getSalesListSummary(activeFilter),
   ]);
 
   const initialSales = sales.map((sale) => ({
@@ -64,6 +68,8 @@ export default async function AdminSalesPage() {
   return (
     <SalesClient
       initialSales={initialSales}
+      initialSummary={listSummary.summary}
+      initialPaymentCounts={listSummary.paymentCounts}
       initialPagination={{
         page: 1,
         pageSize: PAGE_SIZE,

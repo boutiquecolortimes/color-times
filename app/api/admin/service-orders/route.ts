@@ -94,39 +94,45 @@ export async function POST(request: NextRequest): Promise<Response> {
     await connectToDatabase();
 
     const totalAmount = computeServiceOrderTotal(input);
+    // Same service for several dresses at once → one order per dress.
+    const productIds = Array.from(new Set([input.product, ...(input.additionalProducts ?? [])]));
 
-    const order = await ServiceOrder.create({
-      serviceType: input.serviceType,
-      product: input.product,
-      booking: input.booking || null,
-      bookingBillNumberRef: input.bookingBillNumberRef,
-      description: input.description,
-      dryCleanCharge: input.dryCleanCharge,
-      ironCharge: input.ironCharge,
-      stitchingCharge: input.stitchingCharge,
-      stitchingType: input.stitchingType,
-      otherCharge: input.otherCharge,
-      totalAmount,
-      assignedTo: input.assignedTo,
-      sentDate: new Date(input.sentDate),
-      expectedReturnDate: new Date(input.expectedReturnDate),
-      notes: input.notes,
-      status: "pending",
-    });
+    const orders = [];
+    for (const productId of productIds) {
+      const order = await ServiceOrder.create({
+        serviceType: input.serviceType,
+        product: productId,
+        booking: input.booking || null,
+        bookingBillNumberRef: input.bookingBillNumberRef,
+        description: input.description,
+        dryCleanCharge: input.dryCleanCharge,
+        ironCharge: input.ironCharge,
+        stitchingCharge: input.stitchingCharge,
+        stitchingType: input.stitchingType,
+        otherCharge: input.otherCharge,
+        totalAmount,
+        assignedTo: input.assignedTo,
+        sentDate: new Date(input.sentDate),
+        expectedReturnDate: new Date(input.expectedReturnDate),
+        notes: input.notes,
+        status: "pending",
+      });
 
-    await Product.findByIdAndUpdate(input.product, {
-      status: input.serviceType === "dry_clean" ? "under_dry_cleaning" : "under_repair",
-    });
+      await Product.findByIdAndUpdate(productId, {
+        status: input.serviceType === "dry_clean" ? "under_dry_cleaning" : "under_repair",
+      });
 
-    await recordAuditLog({
-      entityType: "ServiceOrder",
-      entityId: String(order._id),
-      action: "create",
-      actor: auth.user,
-      snapshot: order.toObject() as unknown as Record<string, unknown>,
-    });
+      await recordAuditLog({
+        entityType: "ServiceOrder",
+        entityId: String(order._id),
+        action: "create",
+        actor: auth.user,
+        snapshot: order.toObject() as unknown as Record<string, unknown>,
+      });
+      orders.push(order);
+    }
 
-    return apiSuccess({ order }, 201);
+    return apiSuccess({ order: orders[0], orders }, 201);
   } catch (error) {
     return apiErrorFromUnknown(error);
   }

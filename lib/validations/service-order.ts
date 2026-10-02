@@ -3,6 +3,10 @@ import { z } from "zod";
 const serviceOrderBaseSchema = z.object({
   serviceType: z.enum(["dry_clean", "tailor"]),
   product: z.string().min(1, "Select a product"),
+  // Create only: more dresses getting the same service in one go. The API
+  // creates one service order per dress (same details and per-dress
+  // charges), so lists, reports and product statuses stay one-per-dress.
+  additionalProducts: z.array(z.string().min(1)).max(50).optional(),
   booking: z.string().optional().nullable(),
   // Free-text booking bill number reference, for direct-creation orders
   // that have no formal Booking link (see models/ServiceOrder.ts).

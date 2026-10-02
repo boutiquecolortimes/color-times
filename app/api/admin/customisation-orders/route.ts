@@ -9,6 +9,8 @@ import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
+import { escapeRegex } from "@/lib/utils";
+import { getCustomisationListSummary } from "@/lib/admin/list-summaries";
 
 export async function GET(request: NextRequest): Promise<Response> {
   const auth = await requireApiRole(ADMIN_ROLES);
@@ -23,7 +25,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   const status = searchParams.get("status");
   const view = searchParams.get("view") ?? "active";
   const sortBy = searchParams.get("sortBy");
-  const sortDir = searchParams.get("sortDir") === "desc" ? -1 : 1;
+  const sortDir = searchParams.get("sortDir") === "asc" ? 1 : -1;
   const SORTABLE_FIELDS: Record<string, string> = {
     billNumber: "billNumber",
     customerName: "customerName",
@@ -38,15 +40,44 @@ export async function GET(request: NextRequest): Promise<Response> {
     ? { [SORTABLE_FIELDS[sortBy]]: sortDir as 1 | -1 }
     : { createdAt: -1 as const };
 
-  const filter: Record<string, unknown> =
+  const search = searchParams.get("search")?.trim();
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
+
+  const baseFilter: Record<string, unknown> =
     view === "trash" ? { deletedAt: { $ne: null } } : { deletedAt: null };
+  if (from || to) {
+    const range: Record<string, Date> = {};
+    if (from) range.$gte = new Date(from);
+    if (to) {
+      const end = new Date(to);
+      end.setHours(23, 59, 59, 999);
+      range.$lte = end;
+    }
+    baseFilter.orderDate = range;
+  }
+  if (search) {
+    // One box searches bill no., customer name/phone, stitching type and
+    // detail — same idea as the Bookings search.
+    const regex = new RegExp(escapeRegex(search), "i");
+    baseFilter.$or = [
+      { billNumber: regex },
+      { customerName: regex },
+      { customerPhone: regex },
+      { stitchingType: regex },
+      { detail: regex },
+    ];
+  }
+
+  const filter: Record<string, unknown> = { ...baseFilter };
   if (status && status !== "all") filter.status = status;
 
   const baseQuery = CustomisationOrder.find(filter).sort(sort);
 
-  const [orders, total] = await Promise.all([
+  const [orders, total, listSummary] = await Promise.all([
     all ? baseQuery.lean() : baseQuery.skip((page - 1) * pageSize).limit(pageSize).lean(),
     CustomisationOrder.countDocuments(filter),
+    getCustomisationListSummary(baseFilter, filter),
   ]);
 
   return apiSuccess({
@@ -54,6 +85,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     pagination: all
       ? { page: 1, pageSize: total || 1, total, totalPages: 1 }
       : { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    ...listSummary,
   });
 }
 
