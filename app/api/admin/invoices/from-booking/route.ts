@@ -34,6 +34,9 @@ export async function POST(request: NextRequest): Promise<Response> {
   try {
     const body = await request.json();
     const bookingId = String(body.bookingId ?? "");
+    // Set by "Undo Return": the paid amount is recalculated from the booking
+    // (it normally never goes down) and the Returned stage is dropped.
+    const undoReturn = body.undoReturn === true;
     if (!bookingId) {
       return apiError("bookingId is required", 400);
     }
@@ -138,7 +141,15 @@ export async function POST(request: NextRequest): Promise<Response> {
         : Math.min(total, advancePaid);
       // Never move amountPaid backwards — staff may have recorded additional
       // manual payments directly on the invoice beyond what the booking tracks.
-      const amountPaid = Math.max(existing.amountPaid, computedPaid);
+      // Undo Return is the exception: the deposit counted toward rent at
+      // return comes back out, so recompute from the booking plus any older
+      // untagged invoice payments the booking doesn't know about.
+      const untrackedPayments = (existing.payments ?? [])
+        .filter((payment) => !payment.kind)
+        .reduce((sum, payment) => sum + (payment.amount ?? 0), 0);
+      const amountPaid = undoReturn
+        ? Math.min(total, computedPaid + untrackedPayments)
+        : Math.max(existing.amountPaid, computedPaid);
       const amountDue = Math.max(0, total - amountPaid);
       // Reopens as part-paid if a later stage added charges to a paid bill.
       const status =
@@ -154,7 +165,11 @@ export async function POST(request: NextRequest): Promise<Response> {
           lineItems,
           subtotal,
           securityDeposit,
-          depositRefunded: isReturned ? Boolean(booking.depositRefunded) : existing.depositRefunded,
+          depositRefunded: isReturned
+            ? Boolean(booking.depositRefunded)
+            : undoReturn
+              ? false
+              : existing.depositRefunded,
           total,
           amountPaid,
           amountDue,
@@ -164,8 +179,13 @@ export async function POST(request: NextRequest): Promise<Response> {
           // One entry per stage — re-running at the same stage refreshes
           // that entry instead of piling up duplicates.
           stageHistory: [
-            ...(existing.stageHistory ?? []).filter((entry) => entry.stage !== stage),
-            { stage, at: new Date(), total, amountPaid },
+            ...(existing.stageHistory ?? []).filter(
+              (entry) =>
+                entry.stage !== stage && !(undoReturn && entry.stage === "returned")
+            ),
+            ...(undoReturn
+              ? [{ stage: "return_undone", at: new Date(), total, amountPaid }]
+              : [{ stage, at: new Date(), total, amountPaid }]),
           ],
         },
         { returnDocument: "after" }

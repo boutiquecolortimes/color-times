@@ -20,7 +20,7 @@ export default async function InvoiceDetailPage({
 
   const invoice = await Invoice.findById(id)
     .populate("customer", "name email phone")
-    .populate("booking", "bookingNumber rentalStartDate rentalEndDate pickupPaid")
+    .populate("booking", "bookingNumber rentalStartDate rentalEndDate pickupPaid status depositRefundAmount")
     .populate("sale", "billNumber")
     .populate("customisationOrder", "billNumber")
     .populate("payments.recordedBy", "name")
@@ -73,6 +73,9 @@ export default async function InvoiceDetailPage({
             ? {
                 bookingNumber: (invoice.booking as unknown as { bookingNumber: string }).bookingNumber,
                 pickupPaid: (invoice.booking as unknown as { pickupPaid?: number }).pickupPaid ?? 0,
+                status: (invoice.booking as unknown as { status?: string }).status,
+                depositRefundAmount:
+                  (invoice.booking as unknown as { depositRefundAmount?: number }).depositRefundAmount ?? 0,
               }
             : null,
           // A handful of invoices predate later schema additions or were

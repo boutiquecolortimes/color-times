@@ -66,7 +66,9 @@ export function AuditLogList({ entityType, entityId }: { entityType: string; ent
       {entries.map((entry) => (
         <div key={entry._id} className="border-l-2 border-accent/40 pl-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium">{ACTION_LABELS[entry.action]}</p>
+            <p className="text-sm font-medium">
+              {entry.metadata?.undoReturn ? "Return Undone" : ACTION_LABELS[entry.action]}
+            </p>
             <p className="text-xs text-muted-foreground">
               {formatDateTime(entry.createdAt)}
             </p>
@@ -74,6 +76,11 @@ export function AuditLogList({ entityType, entityId }: { entityType: string; ent
           <p className="text-xs text-muted-foreground">
             {entry.actorName} ({entry.actorEmail})
           </p>
+          {typeof entry.metadata?.reason === "string" && entry.metadata.reason && (
+            <p className="mt-1 text-xs">
+              <span className="font-medium">Reason:</span> {entry.metadata.reason}
+            </p>
+          )}
           {entry.changes.length > 0 && (
             <ul className="mt-2 space-y-1 text-xs">
               {entry.changes.map((change) => (

@@ -481,7 +481,12 @@ async function updateBookingDetails(
       eventDate: input.eventDate ? new Date(input.eventDate) : rentalStartDate,
       securityDeposit,
       totalAmount,
-      advancePaid: input.advancePaid ?? before.advancePaid,
+      // The edit form shows the advance only; whatever was collected at
+      // pickup (pickupPaid) stays on top of it, so editing never wipes it.
+      advancePaid:
+        input.advancePaid !== undefined
+          ? input.advancePaid + (before.pickupPaid ?? 0)
+          : before.advancePaid,
       advancePaymentMethod: input.advancePaymentMethod || undefined,
       measurements: input.measurements,
       deliveryAddress: input.deliveryAddress,

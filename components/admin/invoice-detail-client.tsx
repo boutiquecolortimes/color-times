@@ -40,7 +40,12 @@ interface InvoiceDetail {
   invoiceNumber: string;
   status: InvoiceStatus;
   customer: { name: string; email: string; phone?: string };
-  booking: { bookingNumber: string; pickupPaid?: number } | null;
+  booking: {
+    bookingNumber: string;
+    pickupPaid?: number;
+    status?: string;
+    depositRefundAmount?: number;
+  } | null;
   source?: "booking" | "sale" | "customisation" | "manual";
   sale?: { _id: string; billNumber: string } | null;
   customisationOrder?: { _id: string; billNumber: string } | null;
@@ -136,7 +141,16 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
   // what's logged as an invoice payment, so a single "Due" figure that
   // includes it reads as if the deposit is still owed even once it's
   // sitting in hand. Split it out so rent and deposit show separately.
-  const due = getInvoiceDueBreakdown({ ...invoice, pickupPaid: invoice.booking?.pickupPaid ?? 0 });
+  // Returned booking: the part of the deposit kept toward unpaid rent/damage.
+  const depositUsed =
+    invoice.booking?.status === "returned"
+      ? Math.max(0, invoice.securityDeposit - (invoice.booking.depositRefundAmount ?? 0))
+      : 0;
+  const due = getInvoiceDueBreakdown({
+    ...invoice,
+    pickupPaid: invoice.booking?.pickupPaid ?? 0,
+    depositUsed,
+  });
   // Sale / Customisation bills mirror their order: no rent/tax/deposit, and
   // payments are collected from the order side too.
   const isOrderBill = invoice.source === "sale" || invoice.source === "customisation";
@@ -229,6 +243,7 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
         amountPaid: invoice.amountPaid,
         amountDue: invoice.amountDue,
         pickupPaid: invoice.booking?.pickupPaid ?? 0,
+        depositUsed,
         payments: invoice.payments,
         notes: invoice.notes,
         bookingStage: invoice.bookingStage,
@@ -389,14 +404,21 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
                     <span className="text-muted-foreground">Rent</span>
                     <span>{formatCurrency(invoice.subtotal)}</span>
                   </p>
-                  <p className="flex justify-between">
-                    <span className="text-muted-foreground">Discount</span>
-                    <span>-{formatCurrency(invoice.discountAmount)}</span>
-                  </p>
-                  <p className="flex justify-between">
-                    <span className="text-muted-foreground">Tax ({invoice.taxRate}%)</span>
-                    <span>{formatCurrency(invoice.taxAmount)}</span>
-                  </p>
+                  {/* Discount / Tax lines are hidden — the shop doesn't use them.
+                      Shown only if an older invoice actually has one, so the
+                      figures still add up. */}
+                  {invoice.discountAmount > 0 && (
+                    <p className="flex justify-between">
+                      <span className="text-muted-foreground">Discount</span>
+                      <span>-{formatCurrency(invoice.discountAmount)}</span>
+                    </p>
+                  )}
+                  {invoice.taxAmount > 0 && (
+                    <p className="flex justify-between">
+                      <span className="text-muted-foreground">Tax ({invoice.taxRate}%)</span>
+                      <span>{formatCurrency(invoice.taxAmount)}</span>
+                    </p>
+                  )}
                   <p className="flex justify-between border-t border-border pt-2 text-emerald-700">
                     <span>Advance Paid</span>
                     <span>{formatCurrency(due.advancePaid)}</span>
@@ -413,7 +435,15 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
                     <span>Security Paid</span>
                     <span>
                       {formatCurrency(invoice.securityDeposit)}
-                      {invoice.depositRefunded ? " (Refunded)" : ""}
+                      {depositUsed > 0
+                        ? ` (${formatCurrency(depositUsed)} used for rent/damage${
+                            invoice.booking?.depositRefundAmount
+                              ? `, ${formatCurrency(invoice.booking.depositRefundAmount)} refunded`
+                              : ""
+                          })`
+                        : invoice.depositRefunded
+                          ? " (Refunded)"
+                          : ""}
                     </span>
                   </p>
                   <p className="flex justify-between border-t border-border pt-2 font-medium text-red-700">

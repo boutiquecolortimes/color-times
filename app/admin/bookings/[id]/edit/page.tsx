@@ -90,6 +90,15 @@ export default async function EditBookingPage({
             This booking has already been {booking.status} and its totals are part of a completed
             settlement, so its details can no longer be changed.
           </p>
+          {booking.status === "returned" && (
+            <p className="mt-3 text-sm">
+              Marked Returned by mistake?{" "}
+              <Link href={`/admin/bookings/${id}`} className="font-medium text-accent hover:underline">
+                Open the booking and use Undo Return
+              </Link>{" "}
+              to put it back to Picked Up — then you can edit it again.
+            </p>
+          )}
         </div>
       </div>
     );
@@ -111,7 +120,8 @@ export default async function EditBookingPage({
     eventDate: toIsoDate(booking.eventDate),
     deliveryAddress: booking.deliveryAddress ?? "",
     securityDeposit: booking.securityDeposit,
-    advancePaid: booking.advancePaid ?? 0,
+    // Advance only — the pickup payment is shown separately in the form.
+    advancePaid: Math.max(0, (booking.advancePaid ?? 0) - (booking.pickupPaid ?? 0)),
     advancePaymentMethod: booking.advancePaymentMethod ?? "",
     measurements: booking.measurements,
     notes: booking.notes ?? "",
@@ -137,6 +147,7 @@ export default async function EditBookingPage({
       <BookingForm
         bookingId={id}
         defaultValues={defaultValues}
+        pickupPaid={booking.pickupPaid ?? 0}
         customers={customers.map((customer) => ({
           _id: String(customer._id),
           name: customer.name,

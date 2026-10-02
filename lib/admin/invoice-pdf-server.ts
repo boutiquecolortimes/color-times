@@ -33,6 +33,7 @@ interface InvoicePdfData {
   amountPaid: number;
   amountDue: number;
   pickupPaid?: number;
+  depositUsed?: number;
   bookingStage?: string;
   source?: string;
   payments: InvoicePdfPayment[];
@@ -138,12 +139,22 @@ export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise
       ]
     : [
         ["Rent", formatCurrency(invoice.subtotal)],
-        ["Discount", `-${formatCurrency(invoice.discountAmount)}`],
-        [`Tax (${invoice.taxRate}%)`, formatCurrency(invoice.taxAmount)],
+        // Discount / Tax only printed if this invoice actually has one.
+        ...(invoice.discountAmount > 0
+          ? [["Discount", `-${formatCurrency(invoice.discountAmount)}`]]
+          : []),
+        ...(invoice.taxAmount > 0
+          ? [[`Tax (${invoice.taxRate}%)`, formatCurrency(invoice.taxAmount)]]
+          : []),
         ["Advance Paid", formatCurrency(due.advancePaid)],
         ["Due Paid", formatCurrency(due.duePaid)],
         ["Total Rent", formatCurrency(due.rentTotal)],
-        ["Security Paid", formatCurrency(invoice.securityDeposit)],
+        [
+          "Security Paid",
+          invoice.depositUsed
+            ? `${formatCurrency(invoice.securityDeposit)} (${formatCurrency(invoice.depositUsed)} used)`
+            : formatCurrency(invoice.securityDeposit),
+        ],
         ["Remaining Due", formatCurrency(due.rentDue)],
       ];
 

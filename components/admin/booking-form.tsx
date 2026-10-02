@@ -425,12 +425,15 @@ export function BookingForm({
   products,
   bookingId,
   defaultValues,
+  pickupPaid = 0,
 }: {
   customers: CustomerOption[];
   products: ProductOption[];
   // Present only when editing an existing booking (from the Edit page).
   bookingId?: string;
   defaultValues?: BookingCreateInput;
+  /** Already collected at pickup — shown separately, never edited here. */
+  pickupPaid?: number;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -483,7 +486,7 @@ export function BookingForm({
     return sum + (item.pricePerDay || 0);
   }, 0);
   const grandTotal = rentTotal + securityDepositValue;
-  const dueAmount = grandTotal - advancePaidValue;
+  const dueAmount = grandTotal - advancePaidValue - pickupPaid;
 
   // How many item rows (in this unsaved form) currently have each product
   // selected — used to stop the same one-in-stock dress being picked twice
@@ -531,10 +534,27 @@ export function BookingForm({
       );
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
-      return json.data.booking;
+      const saved = json.data.booking as { status?: string };
+      // An edit (e.g. a dress added after Confirm/Pickup) changes the rent —
+      // bring this booking's invoice in line right away instead of leaving
+      // it on the old figures until the next stage.
+      if (isEditing && (saved.status === "confirmed" || saved.status === "in_use")) {
+        const syncRes = await fetch("/api/admin/invoices/from-booking", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bookingId }),
+        });
+        if (!syncRes.ok) {
+          const syncJson = await syncRes.json().catch(() => ({}));
+          toast.error(`Booking saved, but the invoice couldn't be updated: ${syncJson.error ?? "unknown error"}`);
+        }
+      }
+      return saved;
     },
     onSuccess: () => {
       toast.success(isEditing ? "Booking updated" : "Booking created");
+      queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "invoice"] });
       // router.refresh() alone re-fetches the server component's data, but
       // the Bookings list's own React Query cache (staleTime: 60s in
       // app/providers.tsx) can still be holding an older, still-"fresh"
@@ -774,7 +794,7 @@ export function BookingForm({
               name="advancePaid"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Paid Amount (&#8377;)</FormLabel>
+                  <FormLabel>Advance Paid (&#8377;)</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -783,6 +803,11 @@ export function BookingForm({
                       onChange={(event) => field.onChange(Number(event.target.value) || 0)}
                     />
                   </FormControl>
+                  {pickupPaid > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Plus {formatCurrency(pickupPaid)} already collected at pickup.
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}

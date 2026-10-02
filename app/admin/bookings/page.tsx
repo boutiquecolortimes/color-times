@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { SETTINGS_ROLES } from "@/lib/auth/roles";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Booking } from "@/models/Booking";
+import { getBookingsSummary } from "@/lib/admin/bookings-summary";
 import "@/models/User";
 import "@/models/Product";
 import { BookingsClient } from "@/components/admin/bookings-client";
@@ -28,17 +29,7 @@ export default async function AdminBookingsPage() {
       .limit(PAGE_SIZE)
       .lean(),
     Booking.countDocuments({ deletedAt: null }),
-    Booking.aggregate([
-      { $match: { deletedAt: null } },
-      {
-        $group: {
-          _id: null,
-          totalAmount: { $sum: "$totalAmount" },
-          securityDeposit: { $sum: "$securityDeposit" },
-          advancePaid: { $sum: "$advancePaid" },
-        },
-      },
-    ]),
+    getBookingsSummary({ deletedAt: null }),
     Booking.aggregate([
       { $match: { deletedAt: null } },
       { $group: { _id: "$status", count: { $sum: 1 } } },
@@ -59,6 +50,9 @@ export default async function AdminBookingsPage() {
     totalAmount: booking.totalAmount,
     securityDeposit: booking.securityDeposit,
     advancePaid: booking.advancePaid ?? 0,
+    pickupPaid: booking.pickupPaid ?? 0,
+    damageCharges: booking.damageCharges ?? 0,
+    depositRefundAmount: booking.depositRefundAmount ?? 0,
     customer: booking.customer
       ? {
           name: (booking.customer as unknown as { name: string }).name,
@@ -73,7 +67,6 @@ export default async function AdminBookingsPage() {
     })),
   }));
 
-  const summaryRow = summaryAgg[0] ?? { totalAmount: 0, securityDeposit: 0, advancePaid: 0 };
 
   const rawStatusCounts: Record<string, number> = {};
   for (const row of statusAgg as { _id: string; count: number }[]) {
@@ -89,12 +82,7 @@ export default async function AdminBookingsPage() {
         total,
         totalPages: Math.ceil(total / PAGE_SIZE),
       }}
-      initialSummary={{
-        totalAmount: summaryRow.totalAmount,
-        securityDeposit: summaryRow.securityDeposit,
-        advancePaid: summaryRow.advancePaid,
-        dueAmount: summaryRow.totalAmount - summaryRow.advancePaid,
-      }}
+      initialSummary={summaryAgg}
       initialStatusCounts={{
         all: Object.values(rawStatusCounts).reduce((sum, count) => sum + count, 0),
         new: (rawStatusCounts.inquiry ?? 0) + (rawStatusCounts.pending_payment ?? 0),

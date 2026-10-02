@@ -56,6 +56,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { useCanEdit } from "@/components/admin/current-user-context";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 import { cn, customerContact, formatDate } from "@/lib/utils";
+import { bookingDepositUsed, bookingRemainingDue } from "@/lib/admin/booking-status";
 import type { BookingStatus } from "@/models/Booking";
 
 interface BookingRow {
@@ -70,6 +71,8 @@ interface BookingRow {
   securityDeposit: number;
   advancePaid: number;
   pickupPaid?: number;
+  damageCharges?: number;
+  depositRefundAmount?: number;
   customer: { name: string; email: string; phone?: string } | null;
   items: { product: { name: string } | null }[];
 }
@@ -122,9 +125,17 @@ function bookingRentTotal(booking: { totalAmount: number; securityDeposit: numbe
   return Math.max(0, booking.totalAmount - booking.securityDeposit);
 }
 
-function bookingDueAmount(booking: { totalAmount: number; securityDeposit: number; advancePaid: number }): number {
-  const rentTotal = Math.max(0, booking.totalAmount - booking.securityDeposit);
-  return Math.max(0, rentTotal - booking.advancePaid);
+function bookingDueAmount(booking: BookingRow): number {
+  return bookingRemainingDue(booking);
+}
+
+// "₹1,000" — or "₹1,000 (₹1,000 used for rent)" once a returned booking's
+// deposit was kept to cover unpaid rent / damage.
+function securityText(booking: BookingRow): string {
+  const used = bookingDepositUsed(booking);
+  return used > 0
+    ? `${securityText(booking)} (${formatINR(used)} used)`
+    : formatINR(booking.securityDeposit);
 }
 
 function SortIcon({
@@ -138,6 +149,13 @@ function SortIcon({
 }) {
   if (sortBy !== field) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
   return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+}
+
+// Every dress on the booking, in full — used for Excel/PDF exports, where
+// there's room for the real names (the list itself uses productSummary).
+function productNames(items: { product: { name: string } | null }[]): string {
+  const names = items.map((item) => item.product?.name ?? "—");
+  return names.length > 0 ? names.join(", ") : "—";
 }
 
 function productSummary(items: { product: { name: string } | null }[]): string {
@@ -374,7 +392,7 @@ export function BookingsClient({
       formatDate(booking.bookingDate),
       booking.customer?.name ?? "—",
       booking.customer ? customerContact(booking.customer) : "—",
-      productSummary(booking.items),
+      productNames(booking.items),
       formatDate(booking.rentalStartDate),
       formatDate(booking.rentalEndDate),
       bookingPaidSplit(booking).advance,
@@ -496,7 +514,7 @@ export function BookingsClient({
               {formatINR(bookingRentTotal(booking))}
             </span>
             <span>Security Paid</span>
-            <span className="text-right">{formatINR(booking.securityDeposit)}</span>
+            <span className="text-right">{securityText(booking)}</span>
             <span>Remaining Due</span>
             <span className="text-right font-medium text-accent">
               {formatINR(bookingDueAmount(booking))}
@@ -980,7 +998,7 @@ export function BookingsClient({
                       {formatINR(bookingRentTotal(booking))}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {formatINR(booking.securityDeposit)}
+                      {securityText(booking)}
                     </td>
                     <td className="px-4 py-3 font-medium text-accent">
                       {formatINR(bookingDueAmount(booking))}

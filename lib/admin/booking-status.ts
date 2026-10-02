@@ -45,6 +45,7 @@ const ORDER_STAGE_LABELS: Record<string, string> = {
   in_progress: "In Progress",
   ready: "Ready",
   delivered: "Delivered",
+  return_undone: "Return Undone",
 };
 
 export function invoiceStageLabel(stage: string | undefined | null): string | null {
@@ -69,4 +70,35 @@ export const INVOICE_STAGE_LABELS_HI: Record<string, string> = {
   in_progress: "काम जारी",
   ready: "तैयार",
   delivered: "डिलीवर",
+  return_undone: "वापसी रद्द",
 };
+
+/**
+ * What's still owed on a booking. Once it's returned, any rent left unpaid
+ * (plus damage charges) is first taken from the security deposit — only the
+ * part the deposit didn't cover is still due. Matches the booking invoice.
+ */
+export function bookingRemainingDue(booking: {
+  status?: string;
+  totalAmount: number;
+  securityDeposit: number;
+  advancePaid?: number;
+  damageCharges?: number;
+  depositRefundAmount?: number;
+}): number {
+  const rentTotal = Math.max(0, booking.totalAmount - booking.securityDeposit);
+  const paid = Math.max(0, booking.advancePaid ?? 0);
+  if (booking.status !== "returned") return Math.max(0, rentTotal - paid);
+  const depositUsed = Math.max(0, booking.securityDeposit - (booking.depositRefundAmount ?? 0));
+  return Math.max(0, rentTotal + (booking.damageCharges ?? 0) - paid - depositUsed);
+}
+
+/** Part of the security deposit kept (used for rent / damage) at return. */
+export function bookingDepositUsed(booking: {
+  status?: string;
+  securityDeposit: number;
+  depositRefundAmount?: number;
+}): number {
+  if (booking.status !== "returned") return 0;
+  return Math.max(0, booking.securityDeposit - (booking.depositRefundAmount ?? 0));
+}

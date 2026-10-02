@@ -11,6 +11,7 @@ import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 import { escapeRegex } from "@/lib/utils";
+import { getBookingsSummary } from "@/lib/admin/bookings-summary";
 
 export async function GET(request: NextRequest): Promise<Response> {
   const auth = await requireApiRole(ADMIN_ROLES);
@@ -105,51 +106,15 @@ export async function GET(request: NextRequest): Promise<Response> {
     // Earnings summary is computed over every booking matching the current
     // filter (not just the current page) so it reflects the store's real
     // totals, not just what's visible in the table.
-    Booking.aggregate([
-      {
-        $match: {
-          ...filter,
-          // An inquiry (or legacy pending_payment) booking isn't earnings
-          // until the customer actually pays — leave it out of the summary
-          // tiles until an advance is recorded. Once any payment is in, it
-          // counts like any other booking.
-          $nor: [
-            {
-              status: { $in: ["inquiry", "pending_payment"] },
-              $or: [{ advancePaid: { $exists: false } }, { advancePaid: { $lte: 0 } }],
-            },
-          ],
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          totalAmount: { $sum: "$totalAmount" },
-          securityDeposit: { $sum: "$securityDeposit" },
-          advancePaid: { $sum: "$advancePaid" },
-        },
-      },
-    ]),
+    getBookingsSummary(filter),
     Booking.aggregate([
       { $match: countFilter },
       { $group: { _id: "$status", count: { $sum: 1 } } },
     ]),
   ]);
 
-  const summaryRow = summaryAgg[0] ?? { totalAmount: 0, securityDeposit: 0, advancePaid: 0 };
-  // Security deposits are held, not owed — excluded from "due" the same way
-  // invoices and the booking detail page treat them, so this tile doesn't
-  // read as outstanding rent when it's actually just the deposit sitting
-  // with the business pending return.
-  const summary = {
-    totalAmount: summaryRow.totalAmount,
-    securityDeposit: summaryRow.securityDeposit,
-    advancePaid: summaryRow.advancePaid,
-    dueAmount: Math.max(
-      0,
-      summaryRow.totalAmount - summaryRow.securityDeposit - summaryRow.advancePaid
-    ),
-  };
+  // Deposit held isn't counted as due (see lib/admin/bookings-summary.ts).
+  const summary = summaryAgg;
 
   const rawStatusCounts: Record<string, number> = {};
   for (const row of statusAgg as { _id: string; count: number }[]) {

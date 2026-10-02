@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
 
   const invoice = await Invoice.findById(id)
     .populate("customer", "name email phone addresses")
-    .populate("booking", "bookingNumber rentalStartDate rentalEndDate pickupPaid")
+    .populate("booking", "bookingNumber rentalStartDate rentalEndDate pickupPaid status depositRefundAmount")
     .populate("sale", "billNumber")
     .populate("customisationOrder", "billNumber")
     .populate("payments.recordedBy", "name")

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Invoice } from "@/models/Invoice";
+import { Booking } from "@/models/Booking";
 import "@/models/User";
 import { invoicePaymentSchema } from "@/lib/validations/invoice";
 import { requireApiRole } from "@/lib/api/require-role";
@@ -72,6 +73,9 @@ export async function POST(
       {
         $push: {
           payments: {
+            // Booking invoices: tagged "due" because it's also added to the
+            // booking's own paid amounts below (so it isn't counted twice).
+            ...(existing.booking ? { kind: "due" } : {}),
             amount: input.amount,
             method: input.method,
             reference: input.reference,
@@ -86,6 +90,16 @@ export async function POST(
       },
       { returnDocument: "after" }
     ).populate("customer", "name phone");
+
+    // A payment taken on a booking's invoice is real money against that
+    // booking — reflect it on the booking too, so the Bookings list and the
+    // booking page show the same paid / remaining amounts as the invoice.
+    if (existing.booking) {
+      await Booking.updateOne(
+        { _id: existing.booking },
+        { $inc: { advancePaid: input.amount, pickupPaid: input.amount } }
+      );
+    }
 
     await recordAuditLog({
       entityType: "Invoice",

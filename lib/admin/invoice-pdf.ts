@@ -47,6 +47,7 @@ interface InvoicePdfData {
   amountPaid: number;
   amountDue: number;
   pickupPaid?: number;
+  depositUsed?: number;
   bookingStage?: string;
   source?: string;
   payments: InvoicePdfPayment[];
@@ -90,36 +91,37 @@ function loadImageAsDataUrl(src: string): Promise<{ dataUrl: string; ratio: numb
   });
 }
 
-// Target print height (mm) for each Hindi label image — tuned to sit
-// visually level with the Latin text/font sizes used alongside it.
+// Target print height (mm) for each Hindi label image. The images carry
+// built-in padding (the letters fill about two-thirds of the height), so
+// these are larger than the matching English font size to read the same.
 const LABEL_HEIGHT_MM: Record<LabelKey, number> = {
-  invoiceTitle: 5.6,
-  issued: 3.3,
-  due: 3.3,
-  status: 3.3,
-  billTo: 3.6,
-  colDescription: 3.6,
-  colQty: 3.6,
-  colUnitPrice: 3.6,
-  colAmount: 3.6,
-  rowRent: 4.0,
-  rowDiscount: 4.0,
-  rowTax: 4.0,
-  rowSecurityDeposit: 4.0,
-  rowTotal: 4.0,
-  rowAmountPaid: 4.0,
-  rowRentDue: 4.0,
-  rowSecurityHeld: 4.0,
-  rowAdvancePaid: 4.0,
-  rowDuePaid: 4.0,
-  rowTotalRent: 4.0,
-  rowSecurityPaid: 4.0,
-  rowRemainingDue: 4.0,
-  paymentHistory: 3.8,
-  colDate: 3.4,
-  colMethod: 3.4,
-  colReference: 3.4,
-  notes: 3.0,
+  invoiceTitle: 8.0,
+  issued: 4.6,
+  due: 4.6,
+  status: 4.6,
+  billTo: 5.0,
+  colDescription: 4.6,
+  colQty: 4.6,
+  colUnitPrice: 4.6,
+  colAmount: 4.6,
+  rowRent: 4.8,
+  rowDiscount: 4.8,
+  rowTax: 4.8,
+  rowSecurityDeposit: 4.8,
+  rowTotal: 4.8,
+  rowAmountPaid: 4.8,
+  rowRentDue: 4.8,
+  rowSecurityHeld: 4.8,
+  rowAdvancePaid: 4.8,
+  rowDuePaid: 4.8,
+  rowTotalRent: 4.8,
+  rowSecurityPaid: 4.8,
+  rowRemainingDue: 4.8,
+  paymentHistory: 5.4,
+  colDate: 4.4,
+  colMethod: 4.4,
+  colReference: 4.4,
+  notes: 4.4,
 };
 
 export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang = "en"): Promise<void> {
@@ -186,7 +188,7 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
   // the Hindi label image via autoTable's didDrawCell hook.
   function drawCellLabel(hiLabels: HindiLabelMap, key: LabelKey, cell: CellHookData["cell"], align: "left" | "right"): void {
     const img = hiLabels[key];
-    const heightMm = Math.min(LABEL_HEIGHT_MM[key], cell.height * 0.75);
+    const heightMm = Math.min(LABEL_HEIGHT_MM[key], cell.height * 0.9);
     const widthMm = heightMm / img.ratio;
     const pad = cell.padding(align);
     const x = align === "right" ? cell.x + cell.width - pad - widthMm : cell.x + pad;
@@ -342,12 +344,22 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
       ]
     : [
         { key: "rowRent", value: formatCurrency(invoice.subtotal) },
-        { key: "rowDiscount", value: `-${formatCurrency(invoice.discountAmount)}` },
-        { key: "rowTax", value: `${formatCurrency(invoice.taxAmount)} (${invoice.taxRate}%)` },
+        // Discount / Tax only printed if this invoice actually has one.
+        ...(invoice.discountAmount > 0
+          ? [{ key: "rowDiscount" as LabelKey, value: `-${formatCurrency(invoice.discountAmount)}` }]
+          : []),
+        ...(invoice.taxAmount > 0
+          ? [{ key: "rowTax" as LabelKey, value: `${formatCurrency(invoice.taxAmount)} (${invoice.taxRate}%)` }]
+          : []),
         { key: "rowAdvancePaid", value: formatCurrency(due.advancePaid) },
         { key: "rowDuePaid", value: formatCurrency(due.duePaid) },
         { key: "rowTotalRent", value: formatCurrency(due.rentTotal) },
-        { key: "rowSecurityPaid", value: formatCurrency(invoice.securityDeposit) },
+        {
+          key: "rowSecurityPaid",
+          value: invoice.depositUsed
+            ? `${formatCurrency(invoice.securityDeposit)} (${formatCurrency(invoice.depositUsed)} used)`
+            : formatCurrency(invoice.securityDeposit),
+        },
         { key: "rowRemainingDue", value: formatCurrency(due.rentDue) },
       ];
 

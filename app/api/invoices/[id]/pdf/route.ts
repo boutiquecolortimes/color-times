@@ -5,6 +5,13 @@ import { Invoice } from "@/models/Invoice";
 import "@/models/User";
 import { generateInvoicePdfBuffer } from "@/lib/admin/invoice-pdf-server";
 
+// Returned booking: the part of the deposit kept toward unpaid rent/damage.
+function depositUsedFor(invoice: { securityDeposit?: number; booking?: unknown }): number {
+  const booking = invoice.booking as { status?: string; depositRefundAmount?: number } | null;
+  if (!booking || booking.status !== "returned") return 0;
+  return Math.max(0, (invoice.securityDeposit ?? 0) - (booking.depositRefundAmount ?? 0));
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -20,7 +27,7 @@ export async function GET(
 
     const invoice = await Invoice.findById(id)
       .populate("customer", "name email phone")
-      .populate("booking", "pickupPaid")
+      .populate("booking", "pickupPaid status depositRefundAmount")
       .lean();
     if (!invoice || invoice.deletedAt) {
       return new Response("Not found", { status: 404 });
@@ -65,6 +72,7 @@ export async function GET(
       amountPaid: invoice.amountPaid ?? 0,
       amountDue: invoice.amountDue ?? 0,
       pickupPaid: (invoice.booking as unknown as { pickupPaid?: number } | null)?.pickupPaid ?? 0,
+      depositUsed: depositUsedFor(invoice),
       payments: invoice.payments ?? [],
       notes: invoice.notes,
       bookingStage: invoice.bookingStage,

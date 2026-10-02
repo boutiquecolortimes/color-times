@@ -24,6 +24,12 @@ export interface InvoiceDueBreakdownInput {
   pickupPaid?: number;
   /** Payments logged directly on the invoice after it was issued. */
   payments?: { amount: number; kind?: string }[];
+  /**
+   * Returned bookings: part of the security deposit kept toward unpaid
+   * rent/damage. It's inside amountPaid but isn't an advance — shown under
+   * Security instead.
+   */
+  depositUsed?: number;
 }
 
 export interface InvoiceDueBreakdown {
@@ -66,10 +72,15 @@ export function getInvoiceDueBreakdown(invoice: InvoiceDueBreakdownInput): Invoi
       .reduce((sum, p) => sum + (p.amount ?? 0), 0);
     duePaid = Math.max(0, amountPaid - Math.min(amountPaid, advance));
   } else {
-    const loggedPayments = payments.reduce((sum, p) => sum + (p.amount ?? 0), 0);
+    // Booking invoices: payments tagged "due" are already included in the
+    // booking's pickupPaid (see the invoice payments route), so only older
+    // untagged ones are added here.
+    const loggedPayments = payments
+      .filter((p) => p.kind !== "due")
+      .reduce((sum, p) => sum + (p.amount ?? 0), 0);
     duePaid = Math.min(amountPaid, Math.max(0, invoice.pickupPaid ?? 0) + loggedPayments);
   }
-  const advancePaid = amountPaid - duePaid;
+  const advancePaid = Math.max(0, amountPaid - duePaid - Math.max(0, invoice.depositUsed ?? 0));
   return {
     rentTotal,
     securityInTotal,

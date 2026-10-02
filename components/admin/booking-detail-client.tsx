@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Bell, FileText, Loader2, Pencil, Printer, Sparkles, Star } from "lucide-react";
+import { Bell, FileText, Loader2, Pencil, Printer, Sparkles, Star, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,6 +22,7 @@ import { ConfirmBookingDialog } from "@/components/admin/confirm-booking-dialog"
 import { PickupBookingDialog } from "@/components/admin/pickup-booking-dialog";
 import { CancelBookingDialog } from "@/components/admin/cancel-booking-dialog";
 import { AuditLogList } from "@/components/admin/audit-log-list";
+import { UndoReturnDialog } from "@/components/admin/undo-return-dialog";
 import { ImagePreviewDialog } from "@/components/admin/image-preview-dialog";
 import {
   ServiceOrderFormDialog,
@@ -29,6 +30,7 @@ import {
 } from "@/components/admin/service-order-form-dialog";
 import { useCanEdit } from "@/components/admin/current-user-context";
 import { cn, formatDate, isWalkinEmail } from "@/lib/utils";
+import { bookingDepositUsed, bookingRemainingDue } from "@/lib/admin/booking-status";
 import type { BookingStatus, ReturnCondition } from "@/models/Booking";
 
 const REMINDABLE_STATUSES: BookingStatus[] = ["inquiry", "confirmed", "in_use"];
@@ -143,6 +145,7 @@ export function BookingDetailClient({
   const queryClient = useQueryClient();
   const router = useRouter();
   const canEdit = useCanEdit();
+  const [undoReturnOpen, setUndoReturnOpen] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [pickupDialogOpen, setPickupDialogOpen] = useState(false);
@@ -255,8 +258,10 @@ export function BookingDetailClient({
   // the dress's return. Same split used on invoices: rent due on its own,
   // deposit shown as held (never due), and 0 once it's been refunded back.
   const rentTotal = Math.max(0, booking.totalAmount - booking.securityDeposit);
-  const paidTowardRent = Math.min(Math.max(0, booking.advancePaid ?? 0), rentTotal);
-  const rentDue = Math.max(0, rentTotal - paidTowardRent);
+  // Once returned, unpaid rent/damage is first taken from the deposit —
+  // same rule as the invoice and the Bookings list.
+  const rentDue = bookingRemainingDue(booking);
+  const depositUsed = bookingDepositUsed(booking);
   // advancePaid is the running total of everything paid on the booking;
   // pickupPaid is the part collected at pickup. Split it back out so the
   // billing card reads Advance Paid (before pickup) and Due Paid (at pickup).
@@ -323,6 +328,12 @@ export function BookingDetailClient({
                 Generate Invoice
               </Button>
             )}
+          {canEdit && booking.status === "returned" && (
+            <Button variant="outline" size="sm" onClick={() => setUndoReturnOpen(true)}>
+              <Undo2 className="h-4 w-4" />
+              Undo Return
+            </Button>
+          )}
           {canEdit && booking.status !== "returned" && booking.status !== "cancelled" && (
             <ButtonLink variant="outline" size="sm" href={`/admin/bookings/${booking._id}/edit`}>
               <Pencil className="h-4 w-4" />
@@ -552,7 +563,11 @@ export function BookingDetailClient({
                   <span className="text-muted-foreground">Security Paid</span>
                   <span>
                     {formatCurrency(booking.securityDeposit)}
-                    {booking.depositRefunded && " (Refunded)"}
+                    {depositUsed > 0
+                      ? ` (${formatCurrency(depositUsed)} used for rent/damage${
+                          booking.depositRefundAmount ? `, ${formatCurrency(booking.depositRefundAmount)} refunded` : ""
+                        })`
+                      : booking.depositRefunded && " (Refunded)"}
                   </span>
                 </p>
                 <p className="flex justify-between border-t border-border pt-2 font-medium">
@@ -730,6 +745,13 @@ export function BookingDetailClient({
         onConfirm={() =>
           updateStatusMutation.mutate("cancelled", { onSuccess: () => setCancelDialogOpen(false) })
         }
+      />
+
+      <UndoReturnDialog
+        bookingId={booking._id}
+        bookingNumber={booking.bookingNumber}
+        open={undoReturnOpen}
+        onOpenChange={setUndoReturnOpen}
       />
 
       <PickupBookingDialog
