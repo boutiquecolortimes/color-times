@@ -41,6 +41,7 @@ import { InvoiceStatusBadge } from "@/components/admin/invoice-status-badge";
 import { StatusTabs } from "@/components/admin/list-toolbar";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { MobileListBar } from "@/components/admin/mobile-list-bar";
 import { useCanEdit } from "@/components/admin/current-user-context";
 import { downloadPdf, downloadExcel } from "@/lib/admin/export";
 import { getInvoiceDueBreakdown } from "@/lib/admin/invoice-totals";
@@ -725,7 +726,75 @@ export function InvoicesClient({
         </div>
       )}
 
-      <div className="lg:hidden">{cardGrid}</div>
+      <div className="space-y-3 lg:hidden">
+
+        <MobileListBar
+
+
+          sortOptions={[
+
+
+            { value: "invoiceNumber", label: "Invoice #" },
+
+
+            { value: "total", label: "Total" },
+
+
+            { value: "amountPaid", label: "Paid" },
+
+
+            { value: "amountDue", label: "Remaining Due" },
+
+
+            { value: "status", label: "Status" },
+
+
+            { value: "dueDate", label: "Due Date" },
+
+
+          ]}
+
+
+          sortBy={sortBy}
+
+
+          sortDir={sortDir}
+
+
+          onSortChange={(nextSortBy, nextSortDir) => {
+
+
+            setSortBy(nextSortBy);
+
+
+            setSortDir(nextSortDir);
+
+
+            setPage(1);
+
+
+          }}
+
+
+          selectAll={{
+
+
+            checked: invoices.length > 0 && selectedIds.size === invoices.length,
+
+
+            onToggle: toggleSelectAll,
+
+
+            disabled: invoices.length === 0,
+
+
+          }}
+
+        />
+
+        {cardGrid}
+
+      </div>
 
       {layout === "card" ? (
         <div className="hidden lg:block">{cardGrid}</div>

@@ -52,11 +52,16 @@ import { PickupBookingDialog } from "@/components/admin/pickup-booking-dialog";
 import { CancelBookingDialog } from "@/components/admin/cancel-booking-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { MobileListBar } from "@/components/admin/mobile-list-bar";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useCanEdit } from "@/components/admin/current-user-context";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 import { cn, customerContact, formatDate } from "@/lib/utils";
-import { bookingDepositUsed, bookingRemainingDue } from "@/lib/admin/booking-status";
+import {
+  bookingDepositUsed,
+  bookingPaidBreakdown,
+  bookingRemainingDue,
+} from "@/lib/admin/booking-status";
 import type { BookingStatus } from "@/models/Booking";
 
 interface BookingRow {
@@ -112,13 +117,9 @@ function formatINR(value: number): string {
 // as due — the deposit is shown in its own "Security" column instead.
 // advancePaid is the running total paid; pickupPaid is the part collected
 // at pickup. Split back into Advance Paid vs Due Paid for display.
-function bookingPaidSplit(booking: { advancePaid: number; pickupPaid?: number }): {
-  advance: number;
-  due: number;
-} {
-  const total = Math.max(0, booking.advancePaid);
-  const due = Math.min(total, Math.max(0, booking.pickupPaid ?? 0));
-  return { advance: total - due, due };
+function bookingPaidSplit(booking: BookingRow): { advance: number; due: number } {
+  const { advance, duePaid } = bookingPaidBreakdown(booking);
+  return { advance, due: duePaid };
 }
 
 function bookingRentTotal(booking: { totalAmount: number; securityDeposit: number }): number {
@@ -134,7 +135,7 @@ function bookingDueAmount(booking: BookingRow): number {
 function securityText(booking: BookingRow): string {
   const used = bookingDepositUsed(booking);
   return used > 0
-    ? `${securityText(booking)} (${formatINR(used)} used)`
+    ? `${formatINR(booking.securityDeposit)} (${formatINR(used)} used)`
     : formatINR(booking.securityDeposit);
 }
 
@@ -858,7 +859,28 @@ export function BookingsClient({
         <BookingCalendar />
       ) : (
         <>
-          <div className="lg:hidden">{cardGrid}</div>
+          <div className="space-y-3 lg:hidden">
+            <MobileListBar
+              sortOptions={[
+                { value: "bookingNumber", label: "Booking #" },
+                { value: "billNumber", label: "Bill #" },
+                { value: "bookingDate", label: "Booking Date" },
+                { value: "rentalStartDate", label: "Rental Dates" },
+                { value: "advancePaid", label: "Advance Paid" },
+                { value: "totalAmount", label: "Total Rent" },
+                { value: "securityDeposit", label: "Security Paid" },
+                { value: "status", label: "Status" },
+              ]}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSortChange={(nextSortBy, nextSortDir) => {
+                setSortBy(nextSortBy);
+                setSortDir(nextSortDir);
+                setPage(1);
+              }}
+            />
+            {cardGrid}
+          </div>
 
           {view === "card" ? (
             <div className="hidden lg:block">{cardGrid}</div>

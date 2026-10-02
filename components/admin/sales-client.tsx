@@ -21,6 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import type { SaleRow, CustomerOption } from "@/components/admin/sale-form-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { MobileListBar } from "@/components/admin/mobile-list-bar";
 import { useCanEdit } from "@/components/admin/current-user-context";
 import { ListToolbar, StatusTabs, SummaryTiles } from "@/components/admin/list-toolbar";
 import { CollectPaymentDialog, type CollectPaymentTarget } from "@/components/admin/collect-payment-dialog";
@@ -588,7 +589,75 @@ export function SalesClient({
         </div>
       )}
 
-      <div className="lg:hidden">{cardGrid}</div>
+      <div className="space-y-3 lg:hidden">
+
+        <MobileListBar
+
+
+          sortOptions={[
+
+
+            { value: "billNumber", label: "Bill #" },
+
+
+            { value: "customerName", label: "Customer" },
+
+
+            { value: "totalAmount", label: "Total" },
+
+
+            { value: "advancePayment", label: "Advance" },
+
+
+            { value: "dueAmount", label: "Due" },
+
+
+            { value: "saleDate", label: "Sale Date" },
+
+
+          ]}
+
+
+          sortBy={sortBy}
+
+
+          sortDir={sortDir}
+
+
+          onSortChange={(nextSortBy, nextSortDir) => {
+
+
+            setSortBy(nextSortBy);
+
+
+            setSortDir(nextSortDir);
+
+
+            setPage(1);
+
+
+          }}
+
+
+          selectAll={{
+
+
+            checked: sales.length > 0 && selectedIds.size === sales.length,
+
+
+            onToggle: toggleSelectAll,
+
+
+            disabled: sales.length === 0,
+
+
+          }}
+
+        />
+
+        {cardGrid}
+
+      </div>
 
       {layout === "card" ? (
         <div className="hidden lg:block">{cardGrid}</div>

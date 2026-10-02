@@ -81,6 +81,9 @@ export function getInvoiceDueBreakdown(invoice: InvoiceDueBreakdownInput): Invoi
     duePaid = Math.min(amountPaid, Math.max(0, invoice.pickupPaid ?? 0) + loggedPayments);
   }
   const advancePaid = Math.max(0, amountPaid - duePaid - Math.max(0, invoice.depositUsed ?? 0));
+  // Money goes to rent first — whatever was paid beyond the rent is the
+  // security deposit (shown on its own line), not "Due Paid".
+  duePaid = Math.min(duePaid, Math.max(0, rentTotal - advancePaid));
   return {
     rentTotal,
     securityInTotal,

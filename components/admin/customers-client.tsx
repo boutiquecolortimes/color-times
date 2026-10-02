@@ -38,6 +38,7 @@ import {
 import { CustomerImportDialog } from "@/components/admin/customer-import-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { MobileListBar } from "@/components/admin/mobile-list-bar";
 import { useCanEdit } from "@/components/admin/current-user-context";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 import { formatDate, isWalkinEmail } from "@/lib/utils";
@@ -520,7 +521,69 @@ export function CustomersClient({
         </div>
       )}
 
-      <div className="lg:hidden">{cardGrid}</div>
+      <div className="space-y-3 lg:hidden">
+
+        <MobileListBar
+
+
+          sortOptions={[
+
+
+            { value: "name", label: "Name" },
+
+
+            { value: "email", label: "Email" },
+
+
+            { value: "phone", label: "Phone" },
+
+
+            { value: "createdAt", label: "Joined" },
+
+
+          ]}
+
+
+          sortBy={sortBy}
+
+
+          sortDir={sortDir}
+
+
+          onSortChange={(nextSortBy, nextSortDir) => {
+
+
+            setSortBy(nextSortBy);
+
+
+            setSortDir(nextSortDir);
+
+
+            setPage(1);
+
+
+          }}
+
+
+          selectAll={{
+
+
+            checked: customers.length > 0 && selectedIds.size === customers.length,
+
+
+            onToggle: toggleSelectAll,
+
+
+            disabled: customers.length === 0,
+
+
+          }}
+
+        />
+
+        {cardGrid}
+
+      </div>
 
       {layout === "card" ? (
         <div className="hidden lg:block">{cardGrid}</div>

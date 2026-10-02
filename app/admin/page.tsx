@@ -244,6 +244,10 @@ export default async function AdminDashboardPage() {
                         <p className="truncate text-xs text-muted-foreground">
                           {booking.productSummary}
                         </p>
+                        {/* Rental dates sit on the right from sm up; on phones show them here. */}
+                        <p className="text-xs text-muted-foreground sm:hidden">
+                          {formatDate(booking.rentalStartDate)} – {formatDate(booking.rentalEndDate)}
+                        </p>
                       </div>
                     </div>
                     <div className="hidden shrink-0 text-xs text-muted-foreground sm:block">

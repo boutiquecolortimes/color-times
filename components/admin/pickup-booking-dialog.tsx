@@ -56,6 +56,13 @@ export function PickupBookingDialog({
   const dueAmount = Math.max(0, totalAmount - summary.advancePaid);
   const [paymentAmount, setPaymentAmount] = useState(() => dueAmount);
 
+  // Money goes to rent first; anything beyond the rent is the security
+  // deposit, which is only held and is refunded at Return — so it's never
+  // part of "Remaining Due".
+  const rentDueBefore = Math.max(0, rentalFeesTotal - summary.advancePaid);
+  const securityHeldBefore = Math.max(0, summary.advancePaid - rentalFeesTotal);
+  const securityToCollect = Math.max(0, securityDeposit - securityHeldBefore);
+
   const mutation = useMutation({
     mutationFn: async () => {
       const statusRes = await fetch(`/api/admin/bookings/${bookingId}`, {
@@ -101,8 +108,10 @@ export function PickupBookingDialog({
     onError: (error: Error) => toast.error(error.message),
   });
 
-  // Remaining Due = (Total Rent + Security) − (Advance Paid + Due Paid now).
-  const remainingAfter = Math.max(0, totalAmount - summary.advancePaid - paymentAmount);
+  const rentPaidNow = Math.min(paymentAmount, rentDueBefore);
+  const securityHeldAfter = securityHeldBefore + (paymentAmount - rentPaidNow);
+  // Remaining Due = rent still unpaid (security excluded — it's refundable).
+  const remainingAfter = Math.max(0, rentDueBefore - rentPaidNow);
 
   return (
     <Dialog open={open} onOpenChange={(next) => !mutation.isPending && onOpenChange(next)}>
@@ -110,8 +119,8 @@ export function PickupBookingDialog({
         <DialogHeader>
           <DialogTitle>Mark as picked up</DialogTitle>
           <DialogDescription>
-            Collect the full outstanding payment when handing over the dress — this also
-            generates the invoice automatically.
+            Collect the remaining rent and the security deposit when handing over the dress —
+            this also generates the invoice automatically.
           </DialogDescription>
         </DialogHeader>
 
@@ -136,6 +145,10 @@ export function PickupBookingDialog({
               value={paymentAmount === 0 ? "" : paymentAmount}
               onChange={(event) => setPaymentAmount(Math.max(0, Number(event.target.value) || 0))}
             />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Rent due {formatCurrency(rentDueBefore)}
+              {securityToCollect > 0 && <> + security deposit {formatCurrency(securityToCollect)}</>}
+            </p>
           </div>
 
           <div>
@@ -162,7 +175,7 @@ export function PickupBookingDialog({
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Due Paid</span>
-              <span>{formatCurrency(paymentAmount)}</span>
+              <span>{formatCurrency(rentPaidNow)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Total Rent</span>
@@ -170,12 +183,18 @@ export function PickupBookingDialog({
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Security Paid</span>
-              <span>{formatCurrency(securityDeposit)}</span>
+              <span>{formatCurrency(securityHeldAfter)}</span>
             </div>
             <div className="mt-2 flex justify-between border-t border-border pt-2 font-medium">
               <span>Remaining Due</span>
               <span className="text-accent">{formatCurrency(remainingAfter)}</span>
             </div>
+            {securityHeldAfter > 0 && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Security {formatCurrency(securityHeldAfter)} is held and refunded at Return (less any
+                damage or unpaid rent).
+              </p>
+            )}
           </div>
         </div>
 

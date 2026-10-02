@@ -59,6 +59,7 @@ import { ImageUploadField } from "@/components/admin/image-upload-field";
 import { ImagePreviewDialog } from "@/components/admin/image-preview-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { MobileListBar } from "@/components/admin/mobile-list-bar";
 import { useCanEdit } from "@/components/admin/current-user-context";
 import { categorySchema, type CategoryInput } from "@/lib/validations/category";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
@@ -586,7 +587,63 @@ export function CategoriesClient({
         </div>
       )}
 
-      <div className="lg:hidden">{cardGrid}</div>
+      <div className="space-y-3 lg:hidden">
+
+        <MobileListBar
+
+
+          sortOptions={[
+
+
+            { value: "name", label: "Name" },
+
+
+            { value: "slug", label: "Slug" },
+
+
+          ]}
+
+
+          sortBy={sortBy}
+
+
+          sortDir={sortDir}
+
+
+          onSortChange={(nextSortBy, nextSortDir) => {
+
+
+            setSortBy(nextSortBy);
+
+
+            setSortDir(nextSortDir);
+
+
+            setPage(1);
+
+
+          }}
+
+
+          selectAll={{
+
+
+            checked: categories.length > 0 && selectedIds.size === categories.length,
+
+
+            onToggle: toggleSelectAll,
+
+
+            disabled: categories.length === 0,
+
+
+          }}
+
+        />
+
+        {cardGrid}
+
+      </div>
 
       {view === "card" ? (
         <div className="hidden lg:block">{cardGrid}</div>

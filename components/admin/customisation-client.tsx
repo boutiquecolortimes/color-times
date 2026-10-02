@@ -25,6 +25,7 @@ import {
 import { CustomisationStatusBadge } from "@/components/admin/customisation-status-badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { MobileListBar } from "@/components/admin/mobile-list-bar";
 import { useCanEdit } from "@/components/admin/current-user-context";
 import type { CustomisationOrderRow, CustomerOption } from "@/components/admin/customisation-form-dialog";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
@@ -486,7 +487,66 @@ export function CustomisationClient({
         onPrint={handlePrint}
       />
 
-      <div className="lg:hidden">{cardGrid}</div>
+      <div className="space-y-3 lg:hidden">
+
+        <MobileListBar
+
+
+          sortOptions={[
+
+
+            { value: "billNumber", label: "Bill #" },
+
+
+            { value: "customerName", label: "Customer" },
+
+
+            { value: "stitchingType", label: "Stitching Type" },
+
+
+            { value: "totalAmount", label: "Total" },
+
+
+            { value: "advancePayment", label: "Advance" },
+
+
+            { value: "dueAmount", label: "Due" },
+
+
+            { value: "orderDate", label: "Order Date" },
+
+
+            { value: "status", label: "Status" },
+
+
+          ]}
+
+
+          sortBy={sortBy}
+
+
+          sortDir={sortDir}
+
+
+          onSortChange={(nextSortBy, nextSortDir) => {
+
+
+            setSortBy(nextSortBy);
+
+
+            setSortDir(nextSortDir);
+
+
+            setPage(1);
+
+
+          }}
+
+        />
+
+        {cardGrid}
+
+      </div>
 
       {layout === "card" ? (
         <div className="hidden lg:block">{cardGrid}</div>

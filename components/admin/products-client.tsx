@@ -48,6 +48,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ColumnVisibilityMenu } from "@/components/admin/column-visibility-menu";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { MobileListBar } from "@/components/admin/mobile-list-bar";
 import { ProductsBulkToolbar } from "@/components/admin/products-bulk-toolbar";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { ProductImportDialog } from "@/components/admin/product-import-dialog";
@@ -574,21 +575,95 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Status"];
                 </p>
               );
             })()}
-            <div className="mt-2 flex gap-1">
-              {canEdit && (
-                <ButtonLink
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  href={`/admin/products/${product._id}`}
-                >
-                  Edit
-                </ButtonLink>
+            {/* Same actions as the desktop table row — phones only see these cards. */}
+            <div className="mt-2 flex flex-wrap items-center gap-1">
+              {status === "trash" ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => restoreMutation.mutate(product._id)}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" /> Restore
+                  </Button>
+                  {canEdit && (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-destructive"
+                      aria-label="Delete permanently"
+                      onClick={() => setConfirmState({ ids: [product._id], action: "permanent-delete" })}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <>
+                  {canEdit && (
+                    <ButtonLink
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      href={`/admin/products/${product._id}`}
+                    >
+                      Edit
+                    </ButtonLink>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="View details"
+                    onClick={() => setViewingId(product._id)}
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Duplicate"
+                    onClick={() => duplicateMutation.mutate(product._id)}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                  {product.archivedAt ? (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Unarchive"
+                      onClick={() => restoreMutation.mutate(product._id)}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                    </Button>
+                  ) : (
+                    canEdit && (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Archive"
+                        onClick={() => archiveMutation.mutate(product._id)}
+                      >
+                        <Archive className="h-3.5 w-3.5" />
+                      </Button>
+                    )
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-destructive"
+                    aria-label="Move to trash"
+                    onClick={() => trashMutation.mutate(product._id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </>
               )}
               <Checkbox
                 checked={selectedIds.has(product._id)}
                 onCheckedChange={() => toggleSelectOne(product._id)}
                 className="ml-1 self-center"
+                aria-label={`Select ${product.name}`}
               />
             </div>
           </div>
@@ -787,7 +862,66 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Status"];
         )
       )}
 
-      <div className="lg:hidden">{cardGrid}</div>
+      <div className="space-y-3 lg:hidden">
+
+        <MobileListBar
+
+
+          sortOptions={[
+
+
+            { value: "name", label: "Product" },
+
+
+            { value: "rentalPricePerDay", label: "Rent" },
+
+
+            { value: "status", label: "Status" },
+
+
+          ]}
+
+
+          sortBy={sortBy}
+
+
+          sortDir={sortDir}
+
+
+          onSortChange={(nextSortBy, nextSortDir) => {
+
+
+            setSortBy(nextSortBy);
+
+
+            setSortDir(nextSortDir);
+
+
+            setPage(1);
+
+
+          }}
+
+
+          selectAll={{
+
+
+            checked: products.length > 0 && selectedIds.size === products.length,
+
+
+            onToggle: toggleSelectAll,
+
+
+            disabled: products.length === 0,
+
+
+          }}
+
+        />
+
+        {cardGrid}
+
+      </div>
 
       {view === "table" ? (
         <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">

@@ -41,6 +41,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { MobileListBar } from "@/components/admin/mobile-list-bar";
 import { createStaffSchema, type CreateStaffInput } from "@/lib/validations/staff";
 import { formatDate } from "@/lib/utils";
 import type { UserRole } from "@/models/User";
@@ -403,7 +404,60 @@ export function UsersClient({
         </div>
       </div>
 
-      <div className="lg:hidden">{cardGrid}</div>
+      <div className="space-y-3 lg:hidden">
+
+        <MobileListBar
+
+
+          sortOptions={[
+
+
+            { value: "name", label: "Name" },
+
+
+            { value: "email", label: "Email" },
+
+
+            { value: "phone", label: "Phone" },
+
+
+            { value: "role", label: "Role" },
+
+
+            { value: "isActive", label: "Status" },
+
+
+            { value: "createdAt", label: "Joined" },
+
+
+          ]}
+
+
+          sortBy={sortBy}
+
+
+          sortDir={sortDir}
+
+
+          onSortChange={(nextSortBy, nextSortDir) => {
+
+
+            setSortBy(nextSortBy as keyof StaffUser);
+
+
+            setSortDir(nextSortDir);
+
+
+            setPage(1);
+
+
+          }}
+
+        />
+
+        {cardGrid}
+
+      </div>
 
       {layout === "card" ? (
         <div className="hidden lg:block">{cardGrid}</div>

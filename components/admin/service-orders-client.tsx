@@ -39,6 +39,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { ServiceOrderStatusBadge } from "@/components/admin/service-order-status-badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { MobileListBar } from "@/components/admin/mobile-list-bar";
 import {
   ServiceOrderFormDialog,
   type ServiceOrderRow,
@@ -553,7 +554,57 @@ export function ServiceOrdersClient({
         </DropdownMenu>
       </div>
 
-      <div className="lg:hidden">{cardGrid}</div>
+      <div className="space-y-3 lg:hidden">
+
+        <MobileListBar
+
+
+          sortOptions={[
+
+
+            { value: "description", label: "Description" },
+
+
+            { value: "totalAmount", label: "Total" },
+
+
+            { value: "assignedTo", label: "Assigned To" },
+
+
+            { value: "expectedReturnDate", label: "Expected Return" },
+
+
+            { value: "status", label: "Status" },
+
+
+          ]}
+
+
+          sortBy={sortBy}
+
+
+          sortDir={sortDir}
+
+
+          onSortChange={(nextSortBy, nextSortDir) => {
+
+
+            setSortBy(nextSortBy);
+
+
+            setSortDir(nextSortDir);
+
+
+            setPage(1);
+
+
+          }}
+
+        />
+
+        {cardGrid}
+
+      </div>
 
       {layout === "card" ? (
         <div className="hidden lg:block">{cardGrid}</div>

@@ -102,3 +102,24 @@ export function bookingDepositUsed(booking: {
   if (booking.status !== "returned") return 0;
   return Math.max(0, booking.securityDeposit - (booking.depositRefundAmount ?? 0));
 }
+
+/**
+ * Splits what's been paid on a booking for display:
+ *   advance  — paid before pickup
+ *   duePaid  — the rent part of what was paid at/after pickup
+ *   security — the rest of it: the deposit, held and refunded at Return
+ * Money goes to rent first, so the deposit never shows up as rent paid.
+ */
+export function bookingPaidBreakdown(booking: {
+  totalAmount: number;
+  securityDeposit: number;
+  advancePaid?: number;
+  pickupPaid?: number;
+}): { advance: number; duePaid: number; securityHeld: number } {
+  const rentTotal = Math.max(0, booking.totalAmount - booking.securityDeposit);
+  const totalPaid = Math.max(0, booking.advancePaid ?? 0);
+  const pickup = Math.min(totalPaid, Math.max(0, booking.pickupPaid ?? 0));
+  const advance = totalPaid - pickup;
+  const duePaid = Math.min(pickup, Math.max(0, rentTotal - advance));
+  return { advance, duePaid, securityHeld: Math.max(0, totalPaid - rentTotal) };
+}

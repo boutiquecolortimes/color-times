@@ -30,7 +30,11 @@ import {
 } from "@/components/admin/service-order-form-dialog";
 import { useCanEdit } from "@/components/admin/current-user-context";
 import { cn, formatDate, isWalkinEmail } from "@/lib/utils";
-import { bookingDepositUsed, bookingRemainingDue } from "@/lib/admin/booking-status";
+import {
+  bookingDepositUsed,
+  bookingPaidBreakdown,
+  bookingRemainingDue,
+} from "@/lib/admin/booking-status";
 import type { BookingStatus, ReturnCondition } from "@/models/Booking";
 
 const REMINDABLE_STATUSES: BookingStatus[] = ["inquiry", "confirmed", "in_use"];
@@ -265,9 +269,7 @@ export function BookingDetailClient({
   // advancePaid is the running total of everything paid on the booking;
   // pickupPaid is the part collected at pickup. Split it back out so the
   // billing card reads Advance Paid (before pickup) and Due Paid (at pickup).
-  const totalPaid = Math.max(0, booking.advancePaid ?? 0);
-  const duePaid = Math.min(totalPaid, Math.max(0, booking.pickupPaid ?? 0));
-  const advanceOnly = totalPaid - duePaid;
+  const { advance: advanceOnly, duePaid } = bookingPaidBreakdown(booking);
 
   return (
     <div className="space-y-6">
