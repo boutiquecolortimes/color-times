@@ -19,6 +19,7 @@ import { AuditLogList } from "@/components/admin/audit-log-list";
 import { downloadInvoicePdf } from "@/lib/admin/invoice-pdf";
 import type { PdfLang } from "@/lib/admin/pdf-labels";
 import { getInvoiceDueBreakdown } from "@/lib/admin/invoice-totals";
+import { invoiceStageLabel } from "@/lib/admin/booking-status";
 import { formatDate, isWalkinEmail } from "@/lib/utils";
 import type { InvoiceLineItem, InvoiceStatus, PaymentMethod } from "@/models/Invoice";
 
@@ -52,6 +53,8 @@ interface InvoiceDetail {
   issuedAt: string | null;
   createdAt: string;
   notes?: string;
+  bookingStage?: string;
+  stageHistory?: { stage: string; at: string; total: number; amountPaid: number }[];
   payments: PaymentRow[];
 }
 
@@ -200,6 +203,7 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
         pickupPaid: invoice.booking?.pickupPaid ?? 0,
         payments: invoice.payments,
         notes: invoice.notes,
+        bookingStage: invoice.bookingStage,
       },
       lang
     );
@@ -211,6 +215,11 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
           <div className="flex items-center gap-3">
             <h1 className="font-heading text-2xl">{invoice.invoiceNumber}</h1>
             <InvoiceStatusBadge status={invoice.status} />
+            {invoiceStageLabel(invoice.bookingStage) && (
+              <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-medium text-accent">
+                {invoiceStageLabel(invoice.bookingStage)}
+              </span>
+            )}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             Issued {invoice.issuedAt ? formatDate(invoice.issuedAt) : "—"}{" "}
@@ -446,6 +455,26 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
               </>
             )}
           </div>
+
+          {invoice.stageHistory && invoice.stageHistory.length > 0 && (
+            <div className="rounded-lg border border-border bg-card p-6">
+              <h2 className="font-heading text-lg">Generated At</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Booking stages this invoice was generated or updated at.
+              </p>
+              <ol className="mt-3 space-y-2 text-sm">
+                {invoice.stageHistory.map((entry) => (
+                  <li key={entry.stage} className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-medium">{invoiceStageLabel(entry.stage)}</span>
+                    <span className="text-muted-foreground">
+                      {formatDate(entry.at)} &middot; Total {formatCurrency(entry.total)} &middot; Paid{" "}
+                      {formatCurrency(entry.amountPaid)}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
 
           {invoice.notes && (
             <div className="rounded-lg border border-border bg-card p-6">

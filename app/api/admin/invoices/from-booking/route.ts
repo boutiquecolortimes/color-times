@@ -10,6 +10,7 @@ import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { formatDate } from "@/lib/utils";
+import { STATUS_LABELS } from "@/lib/admin/booking-status";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 
 interface PopulatedCustomer {
@@ -60,6 +61,13 @@ export async function POST(request: NextRequest): Promise<Response> {
     }).lean();
 
     const isReturned = booking.status === "returned";
+    // The reason this invoice is being generated/updated right now — the
+    // booking's current stage (Confirmed / Picked Up / Returned).
+    const stage = booking.status;
+    const stageLabel = STATUS_LABELS[stage] ?? stage;
+    const stageNote = isReturned
+      ? `Auto-generated from booking ${booking.bookingNumber} — settled after return`
+      : `Auto-generated from booking ${booking.bookingNumber} — ${stageLabel}`;
     // A handful of bookings were bulk-imported straight into MongoDB rather
     // than created through this app, so fields the schema marks "required"
     // (rentalStartDate/rentalEndDate/securityDeposit, per-item quantity and
@@ -111,7 +119,11 @@ export async function POST(request: NextRequest): Promise<Response> {
       // reflected on the invoice already created back at Confirm. Instead of
       // failing, bring the same invoice in line with the booking's current
       // state and hand it back, so calling this is safe at every stage.
-      if (existing.status === "paid" || existing.status === "cancelled") {
+      // A paid invoice still has to be brought up to date at a later stage
+      // — e.g. paid in full at pickup, then damage charges added at return —
+      // otherwise those charges never reach the bill. Only a cancelled
+      // invoice is left untouched.
+      if (existing.status === "cancelled") {
         return apiSuccess({ invoice: existing });
       }
 
@@ -128,7 +140,13 @@ export async function POST(request: NextRequest): Promise<Response> {
       // manual payments directly on the invoice beyond what the booking tracks.
       const amountPaid = Math.max(existing.amountPaid, computedPaid);
       const amountDue = Math.max(0, total - amountPaid);
-      const status = amountDue === 0 ? "paid" : existing.status;
+      // Reopens as part-paid if a later stage added charges to a paid bill.
+      const status =
+        amountDue === 0
+          ? "paid"
+          : existing.status === "paid"
+            ? "partially_paid"
+            : existing.status;
 
       const updated = await Invoice.findByIdAndUpdate(
         existing._id,
@@ -141,9 +159,14 @@ export async function POST(request: NextRequest): Promise<Response> {
           amountPaid,
           amountDue,
           status,
-          notes: isReturned
-            ? `Auto-generated from booking ${booking.bookingNumber} — settled after return`
-            : existing.notes,
+          notes: stageNote,
+          bookingStage: stage,
+          // One entry per stage — re-running at the same stage refreshes
+          // that entry instead of piling up duplicates.
+          stageHistory: [
+            ...(existing.stageHistory ?? []).filter((entry) => entry.stage !== stage),
+            { stage, at: new Date(), total, amountPaid },
+          ],
         },
         { returnDocument: "after" }
       );
@@ -151,7 +174,8 @@ export async function POST(request: NextRequest): Promise<Response> {
       if (
         amountPaid !== existing.amountPaid ||
         total !== existing.total ||
-        status !== existing.status
+        status !== existing.status ||
+        stage !== existing.bookingStage
       ) {
         await recordAuditLog({
           entityType: "Invoice",
@@ -163,7 +187,7 @@ export async function POST(request: NextRequest): Promise<Response> {
             { field: "amountPaid", from: existing.amountPaid, to: amountPaid },
             { field: "status", from: existing.status, to: status },
           ],
-          metadata: { syncedFromBooking: booking.bookingNumber },
+          metadata: { syncedFromBooking: booking.bookingNumber, bookingStage: stageLabel },
         });
       }
 
@@ -198,9 +222,9 @@ export async function POST(request: NextRequest): Promise<Response> {
       amountDue,
       status: amountDue === 0 ? "paid" : "draft",
       dueDate: booking.eventDate,
-      notes: isReturned
-        ? `Auto-generated from booking ${booking.bookingNumber} — settled after return`
-        : `Auto-generated from booking ${booking.bookingNumber}`,
+      notes: stageNote,
+      bookingStage: stage,
+      stageHistory: [{ stage, at: new Date(), total, amountPaid }],
     });
 
     await recordAuditLog({
@@ -209,7 +233,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       action: "create",
       actor: auth.user,
       snapshot: invoice.toObject() as unknown as Record<string, unknown>,
-      metadata: { fromBooking: booking.bookingNumber },
+      metadata: { fromBooking: booking.bookingNumber, bookingStage: stageLabel },
     });
 
     // Every generated invoice also drops a matching record into the Sale

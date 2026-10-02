@@ -27,6 +27,16 @@ export interface InvoicePayment {
   recordedBy: Types.ObjectId;
 }
 
+// Why a booking invoice was generated/updated: the booking's status at that
+// moment (Confirmed, Picked Up = "in_use", Returned …). One entry per stage
+// the invoice was synced at, so the invoice shows its full reason trail.
+export interface InvoiceStageEntry {
+  stage: string;
+  at: Date;
+  total: number;
+  amountPaid: number;
+}
+
 export interface IInvoice extends Document {
   _id: Types.ObjectId;
   invoiceNumber: string;
@@ -47,6 +57,9 @@ export interface IInvoice extends Document {
   dueDate: Date;
   issuedAt?: Date | null;
   notes?: string;
+  /** Booking status when this invoice was last generated/updated. */
+  bookingStage?: string;
+  stageHistory: InvoiceStageEntry[];
   archivedAt: Date | null;
   deletedAt: Date | null;
   createdAt: Date;
@@ -100,6 +113,21 @@ const invoiceSchema = new Schema<IInvoice>(
     dueDate: { type: Date, required: true },
     issuedAt: { type: Date, default: null },
     notes: { type: String, trim: true },
+    bookingStage: { type: String, trim: true },
+    stageHistory: {
+      type: [
+        new Schema<InvoiceStageEntry>(
+          {
+            stage: { type: String, required: true },
+            at: { type: Date, required: true },
+            total: { type: Number, required: true },
+            amountPaid: { type: Number, required: true },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
     archivedAt: { type: Date, default: null, index: true },
     deletedAt: { type: Date, default: null, index: true },
   },

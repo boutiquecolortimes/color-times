@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import autoTable, { type CellHookData } from "jspdf-autotable";
 import { siteConfig } from "@/lib/config/site";
 import { getInvoiceDueBreakdown } from "@/lib/admin/invoice-totals";
+import { INVOICE_STAGE_LABELS_HI, invoiceStageLabel } from "@/lib/admin/booking-status";
 import {
   drawTermsAndConditions,
   ownerDetailLines,
@@ -46,6 +47,7 @@ interface InvoicePdfData {
   amountPaid: number;
   amountDue: number;
   pickupPaid?: number;
+  bookingStage?: string;
   payments: InvoicePdfPayment[];
   notes?: string;
 }
@@ -237,6 +239,22 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
     doc.addImage(img.dataUrl, "PNG", 196 - statusImg.widthMm - 2 - widthMm, 39 - heightMm * 0.8, widthMm, heightMm);
   } else {
     labelValue("status", statusEn(invoice.status), 196, 39);
+  }
+
+  // Why this invoice exists — the booking stage it was generated/updated at.
+  if (invoice.bookingStage) {
+    if (hi) {
+      const stageHi = INVOICE_STAGE_LABELS_HI[invoice.bookingStage] ?? invoice.bookingStage;
+      placeText(
+        renderHindiText(`बिल का कारण: ${stageHi}`, { fontSizeMm: ptToMm(10), lineHeight: 1.3 }),
+        196,
+        44,
+        "right"
+      );
+    } else if (invoiceStageLabel(invoice.bookingStage)) {
+      doc.setFontSize(10);
+      doc.text(`Generated At: ${invoiceStageLabel(invoice.bookingStage)}`, 196, 44, { align: "right" });
+    }
   }
 
   // Walk-in customers get a generated placeholder email just to satisfy the

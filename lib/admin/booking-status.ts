@@ -32,3 +32,19 @@ export const BOOKING_STATUS_TRANSITIONS: Record<BookingStatus, BookingStatus[]> 
   returned: [],
   cancelled: [],
 };
+
+/** Why a booking invoice exists, from the stage it was generated/updated at. */
+export function invoiceStageLabel(stage: string | undefined | null): string | null {
+  if (!stage) return null;
+  if (stage === "confirmed") return "Booking Confirmed";
+  return STATUS_LABELS[stage as BookingStatus] ?? stage;
+}
+
+export const INVOICE_STAGE_LABELS_HI: Record<string, string> = {
+  inquiry: "पूछताछ",
+  pending_payment: "भुगतान बाकी",
+  confirmed: "बुकिंग कंफर्म",
+  in_use: "ड्रेस पिकअप",
+  returned: "ड्रेस वापसी",
+  cancelled: "रद्द",
+};

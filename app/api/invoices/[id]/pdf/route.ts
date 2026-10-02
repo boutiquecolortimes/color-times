@@ -60,6 +60,7 @@ export async function GET(
       pickupPaid: (invoice.booking as unknown as { pickupPaid?: number } | null)?.pickupPaid ?? 0,
       payments: invoice.payments ?? [],
       notes: invoice.notes,
+      bookingStage: invoice.bookingStage,
     });
 
     return new Response(new Uint8Array(buffer), {

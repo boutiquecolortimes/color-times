@@ -72,6 +72,13 @@ export default async function InvoiceDetailPage({
           issuedAt: invoice.issuedAt ? invoice.issuedAt.toISOString() : null,
           createdAt: (invoice.createdAt ?? new Date()).toISOString(),
           notes: invoice.notes,
+          bookingStage: invoice.bookingStage,
+          stageHistory: (invoice.stageHistory ?? []).map((entry) => ({
+            stage: entry.stage,
+            at: new Date(entry.at).toISOString(),
+            total: entry.total,
+            amountPaid: entry.amountPaid,
+          })),
           payments: (invoice.payments ?? []).map((payment) => ({
             _id: String(payment._id),
             amount: payment.amount,

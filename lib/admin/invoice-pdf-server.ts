@@ -5,6 +5,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { siteConfig } from "@/lib/config/site";
 import { getInvoiceDueBreakdown } from "@/lib/admin/invoice-totals";
+import { invoiceStageLabel } from "@/lib/admin/booking-status";
 import { drawTermsAndConditions, ownerDetailLines } from "@/lib/admin/pdf-footer";
 import { formatDate, isWalkinEmail } from "@/lib/utils";
 import type { InvoiceLineItem, InvoiceStatus, PaymentMethod } from "@/models/Invoice";
@@ -32,6 +33,7 @@ interface InvoicePdfData {
   amountPaid: number;
   amountDue: number;
   pickupPaid?: number;
+  bookingStage?: string;
   payments: InvoicePdfPayment[];
   notes?: string;
 }
@@ -87,6 +89,9 @@ export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise
   doc.text(`Issued On: ${formatDate(invoice.createdAt)}`, 196, 29, { align: "right" });
   doc.text(`Due Date: ${formatDate(invoice.dueDate)}`, 196, 34, { align: "right" });
   doc.text(`Status: ${invoice.status.replace(/_/g, " ").toUpperCase()}`, 196, 39, { align: "right" });
+  if (invoiceStageLabel(invoice.bookingStage)) {
+    doc.text(`Generated At: ${invoiceStageLabel(invoice.bookingStage)}`, 196, 44, { align: "right" });
+  }
 
   // Walk-in customers get a generated placeholder email just to satisfy the
   // account system's unique/required email field (e.g.
