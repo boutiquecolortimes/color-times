@@ -34,7 +34,6 @@ interface InvoicePdfData {
   amountDue: number;
   pickupPaid?: number;
   bookingStage?: string;
-  source?: string;
   payments: InvoicePdfPayment[];
   notes?: string;
 }
@@ -103,7 +102,7 @@ export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise
   doc.text("Bill To:", 14, 46);
   doc.setFontSize(9);
   doc.text(invoice.customer.name, 14, 51);
-  const showEmail = Boolean(invoice.customer.email) && !isWalkinEmail(invoice.customer.email);
+  const showEmail = !isWalkinEmail(invoice.customer.email);
   if (showEmail) doc.text(invoice.customer.email, 14, 56);
   if (invoice.customer.phone) doc.text(invoice.customer.phone, 14, showEmail ? 61 : 56);
 
@@ -127,25 +126,16 @@ export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise
   // gets logged as an invoice payment, so "Amount Due" alone reads as if
   // the deposit is still owed even once it's in hand. Split it out.
   const due = getInvoiceDueBreakdown(invoice);
-  // Sale / Customisation bills have no rent, tax or security deposit.
-  const isOrderBill = invoice.source === "sale" || invoice.source === "customisation";
-  const summaryLines = isOrderBill
-    ? [
-        ["Advance Paid", formatCurrency(due.advancePaid)],
-        ["Due Paid", formatCurrency(due.duePaid)],
-        ["Total", formatCurrency(invoice.total)],
-        ["Remaining Due", formatCurrency(invoice.amountDue)],
-      ]
-    : [
-        ["Rent", formatCurrency(invoice.subtotal)],
-        ["Discount", `-${formatCurrency(invoice.discountAmount)}`],
-        [`Tax (${invoice.taxRate}%)`, formatCurrency(invoice.taxAmount)],
-        ["Advance Paid", formatCurrency(due.advancePaid)],
-        ["Due Paid", formatCurrency(due.duePaid)],
-        ["Total Rent", formatCurrency(due.rentTotal)],
-        ["Security Paid", formatCurrency(invoice.securityDeposit)],
-        ["Remaining Due", formatCurrency(due.rentDue)],
-      ];
+  const summaryLines = [
+    ["Rent", formatCurrency(invoice.subtotal)],
+    ["Discount", `-${formatCurrency(invoice.discountAmount)}`],
+    [`Tax (${invoice.taxRate}%)`, formatCurrency(invoice.taxAmount)],
+    ["Advance Paid", formatCurrency(due.advancePaid)],
+    ["Due Paid", formatCurrency(due.duePaid)],
+    ["Total Rent", formatCurrency(due.rentTotal)],
+    ["Security Paid", formatCurrency(invoice.securityDeposit)],
+    ["Remaining Due", formatCurrency(due.rentDue)],
+  ];
 
   autoTable(doc, {
     body: summaryLines,

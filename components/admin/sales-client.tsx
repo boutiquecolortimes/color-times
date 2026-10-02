@@ -8,6 +8,7 @@ import {
   Pencil,
   Trash2,
   Send,
+  IndianRupee,
   Eye,
   RotateCcw,
   ArrowDown,
@@ -22,6 +23,7 @@ import type { SaleRow, CustomerOption } from "@/components/admin/sale-form-dialo
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { useCanEdit } from "@/components/admin/current-user-context";
 import { ListToolbar, StatusTabs, SummaryTiles } from "@/components/admin/list-toolbar";
+import { CollectPaymentDialog, type CollectPaymentTarget } from "@/components/admin/collect-payment-dialog";
 import type { MoneySummary } from "@/lib/admin/list-summaries";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 import { formatDate } from "@/lib/utils";
@@ -120,6 +122,7 @@ export function SalesClient({
   );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [payment, setPayment] = useState("all");
+  const [collectTarget, setCollectTarget] = useState<CollectPaymentTarget | null>(null);
   const [search, setSearch] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -136,6 +139,18 @@ export function SalesClient({
     sortDir === "desc";
 
   // Any filter change goes back to page 1 and clears the selection.
+  function openCollect(sale: SaleRow) {
+    setCollectTarget({
+      kind: "sale",
+      id: sale._id,
+      billNumber: sale.billNumber,
+      customerName: sale.customerName,
+      totalAmount: sale.totalAmount,
+      advancePayment: sale.advancePayment,
+      dueAmount: sale.dueAmount,
+    });
+  }
+
   function resetPaging() {
     setPage(1);
     setSelectedIds(new Set());
@@ -403,6 +418,16 @@ export function SalesClient({
                 >
                   <Eye className="h-4 w-4" />
                 </ButtonLink>
+                {sale.dueAmount > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => openCollect(sale)}
+                    title="Collect payment"
+                  >
+                    <IndianRupee className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -674,6 +699,16 @@ export function SalesClient({
                         >
                           <Eye className="h-4 w-4" />
                         </ButtonLink>
+                        {sale.dueAmount > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openCollect(sale)}
+                            title="Collect payment"
+                          >
+                            <IndianRupee className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -724,6 +759,12 @@ export function SalesClient({
         total={pagination.total}
         itemLabel="sales"
         onPageChange={setPage}
+      />
+
+      <CollectPaymentDialog
+        target={collectTarget}
+        open={collectTarget !== null}
+        onOpenChange={(open) => !open && setCollectTarget(null)}
       />
 
       <ConfirmDialog

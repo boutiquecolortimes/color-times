@@ -20,6 +20,7 @@ interface CustomisationPdfData {
   measurements: CustomisationMeasurements;
   totalAmount: number;
   advancePayment: number;
+  duePaid?: number;
   dueAmount: number;
   notes?: string;
 }
@@ -103,10 +104,12 @@ export async function generateCustomisationPdfBuffer(order: CustomisationPdfData
     cursorY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
   }
 
+  // Same order as booking invoices: Advance Paid → Due Paid → Total → Remaining Due.
   const summaryLines = [
-    ["Total Amount", formatCurrency(order.totalAmount)],
-    ["Advance Payment", formatCurrency(order.advancePayment)],
-    ["Due Amount", formatCurrency(order.dueAmount)],
+    ["Advance Paid", formatCurrency(order.advancePayment)],
+    ["Due Paid", formatCurrency(order.duePaid ?? 0)],
+    ["Total", formatCurrency(order.totalAmount)],
+    ["Remaining Due", formatCurrency(order.dueAmount)],
   ];
 
   autoTable(doc, {

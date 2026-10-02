@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Bell, ChevronDown, Download, Loader2, Printer } from "lucide-react";
@@ -25,6 +26,7 @@ import type { InvoiceLineItem, InvoiceStatus, PaymentMethod } from "@/models/Inv
 
 interface PaymentRow {
   _id: string;
+  kind?: "advance" | "due" | "manual";
   amount: number;
   method: PaymentMethod;
   reference?: string;
@@ -39,6 +41,9 @@ interface InvoiceDetail {
   status: InvoiceStatus;
   customer: { name: string; email: string; phone?: string };
   booking: { bookingNumber: string; pickupPaid?: number } | null;
+  source?: "booking" | "sale" | "customisation" | "manual";
+  sale?: { _id: string; billNumber: string } | null;
+  customisationOrder?: { _id: string; billNumber: string } | null;
   lineItems: InvoiceLineItem[];
   subtotal: number;
   discountAmount: number;
@@ -62,6 +67,12 @@ function formatCurrency(value: number): string {
   return `₹${value.toLocaleString("en-IN")}`;
 }
 
+const PAYMENT_KIND_LABELS: Record<string, string> = {
+  advance: "Advance",
+  due: "Due Paid",
+  manual: "Payment",
+};
+
 const METHOD_LABELS: Record<PaymentMethod, string> = {
   cash: "Cash",
   card: "Card",
@@ -72,6 +83,7 @@ const METHOD_LABELS: Record<PaymentMethod, string> = {
 
 interface RawInvoicePayment {
   _id: string;
+  kind?: "advance" | "due" | "manual";
   amount: number;
   method: PaymentMethod;
   reference?: string;
@@ -91,9 +103,14 @@ async function fetchInvoice(id: string): Promise<InvoiceDetail> {
     // the system as a billing record — populate then comes back null.
     // Fall back the same way the initial server-rendered load already does
     // instead of crashing on refetch.
-    customer: invoice.customer ?? { name: "—", email: "—" },
+    customer:
+      invoice.customer ??
+      (invoice.billTo
+        ? { name: invoice.billTo.name, email: "", phone: invoice.billTo.phone }
+        : { name: "—", email: "—" }),
     payments: invoice.payments.map((payment: RawInvoicePayment) => ({
       _id: payment._id,
+      kind: payment.kind,
       amount: payment.amount,
       method: payment.method,
       reference: payment.reference,
@@ -120,6 +137,17 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
   // includes it reads as if the deposit is still owed even once it's
   // sitting in hand. Split it out so rent and deposit show separately.
   const due = getInvoiceDueBreakdown({ ...invoice, pickupPaid: invoice.booking?.pickupPaid ?? 0 });
+  // Sale / Customisation bills mirror their order: no rent/tax/deposit, and
+  // payments are collected from the order side too.
+  const isOrderBill = invoice.source === "sale" || invoice.source === "customisation";
+  const orderLink = invoice.sale
+    ? { label: `Sale bill ${invoice.sale.billNumber}`, href: `/admin/sales/${invoice.sale._id}` }
+    : invoice.customisationOrder
+      ? {
+          label: `Customisation bill ${invoice.customisationOrder.billNumber}`,
+          href: `/admin/customisation/${invoice.customisationOrder._id}/edit`,
+        }
+      : null;
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["admin", "invoice", initialInvoice._id] });
@@ -204,6 +232,7 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
         payments: invoice.payments,
         notes: invoice.notes,
         bookingStage: invoice.bookingStage,
+        source: invoice.source,
       },
       lang
     );
@@ -225,6 +254,15 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
             Issued {invoice.issuedAt ? formatDate(invoice.issuedAt) : "—"}{" "}
             &middot; Due {formatDate(invoice.dueDate)}
             {invoice.booking && <> &middot; Booking {invoice.booking.bookingNumber}</>}
+            {orderLink && (
+              <>
+                {" "}
+                &middot;{" "}
+                <Link href={orderLink.href} className="hover:text-accent hover:underline">
+                  {orderLink.label}
+                </Link>
+              </>
+            )}
           </p>
         </div>
 
@@ -297,7 +335,8 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
                 Mark Deposit Refunded
               </Button>
             )}
-          {invoice.status !== "paid" && invoice.status !== "cancelled" && (
+          {/* Order bills are cancelled from the order itself, so they stay in step. */}
+          {!isOrderBill && invoice.status !== "paid" && invoice.status !== "cancelled" && (
             <Button size="sm" variant="destructive" onClick={() => setConfirmAction("cancel")}>
               Cancel Invoice
             </Button>
@@ -325,43 +364,64 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
             </div>
             <div className="rounded-lg border border-border bg-secondary/40 p-6">
               <h2 className="font-heading text-lg">Summary</h2>
-              <div className="mt-2 space-y-1 text-sm">
-                <p className="flex justify-between">
-                  <span className="text-muted-foreground">Rent</span>
-                  <span>{formatCurrency(invoice.subtotal)}</span>
-                </p>
-                <p className="flex justify-between">
-                  <span className="text-muted-foreground">Discount</span>
-                  <span>-{formatCurrency(invoice.discountAmount)}</span>
-                </p>
-                <p className="flex justify-between">
-                  <span className="text-muted-foreground">Tax ({invoice.taxRate}%)</span>
-                  <span>{formatCurrency(invoice.taxAmount)}</span>
-                </p>
-                <p className="flex justify-between border-t border-border pt-2 text-emerald-700">
-                  <span>Advance Paid</span>
-                  <span>{formatCurrency(due.advancePaid)}</span>
-                </p>
-                <p className="flex justify-between text-emerald-700">
-                  <span>Due Paid</span>
-                  <span>{formatCurrency(due.duePaid)}</span>
-                </p>
-                <p className="flex justify-between font-medium">
-                  <span>Total Rent</span>
-                  <span>{formatCurrency(due.rentTotal)}</span>
-                </p>
-                <p className="flex justify-between text-blue-700">
-                  <span>Security Paid</span>
-                  <span>
-                    {formatCurrency(invoice.securityDeposit)}
-                    {invoice.depositRefunded ? " (Refunded)" : ""}
-                  </span>
-                </p>
-                <p className="flex justify-between border-t border-border pt-2 font-medium text-red-700">
-                  <span>Remaining Due</span>
-                  <span>{formatCurrency(due.rentDue)}</span>
-                </p>
-              </div>
+              {isOrderBill ? (
+                <div className="mt-2 space-y-1 text-sm">
+                  <p className="flex justify-between text-emerald-700">
+                    <span>Advance Paid</span>
+                    <span>{formatCurrency(due.advancePaid)}</span>
+                  </p>
+                  <p className="flex justify-between text-emerald-700">
+                    <span>Due Paid</span>
+                    <span>{formatCurrency(due.duePaid)}</span>
+                  </p>
+                  <p className="flex justify-between font-medium">
+                    <span>Total</span>
+                    <span>{formatCurrency(invoice.total)}</span>
+                  </p>
+                  <p className="flex justify-between border-t border-border pt-2 font-medium text-red-700">
+                    <span>Remaining Due</span>
+                    <span>{formatCurrency(invoice.amountDue)}</span>
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-2 space-y-1 text-sm">
+                  <p className="flex justify-between">
+                    <span className="text-muted-foreground">Rent</span>
+                    <span>{formatCurrency(invoice.subtotal)}</span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="text-muted-foreground">Discount</span>
+                    <span>-{formatCurrency(invoice.discountAmount)}</span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="text-muted-foreground">Tax ({invoice.taxRate}%)</span>
+                    <span>{formatCurrency(invoice.taxAmount)}</span>
+                  </p>
+                  <p className="flex justify-between border-t border-border pt-2 text-emerald-700">
+                    <span>Advance Paid</span>
+                    <span>{formatCurrency(due.advancePaid)}</span>
+                  </p>
+                  <p className="flex justify-between text-emerald-700">
+                    <span>Due Paid</span>
+                    <span>{formatCurrency(due.duePaid)}</span>
+                  </p>
+                  <p className="flex justify-between font-medium">
+                    <span>Total Rent</span>
+                    <span>{formatCurrency(due.rentTotal)}</span>
+                  </p>
+                  <p className="flex justify-between text-blue-700">
+                    <span>Security Paid</span>
+                    <span>
+                      {formatCurrency(invoice.securityDeposit)}
+                      {invoice.depositRefunded ? " (Refunded)" : ""}
+                    </span>
+                  </p>
+                  <p className="flex justify-between border-t border-border pt-2 font-medium text-red-700">
+                    <span>Remaining Due</span>
+                    <span>{formatCurrency(due.rentDue)}</span>
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -416,6 +476,7 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
                         <p className="text-xs text-muted-foreground">{formatDate(payment.paidAt)}</p>
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
+                        {payment.kind && `${PAYMENT_KIND_LABELS[payment.kind]} · `}
                         {METHOD_LABELS[payment.method]}
                         {payment.reference && ` · ${payment.reference}`}
                       </p>
@@ -429,6 +490,7 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
                     <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
                       <tr>
                         <th className="px-4 py-3">Date</th>
+                        <th className="px-4 py-3">Type</th>
                         <th className="px-4 py-3">Method</th>
                         <th className="px-4 py-3">Amount</th>
                         <th className="px-4 py-3">Reference</th>
@@ -439,6 +501,12 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
                       {invoice.payments.map((payment) => (
                         <tr key={payment._id} className="border-b border-border last:border-0">
                           <td className="px-4 py-3">{formatDate(payment.paidAt)}</td>
+                          <td className="px-4 py-3">
+                            {payment.kind ? PAYMENT_KIND_LABELS[payment.kind] : "Payment"}
+                            {payment.note && payment.kind === "due" && (
+                              <span className="block text-xs text-muted-foreground">{payment.note}</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3">{METHOD_LABELS[payment.method]}</td>
                           <td className="px-4 py-3">{formatCurrency(payment.amount)}</td>
                           <td className="px-4 py-3 text-muted-foreground">

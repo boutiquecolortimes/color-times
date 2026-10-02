@@ -38,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { InvoiceStatusBadge } from "@/components/admin/invoice-status-badge";
+import { StatusTabs } from "@/components/admin/list-toolbar";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { useCanEdit } from "@/components/admin/current-user-context";
@@ -62,6 +63,44 @@ interface InvoiceRow {
   createdAt: string;
   customer: { name: string; email: string; phone?: string } | null;
   booking: { bookingNumber: string } | null;
+  // Sale / Customisation invoices: the bill's own name/phone (walk-ins may
+  // have no customer record) and the order they belong to.
+  billTo?: { name: string; phone?: string } | null;
+  source?: "booking" | "sale" | "customisation" | "manual";
+  sale?: { _id: string; billNumber: string } | null;
+  customisationOrder?: { _id: string; billNumber: string } | null;
+}
+
+type TypeCounts = { all: number; booking: number; sale: number; customisation: number; manual: number };
+
+const TYPE_TABS: { value: string; label: string; countKey: keyof TypeCounts }[] = [
+  { value: "all", label: "All", countKey: "all" },
+  { value: "booking", label: "Bookings", countKey: "booking" },
+  { value: "sale", label: "Sales", countKey: "sale" },
+  { value: "customisation", label: "Customisation", countKey: "customisation" },
+  { value: "manual", label: "Other", countKey: "manual" },
+];
+
+function invoiceCustomerName(invoice: InvoiceRow): string {
+  return invoice.customer?.name ?? invoice.billTo?.name ?? "—";
+}
+
+function invoiceCustomerContact(invoice: InvoiceRow): string {
+  if (invoice.customer) return customerContact(invoice.customer);
+  return invoice.billTo?.phone || "—";
+}
+
+/** What the invoice is for, with a link to that booking / sale / order. */
+function invoiceFor(invoice: InvoiceRow): { label: string; href?: string } {
+  if (invoice.sale) return { label: `Sale · Bill ${invoice.sale.billNumber}`, href: `/admin/sales/${invoice.sale._id}` };
+  if (invoice.customisationOrder) {
+    return {
+      label: `Customisation · Bill ${invoice.customisationOrder.billNumber}`,
+      href: `/admin/customisation/${invoice.customisationOrder._id}/edit`,
+    };
+  }
+  if (invoice.booking) return { label: `Booking ${invoice.booking.bookingNumber}` };
+  return { label: "—" };
 }
 
 interface Pagination {
@@ -101,12 +140,13 @@ function formatCurrency(value: number): string {
 async function fetchInvoices(params: {
   page: number;
   status: string;
+  type: string;
   view: string;
   search: string;
   sortBy: string;
   sortDir: string;
   all?: boolean;
-}): Promise<{ invoices: InvoiceRow[]; pagination: Pagination }> {
+}): Promise<{ invoices: InvoiceRow[]; pagination: Pagination; typeCounts: TypeCounts }> {
   const searchParams = new URLSearchParams({
     page: String(params.page),
     view: params.view,
@@ -114,6 +154,7 @@ async function fetchInvoices(params: {
     sortDir: params.sortDir,
   });
   if (params.status !== "all") searchParams.set("status", params.status);
+  if (params.type !== "all") searchParams.set("type", params.type);
   if (params.search) searchParams.set("search", params.search);
   if (params.all) searchParams.set("all", "true");
 
@@ -126,9 +167,11 @@ async function fetchInvoices(params: {
 export function InvoicesClient({
   initialInvoices,
   initialPagination,
+  initialTypeCounts,
 }: {
   initialInvoices: InvoiceRow[];
   initialPagination: Pagination;
+  initialTypeCounts: TypeCounts;
 }) {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -138,6 +181,7 @@ export function InvoicesClient({
   const [view, setView] = useState<"active" | "trash">("active");
   const [layout, setLayout] = useState<"table" | "card">("table");
   const [search, setSearch] = useState("");
+  const [type, setType] = useState("all");
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [confirmState, setConfirmState] = useState<{
@@ -166,18 +210,25 @@ export function InvoicesClient({
   }
 
   const isDefaultQuery =
-    page === 1 && status === "all" && view === "active" && search === "" && sortBy === "createdAt" && sortDir === "desc";
+    page === 1 &&
+    status === "all" &&
+    type === "all" &&
+    view === "active" &&
+    search === "" &&
+    sortBy === "createdAt" &&
+    sortDir === "desc";
 
   const { data } = useQuery({
-    queryKey: ["admin", "invoices", { page, status, view, search, sortBy, sortDir }],
-    queryFn: () => fetchInvoices({ page, status, view, search, sortBy, sortDir }),
+    queryKey: ["admin", "invoices", { page, status, type, view, search, sortBy, sortDir }],
+    queryFn: () => fetchInvoices({ page, status, type, view, search, sortBy, sortDir }),
     initialData: isDefaultQuery
-      ? { invoices: initialInvoices, pagination: initialPagination }
+      ? { invoices: initialInvoices, pagination: initialPagination, typeCounts: initialTypeCounts }
       : undefined,
   });
 
   const invoices = data?.invoices ?? [];
   const pagination = data?.pagination ?? initialPagination;
+  const typeCounts = data?.typeCounts ?? initialTypeCounts;
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
@@ -330,11 +381,12 @@ export function InvoicesClient({
     rows: (string | number)[][];
     totals: (string | number)[];
   }> {
-    const full = await fetchInvoices({ page: 1, status, view, search, sortBy, sortDir, all: true });
+    const full = await fetchInvoices({ page: 1, status, type, view, search, sortBy, sortDir, all: true });
     const headers = [
       "Sr No",
       "Invoice #",
       "Customer",
+      "For",
       "Total",
       "Paid",
       "Remaining Due",
@@ -347,7 +399,8 @@ export function InvoicesClient({
       return [
         index + 1,
         invoice.invoiceNumber,
-        invoice.customer?.name ?? "—",
+        invoiceCustomerName(invoice),
+        invoiceFor(invoice).label,
         invoice.total,
         invoice.amountPaid,
         due.rentDue,
@@ -359,6 +412,7 @@ export function InvoicesClient({
     const totals = [
       "",
       "TOTAL",
+      "",
       "",
       full.invoices.reduce((sum, invoice) => sum + invoice.total, 0),
       full.invoices.reduce((sum, invoice) => sum + invoice.amountPaid, 0),
@@ -393,12 +447,10 @@ export function InvoicesClient({
             </div>
             <InvoiceStatusBadge status={invoice.status} />
           </div>
-          <p className="mt-2 text-sm">{invoice.customer?.name ?? "—"}</p>
-          <p className="text-xs text-muted-foreground">
-            {invoice.customer ? customerContact(invoice.customer) : "—"}
-          </p>
-          {invoice.booking && (
-            <p className="mt-1 text-xs text-muted-foreground">Booking {invoice.booking.bookingNumber}</p>
+          <p className="mt-2 text-sm">{invoiceCustomerName(invoice)}</p>
+          <p className="text-xs text-muted-foreground">{invoiceCustomerContact(invoice)}</p>
+          {invoiceFor(invoice).label !== "—" && (
+            <p className="mt-1 text-xs text-muted-foreground">{invoiceFor(invoice).label}</p>
           )}
           <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
             <div>
@@ -503,18 +555,32 @@ export function InvoicesClient({
         <div>
           <h1 className="font-heading text-2xl">Invoices</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Billing, invoicing, and payment tracking.
+            Every bill in one place — bookings, sales and customisation — with payment history.
           </p>
         </div>
         <ButtonLink href="/admin/invoices/new">New Invoice</ButtonLink>
       </div>
 
+      <StatusTabs
+        value={type}
+        onChange={(value) => {
+          setType(value);
+          setPage(1);
+          clearSelection();
+        }}
+        tabs={TYPE_TABS.map((tab) => ({
+          value: tab.value,
+          label: tab.label,
+          count: typeCounts[tab.countKey],
+        }))}
+      />
+
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search invoice number..."
-            className="w-64 pl-9"
+            placeholder="Search invoice #, customer, phone, or bill #..."
+            className="w-72 pl-9"
             value={search}
             onChange={(event) => {
               setSearch(event.target.value);
@@ -682,7 +748,7 @@ export function InvoicesClient({
                 </button>
               </th>
               <th className="px-4 py-3">Customer</th>
-              <th className="px-4 py-3">Booking</th>
+              <th className="px-4 py-3">For</th>
               <th className="px-4 py-3">
                 <button className="flex items-center gap-1" onClick={() => toggleSort("total")}>
                   Total <SortIcon field="total" sortBy={sortBy} sortDir={sortDir} />
@@ -732,13 +798,17 @@ export function InvoicesClient({
                   </Link>
                 </td>
                 <td className="px-4 py-3">
-                  <p>{invoice.customer?.name ?? "—"}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {invoice.customer ? customerContact(invoice.customer) : "—"}
-                  </p>
+                  <p>{invoiceCustomerName(invoice)}</p>
+                  <p className="text-xs text-muted-foreground">{invoiceCustomerContact(invoice)}</p>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">
-                  {invoice.booking?.bookingNumber ?? "—"}
+                  {invoiceFor(invoice).href ? (
+                    <Link href={invoiceFor(invoice).href!} className="hover:text-accent hover:underline">
+                      {invoiceFor(invoice).label}
+                    </Link>
+                  ) : (
+                    invoiceFor(invoice).label
+                  )}
                 </td>
                 <td className="px-4 py-3">{formatCurrency(invoice.total)}</td>
                 <td className="px-4 py-3 text-emerald-700">{formatCurrency(invoice.amountPaid)}</td>

@@ -24,6 +24,9 @@ export interface ISale extends Document {
   details?: string;
   totalAmount: number;
   advancePayment: number;
+  // Paid after the advance (collected via "Collect payment"). Each payment
+  // is also logged on the linked invoice. dueAmount = total − advance − duePaid.
+  duePaid?: number;
   dueAmount: number;
   source: SaleSource;
   deletedAt: Date | null;
@@ -43,6 +46,7 @@ const saleSchema = new Schema<ISale>(
     details: { type: String, trim: true },
     totalAmount: { type: Number, required: true, min: 0 },
     advancePayment: { type: Number, required: true, min: 0, default: 0 },
+    duePaid: { type: Number, min: 0, default: 0 },
     dueAmount: { type: Number, required: true, min: 0, default: 0 },
     source: { type: String, enum: ["manual", "booking"], default: "manual", index: true },
     deletedAt: { type: Date, default: null, index: true },

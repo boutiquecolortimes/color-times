@@ -1,12 +1,14 @@
 import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Sale } from "@/models/Sale";
+import { Invoice } from "@/models/Invoice";
 import { Product } from "@/models/Product";
 import { saleUpdateSchema, computeSaleDue } from "@/lib/validations/sale";
 import { findUpcomingBookingForProduct } from "@/lib/admin/booking-availability";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES, MANAGER_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog, diffObjects } from "@/lib/audit/log";
+import { syncOrderInvoiceSafely } from "@/lib/admin/order-invoices";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 
 interface RouteParams {
@@ -35,7 +37,10 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
   const { id } = await params;
   await connectToDatabase();
 
-  const sale = await Sale.findById(id).populate("product", "name images sku").lean();
+  const [sale, invoice] = await Promise.all([
+    Sale.findById(id).populate("product", "name images sku").lean(),
+    Invoice.findOne({ sale: id }).select("_id").lean(),
+  ]);
   if (!sale) {
     return apiError("Sale not found", 404);
   }
@@ -46,7 +51,9 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
     sale: {
       ...sale,
       advancePayment: sale.advancePayment ?? 0,
+      duePaid: sale.duePaid ?? 0,
       dueAmount: sale.dueAmount ?? 0,
+      invoiceId: invoice ? String(invoice._id) : null,
     },
   });
 }
@@ -114,6 +121,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       update.dueAmount = computeSaleDue({
         totalAmount: input.totalAmount ?? before.totalAmount ?? 0,
         advancePayment: input.advancePayment ?? before.advancePayment ?? 0,
+        duePaid: before.duePaid ?? 0,
       });
     }
 
@@ -147,6 +155,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
         actor: auth.user,
         changes,
       });
+    }
+
+    if (before.source !== "booking") {
+      await syncOrderInvoiceSafely("sale", id, auth.user, "sale_updated");
     }
 
     return apiSuccess({ sale });
@@ -188,6 +200,9 @@ export async function DELETE(request: NextRequest, { params }: RouteParams): Pro
     actor: auth.user,
     snapshot: sale.toObject() as unknown as Record<string, unknown>,
   });
+
+  // Its invoice moves to Trash with it.
+  if (before.source !== "booking") await syncOrderInvoiceSafely("sale", id, auth.user);
 
   return apiSuccess({ deleted: true });
 }

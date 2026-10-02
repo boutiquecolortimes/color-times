@@ -23,7 +23,7 @@ export interface InvoiceDueBreakdownInput {
   /** Amount collected at pickup on the linked booking (Booking.pickupPaid). */
   pickupPaid?: number;
   /** Payments logged directly on the invoice after it was issued. */
-  payments?: { amount: number }[];
+  payments?: { amount: number; kind?: string }[];
 }
 
 export interface InvoiceDueBreakdown {
@@ -56,8 +56,19 @@ export function getInvoiceDueBreakdown(invoice: InvoiceDueBreakdownInput): Invoi
   const paidTowardRent = Math.min(Math.max(0, invoice.amountPaid), rentTotal);
   const rentDue = Math.max(0, rentTotal - paidTowardRent);
   const amountPaid = Math.max(0, invoice.amountPaid);
-  const loggedPayments = (invoice.payments ?? []).reduce((sum, p) => sum + (p.amount ?? 0), 0);
-  const duePaid = Math.min(amountPaid, Math.max(0, invoice.pickupPaid ?? 0) + loggedPayments);
+  const payments = invoice.payments ?? [];
+  let duePaid: number;
+  if (payments.some((p) => p.kind === "advance")) {
+    // Sale / Customisation invoices tag each payment — the advance entry is
+    // the advance, everything else was paid after it.
+    const advance = payments
+      .filter((p) => p.kind === "advance")
+      .reduce((sum, p) => sum + (p.amount ?? 0), 0);
+    duePaid = Math.max(0, amountPaid - Math.min(amountPaid, advance));
+  } else {
+    const loggedPayments = payments.reduce((sum, p) => sum + (p.amount ?? 0), 0);
+    duePaid = Math.min(amountPaid, Math.max(0, invoice.pickupPaid ?? 0) + loggedPayments);
+  }
   const advancePaid = amountPaid - duePaid;
   return {
     rentTotal,

@@ -6,9 +6,16 @@ import autoTable from "jspdf-autotable";
 import { siteConfig } from "@/lib/config/site";
 import { getInvoiceDueBreakdown } from "@/lib/admin/invoice-totals";
 import { invoiceStageLabel } from "@/lib/admin/booking-status";
-import { drawTermsAndConditions, ownerDetailLines } from "@/lib/admin/pdf-footer";
+import {
+  drawTermsAndConditions,
+  ownerDetailLines,
+} from "@/lib/admin/pdf-footer";
 import { formatDate, isWalkinEmail } from "@/lib/utils";
-import type { InvoiceLineItem, InvoiceStatus, PaymentMethod } from "@/models/Invoice";
+import type {
+  InvoiceLineItem,
+  InvoiceStatus,
+  PaymentMethod,
+} from "@/models/Invoice";
 
 interface InvoicePdfPayment {
   amount: number;
@@ -51,17 +58,25 @@ function formatCurrency(value: number): string {
   return `Rs. ${value.toLocaleString("en-IN")}`;
 }
 
-async function loadLogoDataUrl(): Promise<{ dataUrl: string; ratio: number } | null> {
+async function loadLogoDataUrl(): Promise<{
+  dataUrl: string;
+  ratio: number;
+} | null> {
   try {
     const filePath = path.join(process.cwd(), "public", "logo-icon.png");
     const buffer = await readFile(filePath);
-    return { dataUrl: `data:image/png;base64,${buffer.toString("base64")}`, ratio: 1 };
+    return {
+      dataUrl: `data:image/png;base64,${buffer.toString("base64")}`,
+      ratio: 1,
+    };
   } catch {
     return null;
   }
 }
 
-export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise<Buffer> {
+export async function generateInvoicePdfBuffer(
+  invoice: InvoicePdfData,
+): Promise<Buffer> {
   const doc = new jsPDF({ orientation: "portrait" });
   const logo = await loadLogoDataUrl();
 
@@ -77,7 +92,11 @@ export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise
   doc.text(siteConfig.name, textStartX, 19);
   doc.setFontSize(9);
   doc.text(siteConfig.contact.address, textStartX, 25);
-  doc.text(`${siteConfig.contact.email} · ${siteConfig.contact.phone}`, textStartX, 30);
+  doc.text(
+    `${siteConfig.contact.email} · ${siteConfig.contact.phone}`,
+    textStartX,
+    30,
+  );
   doc.setFontSize(8);
   ownerDetailLines().forEach((line, index) => {
     doc.text(line, textStartX, 34 + index * 4);
@@ -87,11 +106,25 @@ export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise
   doc.text("INVOICE", 196, 18, { align: "right" });
   doc.setFontSize(10);
   doc.text(invoice.invoiceNumber, 196, 24, { align: "right" });
-  doc.text(`Issued On: ${formatDate(invoice.createdAt)}`, 196, 29, { align: "right" });
-  doc.text(`Due Date: ${formatDate(invoice.dueDate)}`, 196, 34, { align: "right" });
-  doc.text(`Status: ${invoice.status.replace(/_/g, " ").toUpperCase()}`, 196, 39, { align: "right" });
+  doc.text(`Issued On: ${formatDate(invoice.createdAt)}`, 196, 29, {
+    align: "right",
+  });
+  doc.text(`Due Date: ${formatDate(invoice.dueDate)}`, 196, 34, {
+    align: "right",
+  });
+  doc.text(
+    `Status: ${invoice.status.replace(/_/g, " ").toUpperCase()}`,
+    196,
+    39,
+    { align: "right" },
+  );
   if (invoiceStageLabel(invoice.bookingStage)) {
-    doc.text(`Generated At: ${invoiceStageLabel(invoice.bookingStage)}`, 196, 44, { align: "right" });
+    doc.text(
+      `Generated At: ${invoiceStageLabel(invoice.bookingStage)}`,
+      196,
+      44,
+      { align: "right" },
+    );
   }
 
   // Walk-in customers get a generated placeholder email just to satisfy the
@@ -103,9 +136,11 @@ export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise
   doc.text("Bill To:", 14, 46);
   doc.setFontSize(9);
   doc.text(invoice.customer.name, 14, 51);
-  const showEmail = Boolean(invoice.customer.email) && !isWalkinEmail(invoice.customer.email);
+  const showEmail =
+    Boolean(invoice.customer.email) && !isWalkinEmail(invoice.customer.email);
   if (showEmail) doc.text(invoice.customer.email, 14, 56);
-  if (invoice.customer.phone) doc.text(invoice.customer.phone, 14, showEmail ? 61 : 56);
+  if (invoice.customer.phone)
+    doc.text(invoice.customer.phone, 14, showEmail ? 61 : 56);
 
   autoTable(doc, {
     head: [["Description", "Quantity", "Unit Price", "Amount"]],
@@ -120,15 +155,17 @@ export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise
     headStyles: { fillColor: [32, 26, 22] },
   });
 
-  const afterLineItemsY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
-    .finalY;
+  const afterLineItemsY = (
+    doc as unknown as { lastAutoTable: { finalY: number } }
+  ).lastAutoTable.finalY;
 
   // Security deposits are usually collected and held separately from what
   // gets logged as an invoice payment, so "Amount Due" alone reads as if
   // the deposit is still owed even once it's in hand. Split it out.
   const due = getInvoiceDueBreakdown(invoice);
   // Sale / Customisation bills have no rent, tax or security deposit.
-  const isOrderBill = invoice.source === "sale" || invoice.source === "customisation";
+  const isOrderBill =
+    invoice.source === "sale" || invoice.source === "customisation";
   const summaryLines = isOrderBill
     ? [
         ["Advance Paid", formatCurrency(due.advancePaid)],
@@ -152,11 +189,16 @@ export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise
     startY: afterLineItemsY + 6,
     theme: "plain",
     styles: { fontSize: 9 },
-    columnStyles: { 0: { halign: "right", cellWidth: 130 }, 1: { halign: "right", cellWidth: 46 } },
+    columnStyles: {
+      0: { halign: "right", cellWidth: 130 },
+      1: { halign: "right", cellWidth: 46 },
+    },
     margin: { left: 20 },
   });
 
-  let cursorY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+  let cursorY =
+    (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
+      .finalY + 8;
 
   if (invoice.payments.length > 0) {
     doc.setFontSize(11);
@@ -173,7 +215,9 @@ export async function generateInvoicePdfBuffer(invoice: InvoicePdfData): Promise
       styles: { fontSize: 8 },
       headStyles: { fillColor: [32, 26, 22] },
     });
-    cursorY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+    cursorY =
+      (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
+        .finalY + 8;
   }
 
   if (invoice.notes) {

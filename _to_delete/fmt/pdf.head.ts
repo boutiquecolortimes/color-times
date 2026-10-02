@@ -48,7 +48,6 @@ interface InvoicePdfData {
   amountDue: number;
   pickupPaid?: number;
   bookingStage?: string;
-  source?: string;
   payments: InvoicePdfPayment[];
   notes?: string;
 }
@@ -267,7 +266,7 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
   label("billTo", 14, 46);
   doc.setFontSize(9);
   doc.text(invoice.customer.name, 14, 51);
-  const showEmail = Boolean(invoice.customer.email) && !isWalkinEmail(invoice.customer.email);
+  const showEmail = !isWalkinEmail(invoice.customer.email);
   if (showEmail) doc.text(invoice.customer.email, 14, 56);
   if (invoice.customer.phone) doc.text(invoice.customer.phone, 14, showEmail ? 61 : 56);
 
@@ -330,26 +329,16 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
   // gets logged as an invoice payment, so "Amount Due" alone reads as if
   // the deposit is still owed even once it's in hand. Split it out.
   const due = getInvoiceDueBreakdown(invoice);
-  // Sale / Customisation bills have no rent, tax or security deposit —
-  // just Advance Paid, Due Paid, Total and Remaining Due.
-  const isOrderBill = invoice.source === "sale" || invoice.source === "customisation";
-  const summaryRows: { key: LabelKey; value: string }[] = isOrderBill
-    ? [
-        { key: "rowAdvancePaid", value: formatCurrency(due.advancePaid) },
-        { key: "rowDuePaid", value: formatCurrency(due.duePaid) },
-        { key: "rowTotal", value: formatCurrency(invoice.total) },
-        { key: "rowRemainingDue", value: formatCurrency(invoice.amountDue) },
-      ]
-    : [
-        { key: "rowRent", value: formatCurrency(invoice.subtotal) },
-        { key: "rowDiscount", value: `-${formatCurrency(invoice.discountAmount)}` },
-        { key: "rowTax", value: `${formatCurrency(invoice.taxAmount)} (${invoice.taxRate}%)` },
-        { key: "rowAdvancePaid", value: formatCurrency(due.advancePaid) },
-        { key: "rowDuePaid", value: formatCurrency(due.duePaid) },
-        { key: "rowTotalRent", value: formatCurrency(due.rentTotal) },
-        { key: "rowSecurityPaid", value: formatCurrency(invoice.securityDeposit) },
-        { key: "rowRemainingDue", value: formatCurrency(due.rentDue) },
-      ];
+  const summaryRows: { key: LabelKey; value: string }[] = [
+    { key: "rowRent", value: formatCurrency(invoice.subtotal) },
+    { key: "rowDiscount", value: `-${formatCurrency(invoice.discountAmount)}` },
+    { key: "rowTax", value: `${formatCurrency(invoice.taxAmount)} (${invoice.taxRate}%)` },
+    { key: "rowAdvancePaid", value: formatCurrency(due.advancePaid) },
+    { key: "rowDuePaid", value: formatCurrency(due.duePaid) },
+    { key: "rowTotalRent", value: formatCurrency(due.rentTotal) },
+    { key: "rowSecurityPaid", value: formatCurrency(invoice.securityDeposit) },
+    { key: "rowRemainingDue", value: formatCurrency(due.rentDue) },
+  ];
 
   autoTable(doc, {
     body: summaryRows.map((row) => [EN_LABELS[row.key], row.value]),

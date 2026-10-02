@@ -4,6 +4,7 @@ import { Sale } from "@/models/Sale";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES, MANAGER_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
+import { deleteOrderInvoices } from "@/lib/admin/order-invoices";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 
 export async function DELETE(
@@ -30,6 +31,7 @@ export async function DELETE(
     // else still marks it sold) when this sale was first moved to trash, so
     // there's no inventory side effect left to handle here.
     await Sale.findByIdAndDelete(id);
+    await deleteOrderInvoices("sale", [id]);
 
     await recordAuditLog({
       entityType: "Sale",

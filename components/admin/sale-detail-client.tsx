@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Download, Loader2, Pencil, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, FileText, IndianRupee, Loader2, Pencil, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AuditLogList } from "@/components/admin/audit-log-list";
 import { useCanEdit } from "@/components/admin/current-user-context";
+import { CollectPaymentDialog } from "@/components/admin/collect-payment-dialog";
 import { formatDate } from "@/lib/utils";
 import type { SaleSource } from "@/models/Sale";
 
@@ -34,6 +35,10 @@ interface SaleDetail {
   product: SaleProduct | null;
   details?: string;
   totalAmount: number;
+  advancePayment: number;
+  duePaid: number;
+  dueAmount: number;
+  invoiceId: string | null;
   source: SaleSource;
   createdAt: string;
 }
@@ -59,6 +64,7 @@ export function SaleDetailClient({ initialSale }: { initialSale: SaleDetail }) {
   const queryClient = useQueryClient();
   const canEdit = useCanEdit();
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [collectOpen, setCollectOpen] = useState(false);
 
   const { data: sale = initialSale } = useQuery({
     queryKey: ["admin", "sale", initialSale._id],
@@ -120,6 +126,16 @@ export function SaleDetailClient({ initialSale }: { initialSale: SaleDetail }) {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          {sale.source !== "booking" && sale.dueAmount > 0 && (
+            <Button size="sm" onClick={() => setCollectOpen(true)}>
+              <IndianRupee className="h-4 w-4" /> Collect Payment
+            </Button>
+          )}
+          {sale.invoiceId && (
+            <ButtonLink variant="outline" size="sm" href={`/admin/invoices/${sale.invoiceId}`}>
+              <FileText className="h-4 w-4" /> View Invoice
+            </ButtonLink>
+          )}
           <ButtonLink variant="outline" size="sm" href={pdfUrl} target="_blank" rel="noopener noreferrer">
             <Download className="h-4 w-4" /> PDF
           </ButtonLink>
@@ -207,11 +223,24 @@ export function SaleDetailClient({ initialSale }: { initialSale: SaleDetail }) {
           )}
 
           <div className="rounded-lg border border-border bg-secondary/40 p-6">
-            <div className="flex items-center justify-between">
-              <span className="font-heading text-lg">Total Amount</span>
-              <span className="text-xl font-medium text-accent">
-                {formatCurrency(sale.totalAmount)}
-              </span>
+            <h2 className="font-heading text-lg">Payment</h2>
+            <div className="mt-2 space-y-1 text-sm">
+              <p className="flex justify-between text-emerald-700">
+                <span>Advance Paid</span>
+                <span>{formatCurrency(sale.advancePayment ?? 0)}</span>
+              </p>
+              <p className="flex justify-between text-emerald-700">
+                <span>Due Paid</span>
+                <span>{formatCurrency(sale.duePaid ?? 0)}</span>
+              </p>
+              <p className="flex justify-between font-medium">
+                <span>Total</span>
+                <span>{formatCurrency(sale.totalAmount)}</span>
+              </p>
+              <p className="flex justify-between border-t border-border pt-2 font-medium text-red-700">
+                <span>Remaining Due</span>
+                <span>{formatCurrency(sale.dueAmount ?? 0)}</span>
+              </p>
             </div>
           </div>
         </TabsContent>
@@ -222,6 +251,20 @@ export function SaleDetailClient({ initialSale }: { initialSale: SaleDetail }) {
           </div>
         </TabsContent>
       </Tabs>
+
+      <CollectPaymentDialog
+        target={{
+          kind: "sale",
+          id: sale._id,
+          billNumber: sale.billNumber,
+          customerName: sale.customerName,
+          totalAmount: sale.totalAmount,
+          advancePayment: sale.advancePayment ?? 0,
+          dueAmount: sale.dueAmount ?? 0,
+        }}
+        open={collectOpen}
+        onOpenChange={setCollectOpen}
+      />
 
       <ConfirmDialog
         open={deleteOpen}

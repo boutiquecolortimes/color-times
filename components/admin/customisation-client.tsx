@@ -10,6 +10,7 @@ import {
   Pencil,
   Plus,
   Send,
+  IndianRupee,
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ import { useCanEdit } from "@/components/admin/current-user-context";
 import type { CustomisationOrderRow, CustomerOption } from "@/components/admin/customisation-form-dialog";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 import { ListToolbar, StatusTabs, SummaryTiles } from "@/components/admin/list-toolbar";
+import { CollectPaymentDialog, type CollectPaymentTarget } from "@/components/admin/collect-payment-dialog";
 import type { MoneySummary } from "@/lib/admin/list-summaries";
 import { formatDate } from "@/lib/utils";
 import type { CustomisationOrderStatus } from "@/models/CustomisationOrder";
@@ -129,6 +131,31 @@ export function CustomisationClient({
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [search, setSearch] = useState("");
+  const [collectTarget, setCollectTarget] = useState<CollectPaymentTarget | null>(null);
+  const [collectMarksDelivered, setCollectMarksDelivered] = useState(false);
+
+  function openCollect(order: CustomisationOrderRow, markDelivered: boolean) {
+    setCollectMarksDelivered(markDelivered);
+    setCollectTarget({
+      kind: "customisation",
+      id: order._id,
+      billNumber: order.billNumber,
+      customerName: order.customerName,
+      totalAmount: order.totalAmount,
+      advancePayment: order.advancePayment,
+      dueAmount: order.dueAmount,
+    });
+  }
+
+  // Moving to Delivered with money still due opens the Collect payment
+  // popup instead (it marks the order delivered once payment is recorded).
+  function changeStatus(order: CustomisationOrderRow, value: string) {
+    if (value === "delivered" && order.dueAmount > 0) {
+      openCollect(order, true);
+      return;
+    }
+    statusMutation.mutate({ id: order._id, status: value as CustomisationOrderStatus });
+  }
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
@@ -316,9 +343,7 @@ export function CustomisationClient({
               <Select
                 value={order.status}
                 onValueChange={(value) => {
-                  if (value && value !== order.status) {
-                    statusMutation.mutate({ id: order._id, status: value as CustomisationOrderStatus });
-                  }
+                  if (value && value !== order.status) changeStatus(order, value);
                 }}
               >
                 <SelectTrigger className="mt-3 w-full" size="sm">
@@ -333,6 +358,16 @@ export function CustomisationClient({
                 </SelectContent>
               </Select>
               <div className="mt-3 flex justify-end gap-1">
+                {order.dueAmount > 0 && order.status !== "cancelled" && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => openCollect(order, false)}
+                    title="Collect payment"
+                  >
+                    <IndianRupee className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -529,17 +564,12 @@ export function CustomisationClient({
                     <Select
                       value={order.status}
                       onValueChange={(value) => {
-                        if (value && value !== order.status) {
-                          statusMutation.mutate({
-                            id: order._id,
-                            status: value as CustomisationOrderStatus,
-                          });
-                        }
+                        if (value && value !== order.status) changeStatus(order, value);
                       }}
                     >
                       <SelectTrigger size="sm" className="w-40">
                         <SelectValue>
-                          {(value: string) => value.replace("_", " ")}
+                          {(value: string) => STATUS_LABELS[value] ?? value}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
@@ -555,6 +585,16 @@ export function CustomisationClient({
                 <td className="px-4 py-3">
                   {view === "active" && (
                     <div className="flex justify-end gap-1">
+                      {order.dueAmount > 0 && order.status !== "cancelled" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openCollect(order, false)}
+                          title="Collect payment"
+                        >
+                          <IndianRupee className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -604,6 +644,13 @@ export function CustomisationClient({
         total={pagination.total}
         itemLabel="orders"
         onPageChange={setPage}
+      />
+
+      <CollectPaymentDialog
+        target={collectTarget}
+        open={collectTarget !== null}
+        onOpenChange={(open) => !open && setCollectTarget(null)}
+        markDelivered={collectMarksDelivered}
       />
 
       <ConfirmDialog

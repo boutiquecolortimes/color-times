@@ -4,6 +4,7 @@ import { Sale } from "@/models/Sale";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
+import { syncOrderInvoiceSafely } from "@/lib/admin/order-invoices";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 
 export async function POST(
@@ -36,6 +37,8 @@ export async function POST(
       action: "restore",
       actor: auth.user,
     });
+
+    await syncOrderInvoiceSafely("sale", id, auth.user);
 
     return apiSuccess({ sale });
   } catch (error) {

@@ -87,6 +87,7 @@ export default async function EditSalePage({
       <SaleForm
         saleId={id}
         defaultValues={defaultValues}
+        duePaid={sale.duePaid ?? 0}
         products={products.map((product) => ({
           _id: String(product._id),
           name: product.name,

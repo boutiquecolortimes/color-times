@@ -24,8 +24,9 @@ export type CustomisationOrderInput = z.infer<typeof customisationOrderSchema>;
 export function computeCustomisationDue(input: {
   totalAmount: number;
   advancePayment: number;
+  duePaid?: number;
 }): number {
-  return Math.max(0, input.totalAmount - input.advancePayment);
+  return Math.max(0, input.totalAmount - input.advancePayment - (input.duePaid ?? 0));
 }
 
 export const customisationStatusSchema = z.object({

@@ -17,8 +17,18 @@ export interface InvoiceLineItem {
   amount: number;
 }
 
+// What a payment entry is for — lets the invoice show a clear history:
+// Advance (taken when the order/booking was made), Due Paid (collected
+// later, e.g. at delivery), or a payment recorded by hand on the invoice.
+export type InvoicePaymentKind = "advance" | "due" | "manual";
+
+// Where the invoice came from. Older invoices have no value stored: treat
+// them as "booking" when they have a booking link, else "manual".
+export type InvoiceSource = "booking" | "sale" | "customisation" | "manual";
+
 export interface InvoicePayment {
   _id?: Types.ObjectId;
+  kind?: InvoicePaymentKind;
   amount: number;
   method: PaymentMethod;
   reference?: string;
@@ -40,8 +50,15 @@ export interface InvoiceStageEntry {
 export interface IInvoice extends Document {
   _id: Types.ObjectId;
   invoiceNumber: string;
-  customer: Types.ObjectId;
+  // Optional for Sale / Customisation invoices — walk-in sales don't always
+  // have a customer record; billTo below always carries name/phone.
+  customer?: Types.ObjectId | null;
   booking?: Types.ObjectId | null;
+  source?: InvoiceSource;
+  sale?: Types.ObjectId | null;
+  customisationOrder?: Types.ObjectId | null;
+  /** Name/phone/address as printed on the bill (snapshot from the order). */
+  billTo?: { name: string; phone?: string; address?: string };
   lineItems: InvoiceLineItem[];
   subtotal: number;
   discountAmount: number;
@@ -78,6 +95,7 @@ const lineItemSchema = new Schema<InvoiceLineItem>(
 
 const paymentSchema = new Schema<InvoicePayment>(
   {
+    kind: { type: String, enum: ["advance", "due", "manual"] },
     amount: { type: Number, required: true, min: 0.01 },
     method: { type: String, enum: ["cash", "card", "upi", "bank_transfer", "other"], required: true },
     reference: { type: String, trim: true },
@@ -91,8 +109,27 @@ const paymentSchema = new Schema<InvoicePayment>(
 const invoiceSchema = new Schema<IInvoice>(
   {
     invoiceNumber: { type: String, required: true, unique: true, index: true },
-    customer: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    customer: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
     booking: { type: Schema.Types.ObjectId, ref: "Booking", default: null, index: true },
+    source: { type: String, enum: ["booking", "sale", "customisation", "manual"], index: true },
+    sale: { type: Schema.Types.ObjectId, ref: "Sale", default: null, index: true },
+    customisationOrder: {
+      type: Schema.Types.ObjectId,
+      ref: "CustomisationOrder",
+      default: null,
+      index: true,
+    },
+    billTo: {
+      type: new Schema(
+        {
+          name: { type: String, required: true, trim: true },
+          phone: { type: String, trim: true },
+          address: { type: String, trim: true },
+        },
+        { _id: false }
+      ),
+      default: undefined,
+    },
     lineItems: { type: [lineItemSchema], required: true, validate: (v: unknown[]) => v.length > 0 },
     subtotal: { type: Number, required: true, min: 0 },
     discountAmount: { type: Number, default: 0, min: 0 },

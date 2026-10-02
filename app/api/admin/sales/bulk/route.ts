@@ -6,6 +6,7 @@ import { Product } from "@/models/Product";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES, MANAGER_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
+import { deleteOrderInvoices, syncOrderInvoiceSafely } from "@/lib/admin/order-invoices";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 
 const bulkSaleActionSchema = z.object({
@@ -55,6 +56,10 @@ export async function POST(request: NextRequest): Promise<Response> {
       // applicable) when these sales were first moved to trash, so there's
       // no inventory side effect left to handle here.
       await Sale.deleteMany({ _id: { $in: sales.map((s) => s._id) } });
+      await deleteOrderInvoices(
+        "sale",
+        sales.map((s) => String(s._id))
+      );
 
       await recordAuditLog({
         entityType: "Sale",
@@ -78,6 +83,9 @@ export async function POST(request: NextRequest): Promise<Response> {
         { _id: { $in: input.ids }, deletedAt: { $ne: null } },
         { deletedAt: null }
       );
+      for (const saleId of input.ids) {
+        await syncOrderInvoiceSafely("sale", String(saleId), auth.user);
+      }
 
       await recordAuditLog({
         entityType: "Sale",
@@ -102,6 +110,9 @@ export async function POST(request: NextRequest): Promise<Response> {
     );
 
     const trashedIds = sales.map((s) => String(s._id));
+    for (const saleId of trashedIds) {
+      await syncOrderInvoiceSafely("sale", saleId, auth.user);
+    }
     const manualProductIds = [
       ...new Set(
         sales.filter((s) => s.source !== "booking").map((s) => String(s.product))

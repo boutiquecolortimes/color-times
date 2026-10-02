@@ -2,7 +2,14 @@ import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Invoice } from "@/models/Invoice";
 import "@/models/Booking";
-import "@/models/User";
+import "@/models/Sale";
+import "@/models/CustomisationOrder";
+import { User } from "@/models/User";
+import { Booking } from "@/models/Booking";
+import { Sale } from "@/models/Sale";
+import { CustomisationOrder } from "@/models/CustomisationOrder";
+import { escapeRegex } from "@/lib/utils";
+import { invoiceTypeFilter, getInvoiceTypeCounts } from "@/lib/admin/invoice-types";
 import { invoiceSchema, computeInvoiceTotals } from "@/lib/validations/invoice";
 import { generateInvoiceNumber } from "@/lib/admin/invoice-number";
 import { requireApiRole } from "@/lib/api/require-role";
@@ -24,7 +31,9 @@ export async function GET(request: NextRequest): Promise<Response> {
   const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize") ?? "5")));
   const status = searchParams.get("status");
   const view = searchParams.get("view") ?? "active";
-  const search = searchParams.get("search");
+  const search = searchParams.get("search")?.trim();
+  // Which part of the shop the invoice is for: booking / sale / customisation / manual.
+  const type = searchParams.get("type");
   const sortBy = searchParams.get("sortBy") ?? "createdAt";
   const sortDir = searchParams.get("sortDir") === "asc" ? 1 : -1;
 
@@ -33,8 +42,35 @@ export async function GET(request: NextRequest): Promise<Response> {
   if (status && status !== "all") {
     filter.status = status;
   }
+  // Counts for the type tabs ignore the type tab itself.
+  const baseFilter: Record<string, unknown> = { ...filter };
+  delete baseFilter.status;
   if (search) {
-    filter.invoiceNumber = { $regex: search, $options: "i" };
+    // One box searches invoice no., customer name/phone (linked record or
+    // the name printed on the bill), and booking / sale / customisation
+    // bill numbers.
+    const regex = new RegExp(escapeRegex(search), "i");
+    const [users, bookings, sales, orders] = await Promise.all([
+      User.find({ $or: [{ name: regex }, { phone: regex }, { email: regex }] }).select("_id").lean(),
+      Booking.find({ $or: [{ bookingNumber: regex }, { billNumber: regex }] }).select("_id").lean(),
+      Sale.find({ billNumber: regex }).select("_id").lean(),
+      CustomisationOrder.find({ billNumber: regex }).select("_id").lean(),
+    ]);
+    const searchOr = [
+      { invoiceNumber: regex },
+      { "billTo.name": regex },
+      { "billTo.phone": regex },
+      { customer: { $in: users.map((u) => u._id) } },
+      { booking: { $in: bookings.map((b) => b._id) } },
+      { sale: { $in: sales.map((x) => x._id) } },
+      { customisationOrder: { $in: orders.map((o) => o._id) } },
+    ];
+    filter.$and = [...((filter.$and as unknown[]) ?? []), { $or: searchOr }];
+    baseFilter.$and = [...((baseFilter.$and as unknown[]) ?? []), { $or: searchOr }];
+  }
+  if (status && status !== "all") baseFilter.status = status;
+  if (type && type !== "all") {
+    filter.$and = [...((filter.$and as unknown[]) ?? []), invoiceTypeFilter(type)];
   }
 
   const sortField = SORTABLE_FIELDS.has(sortBy) ? sortBy : "createdAt";
@@ -42,11 +78,14 @@ export async function GET(request: NextRequest): Promise<Response> {
   const baseQuery = Invoice.find(filter)
     .populate("customer", "name email phone")
     .populate("booking", "bookingNumber")
+    .populate("sale", "billNumber")
+    .populate("customisationOrder", "billNumber")
     .sort({ [sortField]: sortDir });
 
-  const [invoices, total] = await Promise.all([
+  const [invoices, total, typeCounts] = await Promise.all([
     all ? baseQuery.lean() : baseQuery.skip((page - 1) * pageSize).limit(pageSize).lean(),
     Invoice.countDocuments(filter),
+    getInvoiceTypeCounts(baseFilter),
   ]);
 
   // A handful of invoices predate later schema additions or were inserted
@@ -71,6 +110,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     pagination: all
       ? { page: 1, pageSize: total || 1, total, totalPages: 1 }
       : { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    typeCounts,
   });
 }
 

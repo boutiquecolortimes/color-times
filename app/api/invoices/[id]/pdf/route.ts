@@ -26,11 +26,18 @@ export async function GET(
       return new Response("Not found", { status: 404 });
     }
 
-    const customer = invoice.customer as unknown as {
+    const linkedCustomer = invoice.customer as unknown as {
       name: string;
       email: string;
       phone?: string;
     } | null;
+    // Sale / Customisation bills for walk-ins have no customer record — the
+    // name and phone printed on the bill come from billTo instead.
+    const customer =
+      linkedCustomer ??
+      (invoice.billTo
+        ? { name: invoice.billTo.name, email: "", phone: invoice.billTo.phone }
+        : null);
     if (!customer) {
       return new Response("This invoice's customer record is missing.", { status: 422 });
     }
@@ -61,6 +68,7 @@ export async function GET(
       payments: invoice.payments ?? [],
       notes: invoice.notes,
       bookingStage: invoice.bookingStage,
+      source: invoice.source,
     });
 
     return new Response(new Uint8Array(buffer), {

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Sale } from "@/models/Sale";
+import { Invoice } from "@/models/Invoice";
 import "@/models/Product";
 import { SaleDetailClient } from "@/components/admin/sale-detail-client";
 
@@ -15,7 +16,10 @@ export default async function SaleDetailPage({
   const { id } = await params;
   await connectToDatabase();
 
-  const sale = await Sale.findById(id).populate("product", "name images sku").lean();
+  const [sale, invoice] = await Promise.all([
+    Sale.findById(id).populate("product", "name images sku").lean(),
+    Invoice.findOne({ sale: id }).select("_id").lean(),
+  ]);
   if (!sale || sale.deletedAt) {
     notFound();
   }
@@ -41,6 +45,10 @@ export default async function SaleDetailPage({
       : null,
     details: sale.details,
     totalAmount: sale.totalAmount,
+    advancePayment: sale.advancePayment ?? 0,
+    duePaid: sale.duePaid ?? 0,
+    dueAmount: sale.dueAmount ?? 0,
+    invoiceId: invoice ? String(invoice._id) : null,
     source: sale.source,
     createdAt: sale.createdAt.toISOString(),
   };

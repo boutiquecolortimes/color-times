@@ -21,6 +21,8 @@ export default async function InvoiceDetailPage({
   const invoice = await Invoice.findById(id)
     .populate("customer", "name email phone")
     .populate("booking", "bookingNumber rentalStartDate rentalEndDate pickupPaid")
+    .populate("sale", "billNumber")
+    .populate("customisationOrder", "billNumber")
     .populate("payments.recordedBy", "name")
     .lean();
 
@@ -48,7 +50,25 @@ export default async function InvoiceDetailPage({
                 email: (invoice.customer as unknown as { email: string }).email,
                 phone: (invoice.customer as unknown as { phone?: string }).phone,
               }
-            : { name: "—", email: "—" },
+            : // Sale / Customisation bills for walk-ins carry the name and
+              // phone on the bill itself rather than a customer record.
+              invoice.billTo
+              ? { name: invoice.billTo.name, email: "", phone: invoice.billTo.phone }
+              : { name: "—", email: "—" },
+          source: invoice.source,
+          sale: invoice.sale
+            ? {
+                _id: String((invoice.sale as unknown as { _id: unknown })._id),
+                billNumber: (invoice.sale as unknown as { billNumber: string }).billNumber,
+              }
+            : null,
+          customisationOrder: invoice.customisationOrder
+            ? {
+                _id: String((invoice.customisationOrder as unknown as { _id: unknown })._id),
+                billNumber: (invoice.customisationOrder as unknown as { billNumber: string })
+                  .billNumber,
+              }
+            : null,
           booking: invoice.booking
             ? {
                 bookingNumber: (invoice.booking as unknown as { bookingNumber: string }).bookingNumber,
@@ -81,6 +101,7 @@ export default async function InvoiceDetailPage({
           })),
           payments: (invoice.payments ?? []).map((payment) => ({
             _id: String(payment._id),
+            kind: payment.kind,
             amount: payment.amount,
             method: payment.method,
             reference: payment.reference,

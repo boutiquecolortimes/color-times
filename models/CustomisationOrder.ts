@@ -26,6 +26,9 @@ export interface ICustomisationOrder extends Document {
   measurements: CustomisationMeasurements;
   totalAmount: number;
   advancePayment: number;
+  // Paid after the advance (collected via "Collect payment"). Each payment
+  // is also logged on the linked invoice. dueAmount = total − advance − duePaid.
+  duePaid?: number;
   dueAmount: number;
   status: CustomisationOrderStatus;
   notes?: string;
@@ -47,6 +50,7 @@ const customisationOrderSchema = new Schema<ICustomisationOrder>(
     measurements: { type: measurementsSchema, default: () => ({}) },
     totalAmount: { type: Number, required: true, min: 0, default: 0 },
     advancePayment: { type: Number, required: true, min: 0, default: 0 },
+    duePaid: { type: Number, min: 0, default: 0 },
     dueAmount: { type: Number, required: true, min: 0, default: 0 },
     status: {
       type: String,

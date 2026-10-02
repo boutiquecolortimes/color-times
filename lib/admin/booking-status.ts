@@ -34,10 +34,23 @@ export const BOOKING_STATUS_TRANSITIONS: Record<BookingStatus, BookingStatus[]> 
 };
 
 /** Why a booking invoice exists, from the stage it was generated/updated at. */
+// Sale / Customisation invoice stages (see lib/admin/order-invoices.ts).
+const ORDER_STAGE_LABELS: Record<string, string> = {
+  sale_created: "Sale Created",
+  sale_updated: "Sale Updated",
+  order_created: "Order Placed",
+  order_updated: "Order Updated",
+  payment: "Payment Received",
+  pending: "Pending",
+  in_progress: "In Progress",
+  ready: "Ready",
+  delivered: "Delivered",
+};
+
 export function invoiceStageLabel(stage: string | undefined | null): string | null {
   if (!stage) return null;
   if (stage === "confirmed") return "Booking Confirmed";
-  return STATUS_LABELS[stage as BookingStatus] ?? stage;
+  return ORDER_STAGE_LABELS[stage] ?? STATUS_LABELS[stage as BookingStatus] ?? stage;
 }
 
 export const INVOICE_STAGE_LABELS_HI: Record<string, string> = {
@@ -47,4 +60,13 @@ export const INVOICE_STAGE_LABELS_HI: Record<string, string> = {
   in_use: "ड्रेस पिकअप",
   returned: "ड्रेस वापसी",
   cancelled: "रद्द",
+  sale_created: "बिक्री",
+  sale_updated: "बिक्री अपडेट",
+  order_created: "ऑर्डर",
+  order_updated: "ऑर्डर अपडेट",
+  payment: "भुगतान प्राप्त",
+  pending: "बाकी",
+  in_progress: "काम जारी",
+  ready: "तैयार",
+  delivered: "डिलीवर",
 };

@@ -33,6 +33,7 @@ export async function GET(
       measurements: order.measurements ?? {},
       totalAmount: order.totalAmount,
       advancePayment: order.advancePayment,
+      duePaid: order.duePaid ?? 0,
       dueAmount: order.dueAmount,
       notes: order.notes,
     });

@@ -8,6 +8,7 @@ import {
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
+import { syncOrderInvoiceSafely } from "@/lib/admin/order-invoices";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 import { escapeRegex } from "@/lib/utils";
 import { getCustomisationListSummary } from "@/lib/admin/list-summaries";
@@ -142,6 +143,8 @@ export async function POST(request: NextRequest): Promise<Response> {
       actor: auth.user,
       snapshot: order.toObject() as unknown as Record<string, unknown>,
     });
+
+    await syncOrderInvoiceSafely("customisation", String(order._id), auth.user, "order_created");
 
     return apiSuccess({ order }, 201);
   } catch (error) {

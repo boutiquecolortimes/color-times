@@ -13,7 +13,7 @@ import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const auth = await requireApiRole(ADMIN_ROLES);
   if ("error" in auth) return auth.error;
@@ -32,34 +32,45 @@ export async function POST(
 
     // Sale / Customisation invoices mirror their order — record the payment
     // through the order so its due amount and this invoice stay in step.
-    const orderKind =
-      existing.source === "sale" && existing.sale
-        ? "sale"
-        : existing.source === "customisation" && existing.customisationOrder
-          ? "customisation"
-          : null;
-    if (orderKind) {
-      const orderId = String(orderKind === "sale" ? existing.sale : existing.customisationOrder);
+    if (
+      (existing.source === "sale" && existing.sale) ||
+      (existing.source === "customisation" && existing.customisationOrder)
+    ) {
+      const kind = existing.source === "sale" ? "sale" : "customisation";
+      const orderId = String(
+        kind === "sale" ? existing.sale : existing.customisationOrder,
+      );
       const result = await collectOrderPayment(
-        orderKind,
+        kind,
         orderId,
-        { amount: input.amount, method: input.method, reference: input.reference, note: input.note },
-        auth.user
+        {
+          amount: input.amount,
+          method: input.method,
+          reference: input.reference,
+          note: input.note,
+        },
+        auth.user,
       );
       if (!result.ok) return apiError(result.message, result.status);
-      const invoice = await Invoice.findById(id).populate("payments.recordedBy", "name");
+      const invoice = await Invoice.findById(id).populate(
+        "payments.recordedBy",
+        "name",
+      );
       return apiSuccess({ invoice });
     }
     if (existing.status === "draft") {
       return apiError("Send the invoice before recording payments", 409);
     }
     if (existing.status === "paid" || existing.status === "cancelled") {
-      return apiError(`Cannot record a payment on an invoice that is ${existing.status}`, 409);
+      return apiError(
+        `Cannot record a payment on an invoice that is ${existing.status}`,
+        409,
+      );
     }
     if (input.amount > existing.amountDue) {
       return apiError(
         `Payment exceeds the amount due (₹${existing.amountDue.toLocaleString("en-IN")})`,
-        422
+        422,
       );
     }
 
@@ -84,7 +95,7 @@ export async function POST(
         amountDue: Math.max(amountDue, 0),
         status,
       },
-      { returnDocument: "after" }
+      { returnDocument: "after" },
     ).populate("customer", "name phone");
 
     await recordAuditLog({
@@ -100,7 +111,10 @@ export async function POST(
     });
 
     if (invoice) {
-      const customer = invoice.customer as unknown as { name: string; phone?: string } | null;
+      const customer = invoice.customer as unknown as {
+        name: string;
+        phone?: string;
+      } | null;
       void notifyPaymentReceived({
         customerName: customer?.name ?? invoice.billTo?.name ?? "Customer",
         customerPhone: customer?.phone || invoice.billTo?.phone,

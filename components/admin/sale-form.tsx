@@ -89,11 +89,14 @@ const EMPTY_VALUES: SaleInput = {
 export function SaleForm({
   saleId,
   defaultValues,
+  duePaid = 0,
   products,
   customers,
 }: {
   saleId?: string;
   defaultValues?: SaleInput;
+  /** Already collected after the advance (Collect payment) — editing only. */
+  duePaid?: number;
   products: ProductOption[];
   customers: CustomerOption[];
 }) {
@@ -116,6 +119,7 @@ export function SaleForm({
   const dueAmount = computeSaleDue({
     totalAmount: totalAmountValue || 0,
     advancePayment: advancePaymentValue || 0,
+    duePaid,
   });
 
   function applyCustomer(customer: CustomerOption) {

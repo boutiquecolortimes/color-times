@@ -22,6 +22,10 @@ export const saleUpdateSchema = saleSchema.partial();
 
 export type SaleUpdateInput = z.infer<typeof saleUpdateSchema>;
 
-export function computeSaleDue(input: { totalAmount: number; advancePayment: number }): number {
-  return Math.max(0, input.totalAmount - input.advancePayment);
+export function computeSaleDue(input: {
+  totalAmount: number;
+  advancePayment: number;
+  duePaid?: number;
+}): number {
+  return Math.max(0, input.totalAmount - input.advancePayment - (input.duePaid ?? 0));
 }

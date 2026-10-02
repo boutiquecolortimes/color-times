@@ -8,7 +8,6 @@ import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { notifyPaymentReceived } from "@/lib/notifications/whatsapp-events";
 import { notifyAccounts } from "@/lib/notifications/in-app";
-import { collectOrderPayment } from "@/lib/admin/order-invoices";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 
 export async function POST(
@@ -28,27 +27,6 @@ export async function POST(
     const existing = await Invoice.findById(id).lean();
     if (!existing) {
       return apiError("Invoice not found", 404);
-    }
-
-    // Sale / Customisation invoices mirror their order — record the payment
-    // through the order so its due amount and this invoice stay in step.
-    const orderKind =
-      existing.source === "sale" && existing.sale
-        ? "sale"
-        : existing.source === "customisation" && existing.customisationOrder
-          ? "customisation"
-          : null;
-    if (orderKind) {
-      const orderId = String(orderKind === "sale" ? existing.sale : existing.customisationOrder);
-      const result = await collectOrderPayment(
-        orderKind,
-        orderId,
-        { amount: input.amount, method: input.method, reference: input.reference, note: input.note },
-        auth.user
-      );
-      if (!result.ok) return apiError(result.message, result.status);
-      const invoice = await Invoice.findById(id).populate("payments.recordedBy", "name");
-      return apiSuccess({ invoice });
     }
     if (existing.status === "draft") {
       return apiError("Send the invoice before recording payments", 409);
@@ -102,8 +80,8 @@ export async function POST(
     if (invoice) {
       const customer = invoice.customer as unknown as { name: string; phone?: string } | null;
       void notifyPaymentReceived({
-        customerName: customer?.name ?? invoice.billTo?.name ?? "Customer",
-        customerPhone: customer?.phone || invoice.billTo?.phone,
+        customerName: customer?.name ?? "Customer",
+        customerPhone: customer?.phone,
         relatedEntityType: "Invoice",
         relatedEntityId: id,
         variables: {

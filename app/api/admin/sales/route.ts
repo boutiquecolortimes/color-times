@@ -7,6 +7,7 @@ import { findUpcomingBookingForProduct } from "@/lib/admin/booking-availability"
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
+import { syncOrderInvoiceSafely } from "@/lib/admin/order-invoices";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 import { escapeRegex } from "@/lib/utils";
 import { getSalesListSummary } from "@/lib/admin/list-summaries";
@@ -175,6 +176,10 @@ export async function POST(request: NextRequest): Promise<Response> {
       actor: auth.user,
       snapshot: sale.toObject() as unknown as Record<string, unknown>,
     });
+
+    // Every sale gets its bill in the Invoices menu, with the advance as
+    // its first payment.
+    await syncOrderInvoiceSafely("sale", String(sale._id), auth.user, "sale_created");
 
     return apiSuccess({ sale }, 201);
   } catch (error) {

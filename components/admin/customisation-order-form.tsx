@@ -87,10 +87,13 @@ const EMPTY_VALUES: CustomisationOrderInput = {
 export function CustomisationOrderForm({
   orderId,
   defaultValues,
+  duePaid = 0,
   customers,
 }: {
   orderId?: string;
   defaultValues?: CustomisationOrderInput;
+  /** Already collected after the advance (Collect payment) — editing only. */
+  duePaid?: number;
   customers: CustomerOption[];
 }) {
   const router = useRouter();
@@ -165,6 +168,7 @@ export function CustomisationOrderForm({
   const dueAmount = computeCustomisationDue({
     totalAmount: totalAmount || 0,
     advancePayment: advancePayment || 0,
+    duePaid,
   });
 
   const mutation = useMutation({

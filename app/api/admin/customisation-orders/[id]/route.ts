@@ -8,6 +8,7 @@ import {
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES, MANAGER_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog, diffObjects } from "@/lib/audit/log";
+import { syncOrderInvoiceSafely } from "@/lib/admin/order-invoices";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 
 interface RouteParams {
@@ -82,6 +83,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       update.dueAmount = computeCustomisationDue({
         totalAmount: input.totalAmount ?? before.totalAmount,
         advancePayment: input.advancePayment ?? before.advancePayment,
+        duePaid: before.duePaid ?? 0,
       });
     }
 
@@ -106,6 +108,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
         changes,
       });
     }
+
+    // Status changes (In Progress, Ready, Delivered, Cancelled) are
+    // recorded on the invoice as the reason it was updated.
+    await syncOrderInvoiceSafely(
+      "customisation",
+      id,
+      auth.user,
+      input.status !== undefined && input.status !== before.status ? input.status : "order_updated"
+    );
 
     return apiSuccess({ order });
   } catch (error) {
@@ -137,6 +148,9 @@ export async function DELETE(request: NextRequest, { params }: RouteParams): Pro
     actor: auth.user,
     snapshot: order.toObject() as unknown as Record<string, unknown>,
   });
+
+  // Its invoice moves to Trash with it.
+  await syncOrderInvoiceSafely("customisation", id, auth.user);
 
   return apiSuccess({ deleted: true });
 }

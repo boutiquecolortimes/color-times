@@ -35,6 +35,9 @@ export async function GET(
       productSku: product?.sku ?? "",
       details: sale.details,
       totalAmount: sale.totalAmount,
+      advancePayment: sale.advancePayment ?? 0,
+      duePaid: sale.duePaid ?? 0,
+      dueAmount: sale.dueAmount ?? 0,
     });
 
     return new Response(new Uint8Array(buffer), {

@@ -29,8 +29,8 @@ export async function POST(
     const customer = invoice.customer as unknown as { name: string; phone?: string } | null;
 
     await notifyPaymentReminder({
-      customerName: customer?.name ?? "Customer",
-      customerPhone: customer?.phone,
+      customerName: customer?.name ?? invoice.billTo?.name ?? "Customer",
+      customerPhone: customer?.phone || invoice.billTo?.phone,
       relatedEntityType: "Invoice",
       relatedEntityId: id,
       variables: {

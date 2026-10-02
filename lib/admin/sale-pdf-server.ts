@@ -17,6 +17,9 @@ interface SalePdfData {
   productSku: string;
   details?: string;
   totalAmount: number;
+  advancePayment?: number;
+  duePaid?: number;
+  dueAmount?: number;
 }
 
 function formatCurrency(value: number): string {
@@ -79,7 +82,13 @@ export async function generateSalePdfBuffer(sale: SalePdfData): Promise<Buffer> 
   const afterTableY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
 
   autoTable(doc, {
-    body: [["Total Amount", formatCurrency(sale.totalAmount)]],
+    // Same order as booking invoices: Advance Paid → Due Paid → Total → Remaining Due.
+    body: [
+      ["Advance Paid", formatCurrency(sale.advancePayment ?? 0)],
+      ["Due Paid", formatCurrency(sale.duePaid ?? 0)],
+      ["Total", formatCurrency(sale.totalAmount)],
+      ["Remaining Due", formatCurrency(sale.dueAmount ?? 0)],
+    ],
     startY: afterTableY + 6,
     theme: "plain",
     styles: { fontSize: 10, fontStyle: "bold" },

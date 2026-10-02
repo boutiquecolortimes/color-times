@@ -74,6 +74,7 @@ export default async function EditCustomisationOrderPage({
       <CustomisationOrderForm
         orderId={id}
         defaultValues={defaultValues}
+        duePaid={order.duePaid ?? 0}
         customers={customers.map((customer) => {
           const address =
             customer.addresses?.find((a) => a.isDefault) ?? customer.addresses?.[0] ?? null;

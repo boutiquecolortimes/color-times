@@ -47,8 +47,8 @@ export async function POST(
     if (invoice) {
       const customer = invoice.customer as unknown as { name: string; phone?: string } | null;
       void notifyInvoiceSent({
-        customerName: customer?.name ?? "Customer",
-        customerPhone: customer?.phone,
+        customerName: customer?.name ?? invoice.billTo?.name ?? "Customer",
+        customerPhone: customer?.phone || invoice.billTo?.phone,
         relatedEntityType: "Invoice",
         relatedEntityId: id,
         // Public, unauthenticated route — Meta's servers can fetch it

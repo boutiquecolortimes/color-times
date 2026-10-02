@@ -2,7 +2,10 @@ import { jsPDF } from "jspdf";
 import autoTable, { type CellHookData } from "jspdf-autotable";
 import { siteConfig } from "@/lib/config/site";
 import { getInvoiceDueBreakdown } from "@/lib/admin/invoice-totals";
-import { INVOICE_STAGE_LABELS_HI, invoiceStageLabel } from "@/lib/admin/booking-status";
+import {
+  INVOICE_STAGE_LABELS_HI,
+  invoiceStageLabel,
+} from "@/lib/admin/booking-status";
 import {
   drawTermsAndConditions,
   ownerDetailLines,
@@ -20,9 +23,19 @@ import {
   translateLineItemHi,
   type TextImage,
 } from "@/lib/admin/hindi-canvas";
-import { EN_LABELS, loadHindiLabels, type HindiLabelMap, type LabelKey, type PdfLang } from "@/lib/admin/pdf-labels";
+import {
+  EN_LABELS,
+  loadHindiLabels,
+  type HindiLabelMap,
+  type LabelKey,
+  type PdfLang,
+} from "@/lib/admin/pdf-labels";
 import { formatDate, isWalkinEmail } from "@/lib/utils";
-import type { InvoiceLineItem, InvoiceStatus, PaymentMethod } from "@/models/Invoice";
+import type {
+  InvoiceLineItem,
+  InvoiceStatus,
+  PaymentMethod,
+} from "@/models/Invoice";
 
 interface InvoicePdfPayment {
   amount: number;
@@ -69,7 +82,9 @@ function statusEn(status: InvoiceStatus): string {
   return status.replace(/_/g, " ").toUpperCase();
 }
 
-function loadImageAsDataUrl(src: string): Promise<{ dataUrl: string; ratio: number } | null> {
+function loadImageAsDataUrl(
+  src: string,
+): Promise<{ dataUrl: string; ratio: number } | null> {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -83,7 +98,10 @@ function loadImageAsDataUrl(src: string): Promise<{ dataUrl: string; ratio: numb
         return;
       }
       ctx.drawImage(img, 0, 0);
-      resolve({ dataUrl: canvas.toDataURL("image/png"), ratio: img.naturalHeight / img.naturalWidth });
+      resolve({
+        dataUrl: canvas.toDataURL("image/png"),
+        ratio: img.naturalHeight / img.naturalWidth,
+      });
     };
     img.onerror = () => resolve(null);
     img.src = src;
@@ -122,23 +140,39 @@ const LABEL_HEIGHT_MM: Record<LabelKey, number> = {
   notes: 3.0,
 };
 
-export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang = "en"): Promise<void> {
+export async function downloadInvoicePdf(
+  invoice: InvoicePdfData,
+  lang: PdfLang = "en",
+): Promise<void> {
   const doc = new jsPDF({ orientation: "portrait" });
   const logo = await loadImageAsDataUrl("/logo-icon.png");
   const hi = lang === "hi" ? await loadHindiLabels() : null;
-  if (hi || (invoice.notes && hasDevanagari(invoice.notes))) await loadDevanagariFont();
+  if (hi || (invoice.notes && hasDevanagari(invoice.notes)))
+    await loadDevanagariFont();
   const fmtDate = hi ? formatDateHi : formatDate;
 
   // Places a rendered Hindi text image so its first line sits on the jsPDF
   // text baseline `y` — the same anchor doc.text() uses — so it lines up
   // with neighbouring English/number text.
-  function placeText(img: TextImage, x: number, y: number, align: "left" | "right" = "left"): void {
+  function placeText(
+    img: TextImage,
+    x: number,
+    y: number,
+    align: "left" | "right" = "left",
+  ): void {
     const drawX = align === "right" ? x - img.widthMm : x;
     // Baseline is drawn at 68% of the first line box (see hindi-canvas.ts);
     // single-line images are one line box tall, wrapped ones use the line
     // height of their first line, approximated from the font size used.
     const firstLineMm = img.firstLineMm ?? img.heightMm;
-    doc.addImage(img.dataUrl, "PNG", drawX, y - firstLineMm * 0.68, img.widthMm, img.heightMm);
+    doc.addImage(
+      img.dataUrl,
+      "PNG",
+      drawX,
+      y - firstLineMm * 0.68,
+      img.widthMm,
+      img.heightMm,
+    );
   }
 
   // jsPDF font sizes are in points; Hindi images are sized in mm.
@@ -150,10 +184,15 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
     key: LabelKey,
     x: number,
     y: number,
-    opts?: { align?: "left" | "right" }
+    opts?: { align?: "left" | "right" },
   ): void {
     if (!hi) {
-      doc.text(EN_LABELS[key], x, y, opts?.align ? { align: opts.align } : undefined);
+      doc.text(
+        EN_LABELS[key],
+        x,
+        y,
+        opts?.align ? { align: opts.align } : undefined,
+      );
       return;
     }
     const img = hi[key];
@@ -161,14 +200,26 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
     const widthMm = heightMm / img.ratio;
     const align = opts?.align ?? "left";
     const drawX = align === "right" ? x - widthMm : x;
-    doc.addImage(img.dataUrl, "PNG", drawX, y - heightMm * 0.8, widthMm, heightMm);
+    doc.addImage(
+      img.dataUrl,
+      "PNG",
+      drawX,
+      y - heightMm * 0.8,
+      widthMm,
+      heightMm,
+    );
   }
 
   // Draws a right-aligned "value" (a date, a status word) preceded by its
   // label, ending at xRight — used for the Issued/Due/Status lines, where
   // English keeps its original single-string rendering and Hindi splits the
   // label into an image ahead of the value text.
-  function labelValue(key: LabelKey, value: string, xRight: number, y: number): void {
+  function labelValue(
+    key: LabelKey,
+    value: string,
+    xRight: number,
+    y: number,
+  ): void {
     if (!hi) {
       doc.text(`${EN_LABELS[key]} ${value}`, xRight, y, { align: "right" });
       return;
@@ -178,18 +229,31 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
     const img = hi[key];
     const heightMm = LABEL_HEIGHT_MM[key];
     const widthMm = heightMm / img.ratio;
-    doc.addImage(img.dataUrl, "PNG", xRight - valueWidth - 2 - widthMm, y - heightMm * 0.8, widthMm, heightMm);
+    doc.addImage(
+      img.dataUrl,
+      "PNG",
+      xRight - valueWidth - 2 - widthMm,
+      y - heightMm * 0.8,
+      widthMm,
+      heightMm,
+    );
   }
 
   // Draws an image centered vertically inside an autoTable cell, aligned to
   // its left or right edge — used to replace table header/label text with
   // the Hindi label image via autoTable's didDrawCell hook.
-  function drawCellLabel(hiLabels: HindiLabelMap, key: LabelKey, cell: CellHookData["cell"], align: "left" | "right"): void {
+  function drawCellLabel(
+    hiLabels: HindiLabelMap,
+    key: LabelKey,
+    cell: CellHookData["cell"],
+    align: "left" | "right",
+  ): void {
     const img = hiLabels[key];
     const heightMm = Math.min(LABEL_HEIGHT_MM[key], cell.height * 0.75);
     const widthMm = heightMm / img.ratio;
     const pad = cell.padding(align);
-    const x = align === "right" ? cell.x + cell.width - pad - widthMm : cell.x + pad;
+    const x =
+      align === "right" ? cell.x + cell.width - pad - widthMm : cell.x + pad;
     const y = cell.y + (cell.height - heightMm) / 2;
     doc.addImage(img.dataUrl, "PNG", x, y, widthMm, heightMm);
   }
@@ -203,8 +267,23 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
   }
 
   if (hi) {
-    placeText(renderHindiText(siteConfig.nameHi, { fontSizeMm: ptToMm(16), bold: true, lineHeight: 1.3 }), textStartX, 19);
-    placeText(renderHindiText(siteConfig.contact.addressHi, { fontSizeMm: ptToMm(9), lineHeight: 1.3 }), textStartX, 25);
+    placeText(
+      renderHindiText(siteConfig.nameHi, {
+        fontSizeMm: ptToMm(16),
+        bold: true,
+        lineHeight: 1.3,
+      }),
+      textStartX,
+      19,
+    );
+    placeText(
+      renderHindiText(siteConfig.contact.addressHi, {
+        fontSizeMm: ptToMm(9),
+        lineHeight: 1.3,
+      }),
+      textStartX,
+      25,
+    );
   } else {
     doc.setFontSize(16);
     doc.text(siteConfig.name, textStartX, 19);
@@ -212,11 +291,19 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
     doc.text(siteConfig.contact.address, textStartX, 25);
   }
   doc.setFontSize(9);
-  doc.text(`${siteConfig.contact.email} · ${siteConfig.contact.phone}`, textStartX, 30);
+  doc.text(
+    `${siteConfig.contact.email} · ${siteConfig.contact.phone}`,
+    textStartX,
+    30,
+  );
   doc.setFontSize(8);
   (hi ? ownerDetailLinesHi() : ownerDetailLines()).forEach((line, index) => {
     if (hi) {
-      placeText(renderHindiText(line, { fontSizeMm: ptToMm(8), lineHeight: 1.3 }), textStartX, 34 + index * 4);
+      placeText(
+        renderHindiText(line, { fontSizeMm: ptToMm(8), lineHeight: 1.3 }),
+        textStartX,
+        34 + index * 4,
+      );
     } else {
       doc.text(line, textStartX, 34 + index * 4);
     }
@@ -229,15 +316,25 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
   labelValue("issued", fmtDate(invoice.createdAt), 196, 29);
   labelValue("due", fmtDate(invoice.dueDate), 196, 34);
   if (hi) {
-    const statusImg = renderHindiText(STATUS_HI[invoice.status] ?? invoice.status, {
-      fontSizeMm: ptToMm(10),
-      lineHeight: 1.3,
-    });
+    const statusImg = renderHindiText(
+      STATUS_HI[invoice.status] ?? invoice.status,
+      {
+        fontSizeMm: ptToMm(10),
+        lineHeight: 1.3,
+      },
+    );
     placeText(statusImg, 196, 39, "right");
     const img = hi.status;
     const heightMm = LABEL_HEIGHT_MM.status;
     const widthMm = heightMm / img.ratio;
-    doc.addImage(img.dataUrl, "PNG", 196 - statusImg.widthMm - 2 - widthMm, 39 - heightMm * 0.8, widthMm, heightMm);
+    doc.addImage(
+      img.dataUrl,
+      "PNG",
+      196 - statusImg.widthMm - 2 - widthMm,
+      39 - heightMm * 0.8,
+      widthMm,
+      heightMm,
+    );
   } else {
     labelValue("status", statusEn(invoice.status), 196, 39);
   }
@@ -245,16 +342,25 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
   // Why this invoice exists — the booking stage it was generated/updated at.
   if (invoice.bookingStage) {
     if (hi) {
-      const stageHi = INVOICE_STAGE_LABELS_HI[invoice.bookingStage] ?? invoice.bookingStage;
+      const stageHi =
+        INVOICE_STAGE_LABELS_HI[invoice.bookingStage] ?? invoice.bookingStage;
       placeText(
-        renderHindiText(`बिल का कारण: ${stageHi}`, { fontSizeMm: ptToMm(10), lineHeight: 1.3 }),
+        renderHindiText(`बिल का कारण: ${stageHi}`, {
+          fontSizeMm: ptToMm(10),
+          lineHeight: 1.3,
+        }),
         196,
         44,
-        "right"
+        "right",
       );
     } else if (invoiceStageLabel(invoice.bookingStage)) {
       doc.setFontSize(10);
-      doc.text(`Generated At: ${invoiceStageLabel(invoice.bookingStage)}`, 196, 44, { align: "right" });
+      doc.text(
+        `Generated At: ${invoiceStageLabel(invoice.bookingStage)}`,
+        196,
+        44,
+        { align: "right" },
+      );
     }
   }
 
@@ -267,11 +373,18 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
   label("billTo", 14, 46);
   doc.setFontSize(9);
   doc.text(invoice.customer.name, 14, 51);
-  const showEmail = Boolean(invoice.customer.email) && !isWalkinEmail(invoice.customer.email);
+  const showEmail =
+    Boolean(invoice.customer.email) && !isWalkinEmail(invoice.customer.email);
   if (showEmail) doc.text(invoice.customer.email, 14, 56);
-  if (invoice.customer.phone) doc.text(invoice.customer.phone, 14, showEmail ? 61 : 56);
+  if (invoice.customer.phone)
+    doc.text(invoice.customer.phone, 14, showEmail ? 61 : 56);
 
-  const lineItemHeadKeys: LabelKey[] = ["colDescription", "colQty", "colUnitPrice", "colAmount"];
+  const lineItemHeadKeys: LabelKey[] = [
+    "colDescription",
+    "colQty",
+    "colUnitPrice",
+    "colAmount",
+  ];
   // Hindi descriptions are pre-rendered at a fixed column width so each row
   // can be made tall enough for its (possibly wrapped) image.
   const DESCRIPTION_WIDTH_MM = 96;
@@ -281,11 +394,18 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
           fontSizeMm: ptToMm(9),
           maxWidthMm: DESCRIPTION_WIDTH_MM - 4,
           lineHeight: 1.4,
-        })
+        }),
       )
     : [];
   autoTable(doc, {
-    head: [[EN_LABELS.colDescription, EN_LABELS.colQty, EN_LABELS.colUnitPrice, EN_LABELS.colAmount]],
+    head: [
+      [
+        EN_LABELS.colDescription,
+        EN_LABELS.colQty,
+        EN_LABELS.colUnitPrice,
+        EN_LABELS.colAmount,
+      ],
+    ],
     body: invoice.lineItems.map((item) => [
       item.description,
       String(item.quantity),
@@ -294,7 +414,10 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
     ]),
     startY: 68,
     styles: { fontSize: 9 },
-    headStyles: { fillColor: [32, 26, 22], textColor: hi ? [32, 26, 22] : [255, 255, 255] },
+    headStyles: {
+      fillColor: [32, 26, 22],
+      textColor: hi ? [32, 26, 22] : [255, 255, 255],
+    },
     columnStyles: hi ? { 0: { cellWidth: DESCRIPTION_WIDTH_MM } } : undefined,
     didParseCell: (data) => {
       if (hi && data.section === "body" && data.column.index === 0) {
@@ -305,7 +428,12 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
     },
     didDrawCell: (data) => {
       if (hi && data.section === "head") {
-        drawCellLabel(hi, lineItemHeadKeys[data.column.index], data.cell, "left");
+        drawCellLabel(
+          hi,
+          lineItemHeadKeys[data.column.index],
+          data.cell,
+          "left",
+        );
       }
       if (hi && data.section === "body" && data.column.index === 0) {
         const img = descriptionImages[data.row.index];
@@ -316,15 +444,16 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
             data.cell.x + data.cell.padding("left"),
             data.cell.y + (data.cell.height - img.heightMm) / 2,
             img.widthMm,
-            img.heightMm
+            img.heightMm,
           );
         }
       }
     },
   });
 
-  const afterLineItemsY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
-    .finalY;
+  const afterLineItemsY = (
+    doc as unknown as { lastAutoTable: { finalY: number } }
+  ).lastAutoTable.finalY;
 
   // Security deposits are usually collected and held separately from what
   // gets logged as an invoice payment, so "Amount Due" alone reads as if
@@ -332,7 +461,8 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
   const due = getInvoiceDueBreakdown(invoice);
   // Sale / Customisation bills have no rent, tax or security deposit —
   // just Advance Paid, Due Paid, Total and Remaining Due.
-  const isOrderBill = invoice.source === "sale" || invoice.source === "customisation";
+  const isOrderBill =
+    invoice.source === "sale" || invoice.source === "customisation";
   const summaryRows: { key: LabelKey; value: string }[] = isOrderBill
     ? [
         { key: "rowAdvancePaid", value: formatCurrency(due.advancePaid) },
@@ -342,12 +472,21 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
       ]
     : [
         { key: "rowRent", value: formatCurrency(invoice.subtotal) },
-        { key: "rowDiscount", value: `-${formatCurrency(invoice.discountAmount)}` },
-        { key: "rowTax", value: `${formatCurrency(invoice.taxAmount)} (${invoice.taxRate}%)` },
+        {
+          key: "rowDiscount",
+          value: `-${formatCurrency(invoice.discountAmount)}`,
+        },
+        {
+          key: "rowTax",
+          value: `${formatCurrency(invoice.taxAmount)} (${invoice.taxRate}%)`,
+        },
         { key: "rowAdvancePaid", value: formatCurrency(due.advancePaid) },
         { key: "rowDuePaid", value: formatCurrency(due.duePaid) },
         { key: "rowTotalRent", value: formatCurrency(due.rentTotal) },
-        { key: "rowSecurityPaid", value: formatCurrency(invoice.securityDeposit) },
+        {
+          key: "rowSecurityPaid",
+          value: formatCurrency(invoice.securityDeposit),
+        },
         { key: "rowRemainingDue", value: formatCurrency(due.rentDue) },
       ];
 
@@ -356,7 +495,10 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
     startY: afterLineItemsY + 6,
     theme: "plain",
     styles: { fontSize: 9 },
-    columnStyles: { 0: { halign: "right", cellWidth: 130 }, 1: { halign: "right", cellWidth: 46 } },
+    columnStyles: {
+      0: { halign: "right", cellWidth: 130 },
+      1: { halign: "right", cellWidth: 46 },
+    },
     margin: { left: 20 },
     didParseCell: (data) => {
       // Hide the English text jsPDF would otherwise draw for this cell —
@@ -374,14 +516,28 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
     },
   });
 
-  let cursorY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+  let cursorY =
+    (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
+      .finalY + 8;
 
   if (invoice.payments.length > 0) {
     doc.setFontSize(11);
     label("paymentHistory", 14, cursorY);
-    const paymentHeadKeys: LabelKey[] = ["colDate", "colMethod", "colAmount", "colReference"];
+    const paymentHeadKeys: LabelKey[] = [
+      "colDate",
+      "colMethod",
+      "colAmount",
+      "colReference",
+    ];
     autoTable(doc, {
-      head: [[EN_LABELS.colDate, EN_LABELS.colMethod, EN_LABELS.colAmount, EN_LABELS.colReference]],
+      head: [
+        [
+          EN_LABELS.colDate,
+          EN_LABELS.colMethod,
+          EN_LABELS.colAmount,
+          EN_LABELS.colReference,
+        ],
+      ],
       body: invoice.payments.map((payment) => [
         fmtDate(payment.paidAt),
         hi ? "" : (PAYMENT_METHOD_EN[payment.method] ?? payment.method),
@@ -390,10 +546,18 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
       ]),
       startY: cursorY + 4,
       styles: { fontSize: 8 },
-      headStyles: { fillColor: [32, 26, 22], textColor: hi ? [32, 26, 22] : [255, 255, 255] },
+      headStyles: {
+        fillColor: [32, 26, 22],
+        textColor: hi ? [32, 26, 22] : [255, 255, 255],
+      },
       didDrawCell: (data) => {
         if (hi && data.section === "head") {
-          drawCellLabel(hi, paymentHeadKeys[data.column.index], data.cell, "left");
+          drawCellLabel(
+            hi,
+            paymentHeadKeys[data.column.index],
+            data.cell,
+            "left",
+          );
         }
         if (hi && data.section === "body" && data.column.index === 1) {
           const method = invoice.payments[data.row.index]?.method;
@@ -409,12 +573,14 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
             data.cell.x + data.cell.padding("left"),
             data.cell.y + (data.cell.height - heightMm) / 2,
             widthMm,
-            heightMm
+            heightMm,
           );
         }
       },
     });
-    cursorY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+    cursorY =
+      (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
+        .finalY + 8;
   }
 
   if (invoice.notes) {
@@ -467,15 +633,27 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
       lineHeight: 1.4,
     });
     const items = TERMS_AND_CONDITIONS_HI.map((line, index) =>
-      renderHindiText(`${index + 1}. ${line}`, { fontSizeMm: ptToMm(8), maxWidthMm: 182, lineHeight: 1.5 })
+      renderHindiText(`${index + 1}. ${line}`, {
+        fontSizeMm: ptToMm(8),
+        maxWidthMm: 182,
+        lineHeight: 1.5,
+      }),
     );
-    const blockHeight = heading.heightMm + items.reduce((sum, img) => sum + img.heightMm, 0) + 2;
+    const blockHeight =
+      heading.heightMm + items.reduce((sum, img) => sum + img.heightMm, 0) + 2;
     let y = startY - 3;
     if (y + blockHeight > 285) {
       doc.addPage();
       y = 15;
     }
-    doc.addImage(heading.dataUrl, "PNG", 14, y, heading.widthMm, heading.heightMm);
+    doc.addImage(
+      heading.dataUrl,
+      "PNG",
+      14,
+      y,
+      heading.widthMm,
+      heading.heightMm,
+    );
     y += heading.heightMm;
     for (const img of items) {
       doc.addImage(img.dataUrl, "PNG", 14, y, img.widthMm, img.heightMm);
