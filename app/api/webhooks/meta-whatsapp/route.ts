@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { NotificationLog } from "@/models/NotificationLog";
 import { WhatsAppMessage } from "@/models/WhatsAppMessage";
@@ -6,6 +6,7 @@ import { WhatsAppTemplate } from "@/models/WhatsAppTemplate";
 import { WhatsAppWebhookEvent, type WebhookEventKind } from "@/models/WhatsAppWebhookEvent";
 import { verifyWebhookSignature } from "@/lib/whatsapp/meta-graph";
 import { isStatusUpgrade } from "@/lib/whatsapp/messages";
+import { MEDIA_MESSAGE_TYPES, storeMessageMedia } from "@/lib/whatsapp/media";
 
 /** Records a webhook call for the admin Overview's "Webhook status" card. Never throws. */
 async function logWebhookEvent(kind: WebhookEventKind, ok: boolean, summary: string): Promise<void> {
@@ -105,8 +106,16 @@ function describeInbound(message: MetaInboundMessage): {
       const media = message[message.type as "image"] as
         | { id: string; mime_type?: string; caption?: string; filename?: string }
         | undefined;
+      // Shown in the chat list and as the bubble text when there's no caption.
+      const label: Record<string, string> = {
+        image: "📷 Photo",
+        video: "🎥 Video",
+        audio: "🎤 Voice message",
+        sticker: "Sticker",
+        document: `📄 ${media?.filename ?? "Document"}`,
+      };
       return {
-        text: media?.caption || media?.filename || `[${message.type}]`,
+        text: media?.caption || label[message.type],
         media: {
           id: media?.id,
           mimeType: media?.mime_type,
@@ -171,7 +180,7 @@ async function handleInbound(value: MetaChangeValue): Promise<void> {
     const { text, media } = describeInbound(message);
     // upsert on the WhatsApp message id — Meta retries webhooks, so the
     // same message can arrive more than once.
-    await WhatsAppMessage.updateOne(
+    const result = await WhatsAppMessage.updateOne(
       { waMessageId: message.id },
       {
         $setOnInsert: {
@@ -189,6 +198,21 @@ async function handleInbound(value: MetaChangeValue): Promise<void> {
       },
       { upsert: true }
     );
+
+    // New photo / video / voice note / document: copy the file from Meta into
+    // our own storage so the Inbox can show it. Runs after the webhook has
+    // replied to Meta (after()), so a slow download never delays the 200.
+    if (
+      result.upsertedId &&
+      media?.id &&
+      (MEDIA_MESSAGE_TYPES as readonly string[]).includes(message.type)
+    ) {
+      const messageId = String(result.upsertedId);
+      after(async () => {
+        await connectToDatabase();
+        await storeMessageMedia(messageId);
+      });
+    }
   }
 }
 

@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { SendTemplateForm } from "@/components/admin/whatsapp/send-template-form";
 import { useMetaTemplates } from "@/components/admin/whatsapp/use-meta-templates";
 import { whatsappApi } from "@/lib/whatsapp/client-fetch";
+import { MEDIA_TYPES, MessageMedia, type MessageMediaInfo } from "@/components/admin/whatsapp/message-media";
 import { cn, formatDateTime } from "@/lib/utils";
 
 interface Conversation {
@@ -29,7 +30,7 @@ interface Message {
   type: string;
   text?: string;
   templateName?: string;
-  media?: { mimeType?: string; filename?: string };
+  media?: MessageMediaInfo;
   status: string;
   errorMessage?: string;
   timestamp: string;
@@ -55,6 +56,19 @@ function shortTime(value: string) {
   return date.toDateString() === today.toDateString()
     ? date.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
     : date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+
+// Older media messages were saved as "[image]" etc. — show them like new ones.
+const MEDIA_PREVIEW: Record<string, string> = {
+  "[image]": "📷 Photo",
+  "[video]": "🎥 Video",
+  "[audio]": "🎤 Voice message",
+  "[sticker]": "Sticker",
+  "[document]": "📄 Document",
+};
+
+function previewText(text?: string): string | undefined {
+  return text ? (MEDIA_PREVIEW[text] ?? text) : text;
 }
 
 export function WhatsAppInbox() {
@@ -136,7 +150,7 @@ export function WhatsAppInbox() {
                 </div>
                 <div className="flex items-center gap-1">
                   {c.lastDirection === "outbound" && <StatusTick status={c.lastStatus} />}
-                  <p className="truncate text-xs text-muted-foreground">{c.lastText}</p>
+                  <p className="truncate text-xs text-muted-foreground">{previewText(c.lastText)}</p>
                   {c.unread > 0 && (
                     <span className="ml-auto rounded-full bg-[#25D366] px-1.5 text-[11px] font-medium text-white">
                       {c.unread}
@@ -185,7 +199,17 @@ export function WhatsAppInbox() {
                       Template · {m.templateName}
                     </p>
                   )}
-                  <p className="whitespace-pre-wrap break-words">{m.text}</p>
+                  {m.media && MEDIA_TYPES.includes(m.type) ? (
+                    <>
+                      <MessageMedia messageId={m._id} type={m.type} media={m.media} waId={selected ?? ""} />
+                      {/* Only a real caption — the "📷 Photo" label is just for the chat list. */}
+                      {m.media.caption && (
+                        <p className="whitespace-pre-wrap break-words">{m.media.caption}</p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="whitespace-pre-wrap break-words">{m.text}</p>
+                  )}
                   {m.status === "failed" && m.errorMessage && (
                     <p className="mt-1 text-xs text-red-700">{m.errorMessage}</p>
                   )}

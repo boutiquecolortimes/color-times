@@ -16,7 +16,20 @@ export interface IWhatsAppMessage extends Document {
   direction: WhatsAppMessageDirection;
   type: string;
   text?: string;
-  media?: { id?: string; mimeType?: string; caption?: string; filename?: string };
+  media?: {
+    id?: string;
+    mimeType?: string;
+    caption?: string;
+    filename?: string;
+    // Permanent copy in Vercel Blob (see lib/whatsapp/media.ts) — Meta's
+    // own media links expire, so the Inbox shows this instead.
+    url?: string;
+    downloadUrl?: string;
+    size?: number;
+    storedAt?: Date;
+    /** Why the copy failed (expired at Meta, too large, …). */
+    error?: string;
+  };
   templateName?: string;
   status: WhatsAppMessageStatus;
   errorMessage?: string;
@@ -40,6 +53,11 @@ const whatsAppMessageSchema = new Schema<IWhatsAppMessage>(
       mimeType: String,
       caption: String,
       filename: String,
+      url: String,
+      downloadUrl: String,
+      size: Number,
+      storedAt: Date,
+      error: String,
     },
     templateName: { type: String },
     status: {
