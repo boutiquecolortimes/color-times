@@ -8,6 +8,7 @@ import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 import { escapeRegex } from "@/lib/utils";
+import { PRODUCT_STATUSES, type ProductStatus } from "@/models/Product";
 
 const SORTABLE_FIELDS = new Set([
   "name",
@@ -70,6 +71,19 @@ export async function GET(request: NextRequest): Promise<Response> {
   }
   if (category) {
     filter.category = category;
+  }
+
+  // Filter by the product's own status: Active/Inactive (website
+  // visibility) or its rental status (Available, Reserved, Dry Cleaning…).
+  const productState = searchParams.get("productState");
+  if (productState === "active") {
+    filter.isActive = true;
+  } else if (productState === "inactive") {
+    filter.isActive = false;
+  } else if (productState && PRODUCT_STATUSES.includes(productState as ProductStatus)) {
+    // "booked" is a legacy value shown as Reserved — keep them together.
+    filter.status =
+      productState === "reserved" ? { $in: ["reserved", "booked"] } : productState;
   }
 
   const sort: Record<string, 1 | -1> = {

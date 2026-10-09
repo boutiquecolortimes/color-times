@@ -657,7 +657,7 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
             <section className="rounded-lg border border-border bg-card p-6">
               <h2 className="font-heading text-lg">Visibility</h2>
               <div className="mt-4 flex flex-wrap gap-6">
-                {(["isFeatured", "isNewArrival"] as const).map((key) => (
+                {(["isActive", "isFeatured", "isNewArrival"] as const).map((key) => (
                   <FormField
                     key={key}
                     control={form.control}
@@ -671,6 +671,7 @@ export function ProductForm({ categories, productId, defaultValues }: ProductFor
                             onChange={(event) => field.onChange(event.target.checked)}
                             className="h-4 w-4 rounded border-input"
                           />
+                          {key === "isActive" && "Active (shown on website)"}
                           {key === "isFeatured" && "Featured"}
                           {key === "isNewArrival" && "New Arrival"}
                         </label>

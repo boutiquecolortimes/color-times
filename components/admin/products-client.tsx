@@ -103,11 +103,26 @@ const COLUMN_DEFS = [
   { key: "status", label: "Status" },
 ];
 
+const PRODUCT_STATE_LABELS: Record<string, string> = {
+  all: "All statuses",
+  active: "Active",
+  inactive: "Inactive",
+  available: "Available",
+  reserved: "Reserved",
+  picked_up: "Picked Up",
+  under_dry_cleaning: "Dry Cleaning",
+  under_repair: "Repair",
+  damaged: "Damaged",
+  returned: "Returned",
+  sold: "Sold",
+};
+
 async function fetchProducts(params: {
   page: number;
   search: string;
   category: string;
   status: string;
+  productState: string;
   sortBy: string;
   sortDir: string;
   all?: boolean;
@@ -120,6 +135,9 @@ async function fetchProducts(params: {
   });
   if (params.search) searchParams.set("search", params.search);
   if (params.category && params.category !== "all") searchParams.set("category", params.category);
+  if (params.productState && params.productState !== "all") {
+    searchParams.set("productState", params.productState);
+  }
   if (params.all) searchParams.set("all", "true");
 
   const res = await fetch(`/api/admin/products?${searchParams.toString()}`);
@@ -173,6 +191,7 @@ export function ProductsClient({
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [status, setStatus] = useState("active");
+  const [productState, setProductState] = useState("all");
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -213,11 +232,11 @@ export function ProductsClient({
 
   const isDefaultQuery =
     page === 1 && search === "" && category === "all" && status === "active" &&
-    sortBy === "createdAt" && sortDir === "desc";
+    productState === "all" && sortBy === "createdAt" && sortDir === "desc";
 
   const { data, isFetching } = useQuery({
-    queryKey: ["admin", "products", { page, search, category, status, sortBy, sortDir }],
-    queryFn: () => fetchProducts({ page, search, category, status, sortBy, sortDir }),
+    queryKey: ["admin", "products", { page, search, category, status, productState, sortBy, sortDir }],
+    queryFn: () => fetchProducts({ page, search, category, status, productState, sortBy, sortDir }),
     initialData: isDefaultQuery
       ? { products: initialProducts, pagination: initialPagination }
       : undefined,
@@ -469,7 +488,7 @@ export function ProductsClient({
 const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Status"];
 
   async function fetchExportRows(): Promise<(string | number)[][]> {
-    const full = await fetchProducts({ page: 1, search, category, status, sortBy, sortDir, all: true });
+    const full = await fetchProducts({ page: 1, search, category, status, productState, sortBy, sortDir, all: true });
     return full.products.map((product, index) => [
       index + 1,
       product.name,
@@ -729,14 +748,35 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Status"];
             <SelectTrigger className="w-full sm:w-40">
               <SelectValue>
                 {(value: string) =>
-                  value === "active" ? "Active" : value === "archived" ? "Archived" : "Trash"
+                  value === "active" ? "Current" : value === "archived" ? "Archived" : "Trash"
                 }
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="active">Current</SelectItem>
               <SelectItem value="archived">Archived</SelectItem>
               <SelectItem value="trash">Trash</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={productState}
+            onValueChange={(value) => {
+              setProductState(value ?? "all");
+              setPage(1);
+              setSelectedIds(new Set());
+            }}
+          >
+            <SelectTrigger className="w-full sm:w-44">
+              <SelectValue>
+                {(value: string) => PRODUCT_STATE_LABELS[value] ?? "All statuses"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(PRODUCT_STATE_LABELS).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
