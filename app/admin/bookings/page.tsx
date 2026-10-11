@@ -53,6 +53,8 @@ export default async function AdminBookingsPage() {
     pickupPaid: booking.pickupPaid ?? 0,
     damageCharges: booking.damageCharges ?? 0,
     depositRefundAmount: booking.depositRefundAmount ?? 0,
+    depositRefunded: booking.depositRefunded ?? false,
+    depositRefundedAt: booking.depositRefundedAt ? booking.depositRefundedAt.toISOString() : null,
     customer: booking.customer
       ? {
           name: (booking.customer as unknown as { name: string }).name,

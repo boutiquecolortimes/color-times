@@ -67,6 +67,9 @@ export interface IBooking extends Document {
   pendingRentAmount?: number;
   depositRefundAmount?: number;
   depositRefunded?: boolean;
+  // When the remaining deposit was actually handed back — at Return, or
+  // later via "Mark deposit refunded" (or the invoice's refund action).
+  depositRefundedAt?: Date | null;
   finalSettlementAmount?: number;
   settledAt?: Date | null;
   // Unguessable token for the public /review/[token] page — generated the
@@ -140,6 +143,7 @@ const bookingSchema = new Schema<IBooking>(
     pendingRentAmount: { type: Number, min: 0, default: 0 },
     depositRefundAmount: { type: Number, min: 0, default: 0 },
     depositRefunded: { type: Boolean, default: false },
+    depositRefundedAt: { type: Date, default: null },
     finalSettlementAmount: { type: Number, default: 0 },
     settledAt: { type: Date, default: null },
     reviewToken: { type: String, trim: true, unique: true, sparse: true },

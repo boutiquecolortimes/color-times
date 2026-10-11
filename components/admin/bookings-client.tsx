@@ -58,9 +58,12 @@ import { useCanEdit } from "@/components/admin/current-user-context";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
 import { cn, customerContact, formatDate } from "@/lib/utils";
 import {
+  bookingDepositHeld,
+  bookingDepositState,
   bookingDepositUsed,
   bookingPaidBreakdown,
   bookingRemainingDue,
+  type DepositState,
 } from "@/lib/admin/booking-status";
 import type { BookingStatus } from "@/models/Booking";
 
@@ -78,6 +81,8 @@ interface BookingRow {
   pickupPaid?: number;
   damageCharges?: number;
   depositRefundAmount?: number;
+  depositRefunded?: boolean;
+  depositRefundedAt?: string | null;
   customer: { name: string; email: string; phone?: string } | null;
   items: { product: { name: string } | null }[];
 }
@@ -137,6 +142,51 @@ function securityText(booking: BookingRow): string {
   return used > 0
     ? `${formatINR(booking.securityDeposit)} (${formatINR(used)} used)`
     : formatINR(booking.securityDeposit);
+}
+
+const DEPOSIT_STATE_LABELS: Record<DepositState, string> = {
+  none: "",
+  not_collected: "Not collected yet",
+  held: "Held",
+  refund_pending: "Refund pending",
+  refunded: "Refunded",
+  kept: "Kept for rent/damage",
+};
+
+// Plain-text deposit state, e.g. "Refunded ₹2,000 on 12 Oct 2026" — used in the
+// table badge's tooltip and in Excel/PDF exports.
+function depositStateText(booking: BookingRow): string {
+  const state = bookingDepositState(booking);
+  if (state === "refunded") {
+    const amount = formatINR(booking.depositRefundAmount ?? 0);
+    return booking.depositRefundedAt
+      ? `Refunded ${amount} on ${formatDate(booking.depositRefundedAt)}`
+      : `Refunded ${amount}`;
+  }
+  if (state === "refund_pending") return `Refund pending · ${formatINR(booking.depositRefundAmount ?? 0)}`;
+  return DEPOSIT_STATE_LABELS[state];
+}
+
+function DepositBadge({ booking }: { booking: BookingRow }) {
+  const state = bookingDepositState(booking);
+  if (state === "none") return null;
+  const tone: Record<Exclude<DepositState, "none">, string> = {
+    not_collected: "bg-muted text-muted-foreground",
+    held: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+    refund_pending: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+    refunded: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    kept: "bg-muted text-muted-foreground",
+  };
+  return (
+    <span
+      title={depositStateText(booking)}
+      className={cn("mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-medium", tone[state])}
+    >
+      {state === "refunded" && booking.depositRefundedAt
+        ? `Refunded ${formatDate(booking.depositRefundedAt)}`
+        : DEPOSIT_STATE_LABELS[state]}
+    </span>
+  );
 }
 
 function SortIcon({
@@ -381,6 +431,8 @@ export function BookingsClient({
     "Due Paid",
     "Total Rent",
     "Security Paid",
+    "Security Held",
+    "Deposit Status",
     "Remaining Due",
     "Status",
   ];
@@ -400,6 +452,8 @@ export function BookingsClient({
       bookingPaidSplit(booking).due,
       bookingRentTotal(booking),
       booking.securityDeposit,
+      bookingDepositHeld(booking),
+      depositStateText(booking) || "—",
       bookingDueAmount(booking),
       STATUS_LABELS[booking.status],
     ]);
@@ -420,6 +474,9 @@ export function BookingsClient({
       rows.reduce((sum, b) => sum + bookingPaidSplit(b).due, 0),
       rows.reduce((sum, b) => sum + bookingRentTotal(b), 0),
       rows.reduce((sum, b) => sum + b.securityDeposit, 0),
+      // Matches the "Security Held" tile — only deposit money still with the store
+      rows.reduce((sum, b) => sum + bookingDepositHeld(b), 0),
+      "",
       rows.reduce((sum, b) => sum + bookingDueAmount(b), 0),
       "",
     ];
@@ -515,7 +572,11 @@ export function BookingsClient({
               {formatINR(bookingRentTotal(booking))}
             </span>
             <span>Security Paid</span>
-            <span className="text-right">{securityText(booking)}</span>
+            <span className="text-right">
+              {securityText(booking)}
+              <br />
+              <DepositBadge booking={booking} />
+            </span>
             <span>Remaining Due</span>
             <span className="text-right font-medium text-accent">
               {formatINR(bookingDueAmount(booking))}
@@ -1021,6 +1082,8 @@ export function BookingsClient({
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {securityText(booking)}
+                      <br />
+                      <DepositBadge booking={booking} />
                     </td>
                     <td className="px-4 py-3 font-medium text-accent">
                       {formatINR(bookingDueAmount(booking))}

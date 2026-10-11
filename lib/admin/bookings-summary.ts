@@ -34,7 +34,44 @@ export async function getBookingsSummary(filter: Record<string, unknown>): Promi
       $group: {
         _id: null,
         totalAmount: { $sum: "$totalAmount" },
-        securityDeposit: { $sum: "$securityDeposit" },
+        // "Security Held" = deposit money still physically with the store —
+        // not every deposit ever recorded. Same rule as bookingDepositHeld()
+        // in lib/admin/booking-status.ts.
+        securityDeposit: {
+          $sum: {
+            $switch: {
+              branches: [
+                { case: { $eq: ["$status", "cancelled"] }, then: 0 },
+                {
+                  case: { $eq: ["$status", "returned"] },
+                  then: {
+                    $cond: [
+                      { $eq: [{ $ifNull: ["$depositRefunded", false] }, true] },
+                      0,
+                      { $max: [0, { $ifNull: ["$depositRefundAmount", 0] }] },
+                    ],
+                  },
+                },
+              ],
+              default: {
+                $min: [
+                  "$securityDeposit",
+                  {
+                    $max: [
+                      0,
+                      {
+                        $subtract: [
+                          { $ifNull: ["$advancePaid", 0] },
+                          { $max: [0, { $subtract: ["$totalAmount", "$securityDeposit"] }] },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        },
         advancePaid: { $sum: "$advancePaid" },
         // Same rule as bookingRemainingDue(): rent − paid, and for a
         // returned booking also minus the deposit kept toward rent/damage.

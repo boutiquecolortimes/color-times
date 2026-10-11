@@ -99,6 +99,7 @@ interface BookingDetail {
   damageCharges?: number;
   pendingRentAmount?: number;
   depositRefunded?: boolean;
+  depositRefundedAt?: string | null;
   depositRefundAmount?: number;
   finalSettlementAmount?: number;
   // Public /review/[token] link state — reviewToken is only ever generated
@@ -218,6 +219,24 @@ export function BookingDetailClient({
         navigator.clipboard?.writeText(data.reviewUrl).catch(() => {});
         toast.success("Review link copied — no phone number on file to open WhatsApp with");
       }
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  // For deposits handed back after the Return step (the refund box was left
+  // unticked then) — takes it out of "Security Held" and records the date.
+  const refundDepositMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/admin/bookings/${booking._id}/refund-deposit`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      return json.data.booking;
+    },
+    onSuccess: () => {
+      toast.success("Deposit marked as refunded");
+      queryClient.invalidateQueries({ queryKey: ["admin", "booking", booking._id] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -638,11 +657,29 @@ export function BookingDetailClient({
                     <p className="flex justify-between">
                       <span className="text-muted-foreground">Deposit Refunded</span>
                       <span>
-                        {booking.depositRefunded
-                          ? formatCurrency(booking.depositRefundAmount ?? 0)
-                          : "Not yet"}
+                        {(booking.depositRefundAmount ?? 0) <= 0
+                          ? "Nothing to refund"
+                          : booking.depositRefunded
+                            ? `${formatCurrency(booking.depositRefundAmount ?? 0)}${
+                                booking.depositRefundedAt ? ` on ${formatDate(booking.depositRefundedAt)}` : ""
+                              }`
+                            : `Not yet — ${formatCurrency(booking.depositRefundAmount ?? 0)} still held`}
                       </span>
                     </p>
+                    {canEdit && !booking.depositRefunded && (booking.depositRefundAmount ?? 0) > 0 && (
+                      <div className="flex justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={refundDepositMutation.isPending}
+                          onClick={() => refundDepositMutation.mutate()}
+                        >
+                          {refundDepositMutation.isPending
+                            ? "Saving…"
+                            : `Mark ${formatCurrency(booking.depositRefundAmount ?? 0)} deposit refunded`}
+                        </Button>
+                      </div>
+                    )}
                     <p className="flex justify-between font-medium">
                       <span>
                         {(booking.finalSettlementAmount ?? 0) > 0

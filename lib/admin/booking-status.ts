@@ -103,6 +103,46 @@ export function bookingDepositUsed(booking: {
   return Math.max(0, booking.securityDeposit - (booking.depositRefundAmount ?? 0));
 }
 
+type DepositFields = {
+  status?: string;
+  totalAmount: number;
+  securityDeposit: number;
+  advancePaid?: number;
+  depositRefundAmount?: number;
+  depositRefunded?: boolean;
+};
+
+/**
+ * Security money physically still with the boutique for this booking.
+ *   before Return — whatever was paid beyond the rent, capped at the deposit
+ *                   (the deposit is collected at Pickup, after rent)
+ *   Returned      — the refund still owed to the customer, until it's handed back;
+ *                   the part kept for rent/damage became income, so it isn't "held"
+ *   Cancelled     — nothing
+ * Must stay in step with the $switch in lib/admin/bookings-summary.ts.
+ */
+export function bookingDepositHeld(booking: DepositFields): number {
+  if (booking.status === "cancelled") return 0;
+  if (booking.status === "returned") {
+    return booking.depositRefunded ? 0 : Math.max(0, booking.depositRefundAmount ?? 0);
+  }
+  const rentTotal = Math.max(0, booking.totalAmount - booking.securityDeposit);
+  const paidBeyondRent = Math.max(0, (booking.advancePaid ?? 0) - rentTotal);
+  return Math.min(booking.securityDeposit, paidBeyondRent);
+}
+
+export type DepositState = "none" | "not_collected" | "held" | "refund_pending" | "refunded" | "kept";
+
+/** Where the deposit stands, for the Security column badge. */
+export function bookingDepositState(booking: DepositFields): DepositState {
+  if (booking.securityDeposit <= 0 || booking.status === "cancelled") return "none";
+  if (booking.status === "returned") {
+    if ((booking.depositRefundAmount ?? 0) <= 0) return "kept";
+    return booking.depositRefunded ? "refunded" : "refund_pending";
+  }
+  return bookingDepositHeld(booking) > 0 ? "held" : "not_collected";
+}
+
 /**
  * Splits what's been paid on a booking for display:
  *   advance  — paid before pickup

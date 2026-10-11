@@ -94,6 +94,7 @@ export default async function BookingDetailPage({
           damageCharges: booking.damageCharges,
           pendingRentAmount: booking.pendingRentAmount,
           depositRefunded: booking.depositRefunded,
+          depositRefundedAt: booking.depositRefundedAt ? booking.depositRefundedAt.toISOString() : null,
           depositRefundAmount: booking.depositRefundAmount,
           finalSettlementAmount: booking.finalSettlementAmount,
           reviewToken: booking.reviewToken,

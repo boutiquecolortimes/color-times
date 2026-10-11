@@ -79,6 +79,7 @@ export async function POST(
           stitchingRequired: false,
           damageCharges: 0,
           depositRefunded: false,
+          depositRefundedAt: null,
           depositRefundAmount: 0,
         },
         $unset: {

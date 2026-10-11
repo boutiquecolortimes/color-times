@@ -181,6 +181,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       update.damageCharges = damageCharges;
       update.pendingRentAmount = pendingRentAmount;
       update.depositRefunded = input.depositRefunded ?? false;
+      update.depositRefundedAt = update.depositRefunded && depositRefundAmount > 0 ? new Date() : null;
       update.depositRefundAmount = depositRefundAmount;
       update.finalSettlementAmount = finalSettlementAmount;
       update.settledAt = new Date();

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Invoice } from "@/models/Invoice";
+import { Booking } from "@/models/Booking";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
@@ -48,6 +49,25 @@ export async function POST(
       actor: auth.user,
       changes: [{ field: "depositRefunded", from: false, to: true }],
     });
+
+    // Keep the linked booking in step, so its deposit leaves "Security Held"
+    // and shows as refunded on the Bookings page too.
+    if (existing.booking) {
+      const booking = await Booking.findOneAndUpdate(
+        { _id: existing.booking, depositRefunded: { $ne: true } },
+        { depositRefunded: true, depositRefundedAt: new Date() }
+      );
+      if (booking) {
+        await recordAuditLog({
+          entityType: "Booking",
+          entityId: String(existing.booking),
+          action: "update",
+          actor: auth.user,
+          changes: [{ field: "depositRefunded", from: false, to: true }],
+          metadata: { viaInvoice: id },
+        });
+      }
+    }
 
     return apiSuccess({ invoice });
   } catch (error) {
