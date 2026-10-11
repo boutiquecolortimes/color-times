@@ -13,6 +13,22 @@ export interface BookingConflict {
 }
 
 /**
+ * Mongo filter for bookings whose rental period clashes with the given one.
+ * A shared handover day is allowed — a dress returned on the 11th can go out
+ * again on the 11th (e.g. back-to-back Navratri/Dandiya nights) — so ranges
+ * that merely touch don't conflict. Two bookings picked up on the same day
+ * always do, which also covers single-day rentals on the same date.
+ */
+function overlapFilter(rentalStartDate: Date, rentalEndDate: Date): Record<string, unknown> {
+  return {
+    $or: [
+      { rentalStartDate: { $lt: rentalEndDate }, rentalEndDate: { $gt: rentalStartDate } },
+      { rentalStartDate },
+    ],
+  };
+}
+
+/**
  * All product IDs with an active booking overlapping the given date range —
  * used to pre-mark already-booked dresses in the item picker before the
  * user selects one, instead of only warning after the fact.
@@ -24,8 +40,7 @@ export async function findBookedProductIds(
 ): Promise<string[]> {
   const filter: Record<string, unknown> = {
     status: { $in: ACTIVE_BOOKING_STATUSES },
-    rentalStartDate: { $lte: rentalEndDate },
-    rentalEndDate: { $gte: rentalStartDate },
+    ...overlapFilter(rentalStartDate, rentalEndDate),
   };
   if (excludeBookingId) {
     filter._id = { $ne: excludeBookingId };
@@ -44,8 +59,7 @@ export async function findBookingConflicts(
   const filter: Record<string, unknown> = {
     "items.product": productId,
     status: { $in: ACTIVE_BOOKING_STATUSES },
-    rentalStartDate: { $lte: rentalEndDate },
-    rentalEndDate: { $gte: rentalStartDate },
+    ...overlapFilter(rentalStartDate, rentalEndDate),
   };
   if (excludeBookingId) {
     filter._id = { $ne: excludeBookingId };

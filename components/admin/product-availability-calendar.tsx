@@ -12,12 +12,23 @@ interface DateRange {
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
-function isWithinRange(day: Date, range: DateRange): boolean {
+function rangeBounds(range: DateRange): { start: Date; end: Date } {
   const start = new Date(range.rentalStartDate);
   const end = new Date(range.rentalEndDate);
   start.setHours(0, 0, 0, 0);
   end.setHours(0, 0, 0, 0);
-  return day >= start && day <= end;
+  return { start, end };
+}
+
+// The return day is a handover day — the dress can go out again that same
+// day — so it only counts as booked for a single-day rental.
+function isBookedOn(day: Date, range: DateRange): boolean {
+  const { start, end } = rangeBounds(range);
+  return day >= start && (day < end || start.getTime() === end.getTime());
+}
+
+function isReturnDay(day: Date, range: DateRange): boolean {
+  return day.getTime() === rangeBounds(range).end.getTime();
 }
 
 export function ProductAvailabilityCalendar({ activeRanges }: { activeRanges: DateRange[] }) {
@@ -79,16 +90,25 @@ export function ProductAvailabilityCalendar({ activeRanges }: { activeRanges: Da
       <div className="grid grid-cols-7 gap-1">
         {days.map((day, index) => {
           if (!day) return <div key={index} />;
-          const booking = activeRanges.find((range) => isWithinRange(day, range));
+          const booking = activeRanges.find((range) => isBookedOn(day, range));
+          const returning = booking ? undefined : activeRanges.find((range) => isReturnDay(day, range));
           const isToday = day.getTime() === today.getTime();
           return (
             <div
               key={index}
-              title={booking ? `Booked — ${booking.bookingNumber}` : "Available"}
+              title={
+                booking
+                  ? `Booked — ${booking.bookingNumber}`
+                  : returning
+                    ? `Return day — ${returning.bookingNumber} (can be booked from this day)`
+                    : "Available"
+              }
               className={`flex aspect-square items-center justify-center rounded-md text-xs ${
                 booking
                   ? "bg-red-100 font-medium text-red-800"
-                  : "bg-emerald-50 text-emerald-800"
+                  : returning
+                    ? "bg-amber-100 font-medium text-amber-800"
+                    : "bg-emerald-50 text-emerald-800"
               } ${isToday ? "ring-2 ring-accent" : ""}`}
             >
               {day.getDate()}
@@ -103,6 +123,9 @@ export function ProductAvailabilityCalendar({ activeRanges }: { activeRanges: Da
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-sm bg-red-100" /> Booked
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-sm bg-amber-100" /> Return day
         </span>
       </div>
     </div>
