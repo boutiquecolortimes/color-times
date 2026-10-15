@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { User } from "@/models/User";
 import { requireApiRole } from "@/lib/api/require-role";
+import { escapeRegex } from "@/lib/utils";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { customerCreateSchema } from "@/lib/validations/customer";
 import { hashPassword } from "@/lib/auth/password";
@@ -40,8 +41,9 @@ export async function GET(request: NextRequest): Promise<Response> {
   };
   if (search) {
     filter.$or = [
-      { name: { $regex: search, $options: "i" } },
-      { email: { $regex: search, $options: "i" } },
+      { name: { $regex: escapeRegex(search), $options: "i" } },
+      { email: { $regex: escapeRegex(search), $options: "i" } },
+      { phone: { $regex: escapeRegex(search), $options: "i" } },
     ];
   }
 

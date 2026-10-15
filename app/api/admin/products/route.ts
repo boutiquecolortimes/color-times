@@ -52,6 +52,14 @@ export async function GET(request: NextRequest): Promise<Response> {
     }
   }
 
+  // Booking item picker: only what can actually be rented right now —
+  // not archived, not sold outright. Website visibility (isActive) is
+  // deliberately ignored; hidden dresses are still rentable in the shop.
+  if (searchParams.get("bookable") === "true") {
+    filter.archivedAt = null;
+    filter.status = { $ne: "sold" };
+  }
+
   if (search) {
     // Partial, case-insensitive match across product code (SKU), name, and
     // other descriptive fields — $text only did whole-word stemmed matches

@@ -39,17 +39,18 @@ export default async function EditBookingPage({
     User.find({ role: "customer", deletedAt: null })
       .select("name email phone")
       .sort({ name: 1 })
-      .limit(200)
+      // First page only; the customer picker searches the rest server-side.
+      .limit(20)
       .lean(),
     // A dress that's been sold outright is no longer available to rent —
     // still merged back in below if this booking's own items reference it.
-    // "Inactive" only hides a dress from the public website — it's still in
-    // the shop and rentable, so it stays bookable here. No row cap either:
-    // the picker is searchable, and a limit silently dropped every product
-    // past the first 200 alphabetically.
+    // Only the first page — the item picker searches the rest on the server
+    // as staff type (any number of products). "Inactive" only hides a dress
+    // from the public website, so it's still bookable here.
     Product.find({ deletedAt: null, archivedAt: null, status: { $ne: "sold" } })
       .select("name sku color rentalPricePerDay securityDeposit variants isActive")
       .sort({ name: 1 })
+      .limit(20)
       .lean(),
   ]);
 
@@ -73,6 +74,14 @@ export default async function EditBookingPage({
         .lean()
     : [];
   const products = [...activeProducts, ...extraProducts];
+
+  // The picker only preloads the first page of customers — make sure this
+  // booking's own customer is in it so the field shows their name.
+  const bookingCustomerId = String(booking.customer);
+  if (!customers.some((customer) => String(customer._id) === bookingCustomerId)) {
+    const bookingCustomer = await User.findById(bookingCustomerId).select("name email phone").lean();
+    if (bookingCustomer) customers.push(bookingCustomer);
+  }
 
   // Once returned/cancelled, the booking's totals feed a settlement that's
   // already been computed (and often paid out) — the API rejects an edit at

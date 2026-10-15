@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useFieldArray, useWatch, type Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -99,6 +99,61 @@ function formatCurrency(value: number): string {
   return `₹${value.toLocaleString("en-IN")}`;
 }
 
+// Both pickers search on the server (the list APIs already search + page),
+// so they work the same with 100 records or a million — the page never
+// loads more than one page of matches at a time.
+const PICKER_PAGE_SIZE = 20;
+
+async function searchProductOptions(search: string): Promise<ProductOption[]> {
+  const params = new URLSearchParams({
+    bookable: "true",
+    pageSize: String(PICKER_PAGE_SIZE),
+    sortBy: "name",
+    sortDir: "asc",
+  });
+  if (search) params.set("search", search);
+  const res = await fetch(`/api/admin/products?${params.toString()}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error);
+  return (json.data.products as ProductOption[]).map((product) => ({
+    _id: String(product._id),
+    name: product.name,
+    sku: product.sku,
+    color: product.color,
+    rentalPricePerDay: product.rentalPricePerDay,
+    securityDeposit: product.securityDeposit,
+    variants: product.variants.map((variant) => ({
+      size: variant.size,
+      quantityInStock: variant.quantityInStock,
+    })),
+    isActive: product.isActive,
+  }));
+}
+
+async function searchCustomerOptions(search: string): Promise<CustomerOption[]> {
+  const params = new URLSearchParams({
+    pageSize: String(PICKER_PAGE_SIZE),
+    sortBy: "name",
+    sortDir: "asc",
+  });
+  if (search) params.set("search", search);
+  const res = await fetch(`/api/admin/customers?${params.toString()}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error);
+  return (json.data.customers as CustomerOption[]).map((customer) => ({
+    _id: String(customer._id),
+    name: customer.name,
+    email: customer.email,
+    phone: customer.phone,
+  }));
+}
+
+function mergeById<T extends { _id: string }>(current: T[], incoming: T[]): T[] {
+  const known = new Set(current.map((item) => item._id));
+  const added = incoming.filter((item) => !known.has(item._id));
+  return added.length > 0 ? [...current, ...added] : current;
+}
+
 // Belt-and-suspenders check run right before submit — the item picker
 // already disables a dress once it's used as many times as it has stock,
 // but this catches anything that slips past that (e.g. stock changing
@@ -175,11 +230,15 @@ function BookingItemRow({
   onRemove,
   onProductChange,
   onConflictChange,
+  onProductsLoaded,
   excludeBookingId,
 }: {
   index: number;
   control: Control<BookingCreateInput>;
   products: ProductOption[];
+  // Search results are handed up so the parent can look up price/stock for
+  // whatever gets picked, even though it only ever loaded one page.
+  onProductsLoaded: (products: ProductOption[]) => void;
   bookedProductIds: Set<string>;
   // How many item rows in THIS form (not yet saved) currently have each
   // product selected — the "already booked" set above only knows about
@@ -200,6 +259,25 @@ function BookingItemRow({
   const pricePerDayValue = useWatch({ control, name: `items.${index}.pricePerDay` }) || 0;
 
   const selectedProduct = products.find((p) => p._id === productValue);
+  const [productSearch, setProductSearch] = useState<string | null>(null);
+  const productSearchQuery = useQuery({
+    queryKey: ["admin", "booking-product-search", productSearch],
+    queryFn: () => searchProductOptions(productSearch ?? ""),
+    enabled: productSearch !== null,
+    staleTime: 30 * 1000,
+  });
+  useEffect(() => {
+    if (productSearchQuery.data) onProductsLoaded(productSearchQuery.data);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productSearchQuery.data]);
+  // Until the picker is opened, show what the page loaded; after that, the
+  // server's matches for what's typed (plus the current pick, so it stays visible).
+  const pickerProducts = productSearchQuery.data
+    ? mergeById(
+        selectedProduct ? [selectedProduct] : [],
+        productSearchQuery.data
+      )
+    : products;
   const days = daysBetween(rentalStartDate, rentalEndDate);
   // Flat rent amount per item — not multiplied by the number of rental days.
   const fee = pricePerDayValue;
@@ -243,7 +321,12 @@ function BookingItemRow({
                   placeholder="Select item"
                   searchPlaceholder="Search by name, code, or color..."
                   emptyText="No items found."
-                  options={products.map((product) => {
+                  onSearch={setProductSearch}
+                  loading={productSearchQuery.isFetching && !productSearchQuery.data}
+                  selectedLabel={
+                    selectedProduct ? `${selectedProduct.name} (${selectedProduct.sku})` : undefined
+                  }
+                  options={pickerProducts.map((product) => {
                     const isBooked =
                       bookedProductIds.has(product._id) && product._id !== field.value;
 
@@ -443,7 +526,22 @@ export function BookingForm({
   const queryClient = useQueryClient();
   const isEditing = Boolean(bookingId);
   const [customerList, setCustomerList] = useState<CustomerOption[]>(customers);
+  const [productList, setProductList] = useState<ProductOption[]>(products);
+  const [customerSearch, setCustomerSearch] = useState<string | null>(null);
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
+  const handleProductsLoaded = useCallback((loaded: ProductOption[]) => {
+    setProductList((prev) => mergeById(prev, loaded));
+  }, []);
+  const customerSearchQuery = useQuery({
+    queryKey: ["admin", "booking-customer-search", customerSearch],
+    queryFn: () => searchCustomerOptions(customerSearch ?? ""),
+    enabled: customerSearch !== null,
+    staleTime: 30 * 1000,
+  });
+  useEffect(() => {
+    const found = customerSearchQuery.data;
+    if (found) setCustomerList((prev) => mergeById(prev, found));
+  }, [customerSearchQuery.data]);
 
   const form = useForm<BookingCreateInput>({
     resolver: zodResolver(bookingCreateSchema),
@@ -519,7 +617,7 @@ export function BookingForm({
 
   function handleProductChange(index: number) {
     const productId = form.getValues(`items.${index}.product`);
-    const product = products.find((p) => p._id === productId);
+    const product = productList.find((p) => p._id === productId);
     if (product) {
       form.setValue(`items.${index}.color`, product.color);
       form.setValue(`items.${index}.pricePerDay`, product.rentalPricePerDay);
@@ -619,7 +717,7 @@ export function BookingForm({
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit((values) => {
-          const stockViolation = findStockViolation(values.items, products);
+          const stockViolation = findStockViolation(values.items, productList);
           if (stockViolation) {
             toast.error(stockViolation);
             return;
@@ -671,9 +769,18 @@ export function BookingForm({
                     value={customerValue}
                     onChange={(value) => form.setValue("customer", value)}
                     placeholder="Select customer"
-                    searchPlaceholder="Search by name or email..."
+                    searchPlaceholder="Search by name, phone or email..."
                     emptyText="No customers found."
-                    options={customerList.map((customer) => ({
+                    onSearch={setCustomerSearch}
+                    loading={customerSearchQuery.isFetching && !customerSearchQuery.data}
+                    selectedLabel={customerList.find((c) => c._id === customerValue)?.name}
+                    options={(customerSearchQuery.data
+                      ? mergeById(
+                          customerList.filter((c) => c._id === customerValue),
+                          customerSearchQuery.data
+                        )
+                      : customerList
+                    ).map((customer) => ({
                       value: customer._id,
                       label: customer.name,
                       sublabel: customerContact(customer),
@@ -742,7 +849,8 @@ export function BookingForm({
               key={field.id}
               index={index}
               control={form.control}
-              products={products}
+              products={productList}
+              onProductsLoaded={handleProductsLoaded}
               bookedProductIds={bookedProductIds}
               productUsageCounts={productUsageCounts}
               rentalStartDate={rentalStartDate}

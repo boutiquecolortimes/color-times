@@ -21,6 +21,16 @@ interface SearchableSelectProps {
   emptyText?: string
   disabled?: boolean
   className?: string
+  /**
+   * Server-side search mode: called (debounced) with what the user types,
+   * and `options` is expected to already be the server's matches — no local
+   * filtering. Lets a dropdown cover any number of records while only ever
+   * holding one page of them.
+   */
+  onSearch?: (query: string) => void
+  loading?: boolean
+  /** Label for the selected value when it isn't in the current `options`. */
+  selectedLabel?: string
 }
 
 function SearchableSelect({
@@ -32,19 +42,30 @@ function SearchableSelect({
   emptyText = "No results.",
   disabled,
   className,
+  onSearch,
+  loading,
+  selectedLabel,
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
   const selected = options.find((option) => option.value === value)
+  const triggerLabel = selected?.label ?? (value ? selectedLabel : undefined)
+
+  // Debounced so fast typing sends one request, not one per keystroke.
+  React.useEffect(() => {
+    if (!onSearch || !open) return
+    const timer = setTimeout(() => onSearch(query.trim()), 250)
+    return () => clearTimeout(timer)
+  }, [query, open, onSearch])
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return options
+    if (!q || onSearch) return options
     return options.filter(
       (option) =>
         option.label.toLowerCase().includes(q) || option.sublabel?.toLowerCase().includes(q)
     )
-  }, [options, query])
+  }, [options, query, onSearch])
 
   function handleOpenChange(next: boolean) {
     setOpen(next)
@@ -65,8 +86,8 @@ function SearchableSelect({
           />
         }
       >
-        <span className={cn("truncate text-left", !selected && "text-muted-foreground")}>
-          {selected ? selected.label : placeholder}
+        <span className={cn("truncate text-left", !triggerLabel && "text-muted-foreground")}>
+          {triggerLabel ?? placeholder}
         </span>
         <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
       </PopoverPrimitive.Trigger>
@@ -84,7 +105,10 @@ function SearchableSelect({
               />
             </div>
             <div className="mt-1 max-h-64 overflow-y-auto">
-              {filtered.length === 0 && (
+              {loading && (
+                <p className="px-2 py-3 text-center text-sm text-muted-foreground">Searching...</p>
+              )}
+              {!loading && filtered.length === 0 && (
                 <p className="px-2 py-3 text-center text-sm text-muted-foreground">{emptyText}</p>
               )}
               {filtered.map((option) => (
