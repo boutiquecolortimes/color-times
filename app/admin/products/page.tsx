@@ -49,6 +49,7 @@ export default async function AdminProductsPage() {
     tags: product.tags,
     variants: product.variants,
     createdAt: product.createdAt.toISOString(),
+    updatedAt: product.updatedAt.toISOString(),
     archivedAt: product.archivedAt ? product.archivedAt.toISOString() : null,
     deletedAt: product.deletedAt ? product.deletedAt.toISOString() : null,
   }));

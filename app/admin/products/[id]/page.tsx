@@ -5,6 +5,7 @@ import { Category } from "@/models/Category";
 import { Product } from "@/models/Product";
 import { ProductForm } from "@/components/admin/product-form";
 import { requireRole } from "@/lib/auth/session";
+import { formatDateTime } from "@/lib/utils";
 import { MANAGER_ROLES } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Edit Product" };
@@ -38,7 +39,13 @@ export default async function EditProductPage({
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-2xl">Edit Product</h1>
+      <div>
+        <h1 className="font-heading text-2xl">Edit Product</h1>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Created {formatDateTime(product.createdAt)} &middot; Last updated{" "}
+          {formatDateTime(product.updatedAt)}
+        </p>
+      </div>
       <ProductForm
         productId={id}
         categories={categories.map((category) => ({

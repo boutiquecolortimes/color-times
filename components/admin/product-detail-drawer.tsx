@@ -22,7 +22,7 @@ import { ProductStatusBadge } from "@/components/admin/product-status-badge";
 import { ProductAvailabilityCalendar } from "@/components/admin/product-availability-calendar";
 import { ImagePreviewDialog } from "@/components/admin/image-preview-dialog";
 import { useCanEdit } from "@/components/admin/current-user-context";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import type { BookingStatus } from "@/models/Booking";
 import type { ServiceOrderStatus } from "@/models/ServiceOrder";
 import type { ProductStatus } from "@/models/Product";
@@ -51,6 +51,8 @@ interface ProductDetail {
   status: ProductStatus;
   isActive: boolean;
   tags: string[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface ProductHistoryBooking {
@@ -171,6 +173,12 @@ export function ProductDetailDrawer({
                 <div>
                   <SheetTitle className="font-heading text-xl">{product.name}</SheetTitle>
                   <p className="text-xs text-muted-foreground">{product.sku}</p>
+                  {product.createdAt && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Created {formatDateTime(product.createdAt)}
+                      {product.updatedAt && <> &middot; Updated {formatDateTime(product.updatedAt)}</>}
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-wrap justify-end gap-1.5">
                   <Badge variant={product.isActive ? "default" : "secondary"} className="rounded-full">

@@ -57,7 +57,7 @@ import { ImagePreviewDialog } from "@/components/admin/image-preview-dialog";
 import { ProductStatusBadge } from "@/components/admin/product-status-badge";
 import { useCanEdit } from "@/components/admin/current-user-context";
 import { downloadPdf, downloadExcel } from "@/lib/admin/export";
-import { cn } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 import type { ProductStatus } from "@/models/Product";
 
 interface ProductRow {
@@ -75,6 +75,7 @@ interface ProductRow {
   tags?: string[];
   variants: { size: string; quantityInStock: number }[];
   createdAt?: string;
+  updatedAt?: string;
   archivedAt?: string | null;
   deletedAt?: string | null;
 }
@@ -101,6 +102,8 @@ const COLUMN_DEFS = [
   { key: "category", label: "Category" },
   { key: "price", label: "Rent" },
   { key: "status", label: "Status" },
+  { key: "createdAt", label: "Created" },
+  { key: "updatedAt", label: "Updated" },
 ];
 
 const PRODUCT_STATE_LABELS: Record<string, string> = {
@@ -199,6 +202,8 @@ export function ProductsClient({
     category: true,
     price: true,
     status: true,
+    createdAt: true,
+    updatedAt: true,
   });
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [priceDraft, setPriceDraft] = useState("");
@@ -594,6 +599,16 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Status"];
                 </p>
               );
             })()}
+            {product.createdAt && (
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                Added {formatDateTime(product.createdAt)}
+              </p>
+            )}
+            {product.updatedAt && (
+              <p className="text-[11px] text-muted-foreground">
+                Updated {formatDateTime(product.updatedAt)}
+              </p>
+            )}
             {/* Same actions as the desktop table row — phones only see these cards. */}
             <div className="mt-2 flex flex-wrap items-center gap-1">
               {status === "trash" ? (
@@ -1008,6 +1023,28 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Status"];
                     </button>
                   </th>
                 )}
+                {columnVisibility.createdAt && (
+                  <th className="px-4 py-3">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-foreground"
+                      onClick={() => toggleSort("createdAt")}
+                    >
+                      Created <SortIcon field="createdAt" sortBy={sortBy} sortDir={sortDir} />
+                    </button>
+                  </th>
+                )}
+                {columnVisibility.updatedAt && (
+                  <th className="px-4 py-3">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-foreground"
+                      onClick={() => toggleSort("updatedAt")}
+                    >
+                      Updated <SortIcon field="updatedAt" sortBy={sortBy} sortDir={sortDir} />
+                    </button>
+                  </th>
+                )}
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -1115,6 +1152,16 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Status"];
                         </Badge>
                         {product.status === "sold" && <ProductStatusBadge status="sold" />}
                       </div>
+                    </td>
+                  )}
+                  {columnVisibility.createdAt && (
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
+                      {product.createdAt ? formatDateTime(product.createdAt) : "—"}
+                    </td>
+                  )}
+                  {columnVisibility.updatedAt && (
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
+                      {product.updatedAt ? formatDateTime(product.updatedAt) : "—"}
                     </td>
                   )}
                   <td className="px-4 py-3">
@@ -1286,7 +1333,7 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Status"];
               ))}
               {products.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
+                  <td colSpan={10} className="px-4 py-10 text-center text-muted-foreground">
                     {isFetching ? "Loading..." : "No products found."}
                   </td>
                 </tr>

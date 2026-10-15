@@ -29,10 +29,23 @@ export function formatDate(value: string | number | Date): string {
 }
 
 /** Formats a date with time as "10-Jul-2026, 2:30 PM". */
+// Always shown in India time: server components render on Vercel in UTC, so
+// relying on the runtime's local zone would put times 5h30m off (and cause a
+// server/browser hydration mismatch).
 export function formatDateTime(value: string | number | Date): string {
   const date = new Date(value)
-  const time = date.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })
-  return `${formatDate(date)}, ${time}`
+  const parts = new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).formatToParts(date)
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? ""
+  return `${get("day")}-${get("month")}-${get("year")}, ${get("hour")}:${get("minute")} ${get("dayPeriod").toUpperCase()}`
 }
 
 // Walk-in bookings don't collect a real email, so a quick-add customer gets
