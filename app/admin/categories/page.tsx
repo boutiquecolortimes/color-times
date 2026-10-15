@@ -26,6 +26,8 @@ export default async function AdminCategoriesPage() {
     heroImage: category.heroImage,
     displayOrder: category.displayOrder,
     isFeatured: category.isFeatured,
+    createdAt: category.createdAt?.toISOString(),
+    updatedAt: category.updatedAt?.toISOString(),
   }));
 
   return (

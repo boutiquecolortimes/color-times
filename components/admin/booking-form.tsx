@@ -91,6 +91,8 @@ interface ProductOption {
   rentalPricePerDay: number;
   securityDeposit: number;
   variants: { size: string; quantityInStock: number }[];
+  // false = hidden on the public website, but still rentable in the shop.
+  isActive?: boolean;
 }
 
 function formatCurrency(value: number): string {
@@ -258,7 +260,9 @@ function BookingItemRow({
                       (product._id === field.value ? 1 : 0);
                     const exceedsStock = usedElsewhere > 0 && usedElsewhere >= totalStock;
 
-                    let sublabel = `${product.color} · ${formatCurrency(product.rentalPricePerDay)} rent`;
+                    let sublabel = `${product.color} · ${formatCurrency(product.rentalPricePerDay)} rent${
+                      product.isActive === false ? " · Hidden on website" : ""
+                    }`;
                     if (isBooked) {
                       sublabel = "Already booked for these dates";
                     } else if (exceedsStock) {

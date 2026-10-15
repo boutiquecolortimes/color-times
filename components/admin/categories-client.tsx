@@ -63,9 +63,12 @@ import { MobileListBar } from "@/components/admin/mobile-list-bar";
 import { useCanEdit } from "@/components/admin/current-user-context";
 import { categorySchema, type CategoryInput } from "@/lib/validations/category";
 import { downloadExcel, downloadPdf } from "@/lib/admin/export";
+import { formatDateTime } from "@/lib/utils";
 
 interface CategoryRow extends CategoryInput {
   _id: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface Pagination {
@@ -423,6 +426,11 @@ export function CategoriesClient({
           <div className="p-3">
             <p className="truncate text-sm font-medium">{category.name}</p>
             <p className="truncate text-xs text-muted-foreground">{category.slug}</p>
+            {category.updatedAt && (
+              <p className="truncate text-[11px] text-muted-foreground">
+                Updated {formatDateTime(category.updatedAt)}
+              </p>
+            )}
             <div className="mt-2 flex justify-end gap-1">
               {status === "trash" ? (
                 <>
@@ -671,6 +679,16 @@ export function CategoriesClient({
                   Slug <SortIcon field="slug" sortBy={sortBy} sortDir={sortDir} />
                 </button>
               </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("createdAt")}>
+                  Created <SortIcon field="createdAt" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("updatedAt")}>
+                  Updated <SortIcon field="updatedAt" sortBy={sortBy} sortDir={sortDir} />
+                </button>
+              </th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
@@ -711,6 +729,12 @@ export function CategoriesClient({
                 </td>
                 <td className="px-4 py-3 font-medium">{category.name}</td>
                 <td className="px-4 py-3 text-muted-foreground">{category.slug}</td>
+                <td className="px-4 py-3 text-xs text-muted-foreground">
+                  {category.createdAt ? formatDateTime(category.createdAt) : "—"}
+                </td>
+                <td className="px-4 py-3 text-xs text-muted-foreground">
+                  {category.updatedAt ? formatDateTime(category.updatedAt) : "—"}
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-2">
                     {status === "trash" ? (
@@ -759,7 +783,7 @@ export function CategoriesClient({
             ))}
             {categories.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
                   {status === "trash" ? "Trash is empty." : "No categories yet. Create your first one."}
                 </td>
               </tr>

@@ -43,10 +43,13 @@ export default async function EditBookingPage({
       .lean(),
     // A dress that's been sold outright is no longer available to rent —
     // still merged back in below if this booking's own items reference it.
-    Product.find({ isActive: true, deletedAt: null, archivedAt: null, status: { $ne: "sold" } })
-      .select("name sku color rentalPricePerDay securityDeposit variants")
+    // "Inactive" only hides a dress from the public website — it's still in
+    // the shop and rentable, so it stays bookable here. No row cap either:
+    // the picker is searchable, and a limit silently dropped every product
+    // past the first 200 alphabetically.
+    Product.find({ deletedAt: null, archivedAt: null, status: { $ne: "sold" } })
+      .select("name sku color rentalPricePerDay securityDeposit variants isActive")
       .sort({ name: 1 })
-      .limit(200)
       .lean(),
   ]);
 
@@ -66,7 +69,7 @@ export default async function EditBookingPage({
   ];
   const extraProducts = missingProductIds.length
     ? await Product.find({ _id: { $in: missingProductIds } })
-        .select("name sku color rentalPricePerDay securityDeposit variants")
+        .select("name sku color rentalPricePerDay securityDeposit variants isActive")
         .lean()
     : [];
   const products = [...activeProducts, ...extraProducts];
@@ -161,6 +164,7 @@ export default async function EditBookingPage({
           color: product.color,
           rentalPricePerDay: product.rentalPricePerDay,
           securityDeposit: product.securityDeposit,
+          isActive: product.isActive,
           variants: product.variants.map((variant) => ({
             size: variant.size,
             quantityInStock: variant.quantityInStock,
