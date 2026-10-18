@@ -120,6 +120,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
     }
 
     const update: Record<string, unknown> = { status: input.status };
+    if (input.status !== before.status) {
+      update.statusUpdatedAt = new Date();
+    }
     if (input.status === "confirmed") {
       // Same correction pattern as Pickup/Return below — the rent, security
       // deposit, and advance entered when the booking was first noted down

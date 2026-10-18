@@ -12,12 +12,14 @@ import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 import { escapeRegex } from "@/lib/utils";
 import { getBookingsSummary } from "@/lib/admin/bookings-summary";
+import { ensureBookingStatusUpdatedAt } from "@/lib/admin/booking-activity-backfill";
 
 export async function GET(request: NextRequest): Promise<Response> {
   const auth = await requireApiRole(ADMIN_ROLES);
   if ("error" in auth) return auth.error;
 
   await connectToDatabase();
+  await ensureBookingStatusUpdatedAt();
 
   const searchParams = request.nextUrl.searchParams;
   const all = searchParams.get("all") === "true";
@@ -27,9 +29,10 @@ export async function GET(request: NextRequest): Promise<Response> {
   const from = searchParams.get("from");
   const to = searchParams.get("to");
   const search = searchParams.get("search")?.trim();
-  // Defaults to most-recently-booked first when the caller doesn't
-  // specify — matches the admin list's own default (see bookings-client.tsx).
-  const sortBy = searchParams.get("sortBy") || "bookingDate";
+  // Defaults to latest activity first (newest created or most recently
+  // status-changed) when the caller doesn't specify — matches the admin
+  // list's own default (see bookings-client.tsx).
+  const sortBy = searchParams.get("sortBy") || "latestActivity";
   const sortDir = searchParams.get("sortDir") === "asc" ? 1 : -1;
   // "view" (trash/active) is intentionally separate from "status" above —
   // status is the booking lifecycle (inquiry/confirmed/...), this is purely
@@ -86,13 +89,17 @@ export async function GET(request: NextRequest): Promise<Response> {
     status: "status",
     createdAt: "createdAt",
     deletedAt: "deletedAt",
+    latestActivity: "statusUpdatedAt",
   };
-  const sortField = SORTABLE_FIELDS[sortBy] ?? "createdAt";
+  const sortField = SORTABLE_FIELDS[sortBy] ?? "statusUpdatedAt";
 
+  // bookingDate is a date-only value (midnight), so many bookings tie on it —
+  // break ties by creation time (then _id) so the newest always comes first
+  // and pagination stays stable.
   const baseQuery = Booking.find(filter)
     .populate("customer", "name email phone")
     .populate("items.product", "name images")
-    .sort({ [sortField]: sortDir, createdAt: -1 });
+    .sort({ [sortField]: sortDir, createdAt: -1, _id: -1 });
 
   // Tab counts (and the earnings summary) ignore the "status" filter itself
   // so every tab can show its own count regardless of which one is active —

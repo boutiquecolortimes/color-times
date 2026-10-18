@@ -297,9 +297,9 @@ export function BookingsClient({
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [search, setSearch] = useState("");
-  // Default to most-recently-booked first, so the newest bookings are
-  // always visible at the top of the list.
-  const [sortBy, setSortBy] = useState("bookingDate");
+  // Default to latest activity first — a newly created booking, or one whose
+  // status just changed (confirmed, picked up, returned...), sits at the top.
+  const [sortBy, setSortBy] = useState("latestActivity");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [view, setView] = useState<"table" | "card" | "calendar">("table");
   const [trashView, setTrashView] = useState<"active" | "trash">("active");
@@ -317,7 +317,7 @@ export function BookingsClient({
     from === "" &&
     to === "" &&
     search === "" &&
-    sortBy === "bookingDate" &&
+    sortBy === "latestActivity" &&
     sortDir === "desc" &&
     trashView === "active";
 
@@ -923,6 +923,7 @@ export function BookingsClient({
           <div className="space-y-3 lg:hidden">
             <MobileListBar
               sortOptions={[
+                { value: "latestActivity", label: "Latest Activity" },
                 { value: "bookingNumber", label: "Booking #" },
                 { value: "billNumber", label: "Bill #" },
                 { value: "bookingDate", label: "Booking Date" },

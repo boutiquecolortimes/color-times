@@ -79,6 +79,12 @@ export interface IBooking extends Document {
   reviewToken?: string;
   reviewRequestedAt?: Date | null;
   deletedAt?: Date | null;
+  // When the booking last entered its current status — set on creation and
+  // bumped on every status change (confirm, pickup, return, cancel, undo).
+  // Drives the admin list's default "latest activity" ordering, so a booking
+  // that just moved stage rises to the top. Kept separate from updatedAt,
+  // which also changes on unrelated edits (notes, reminders, review links).
+  statusUpdatedAt: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -149,11 +155,13 @@ const bookingSchema = new Schema<IBooking>(
     reviewToken: { type: String, trim: true, unique: true, sparse: true },
     reviewRequestedAt: { type: Date, default: null },
     deletedAt: { type: Date, default: null, index: true },
+    statusUpdatedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );
 
 bookingSchema.index({ createdAt: -1 });
+bookingSchema.index({ statusUpdatedAt: -1, createdAt: -1 });
 bookingSchema.index({ status: 1, rentalEndDate: 1 });
 
 export const Booking: Model<IBooking> =

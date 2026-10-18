@@ -73,6 +73,7 @@ export async function POST(
       {
         $set: {
           status: "in_use",
+          statusUpdatedAt: new Date(),
           returnedAt: null,
           settledAt: null,
           dryCleaningRequired: false,

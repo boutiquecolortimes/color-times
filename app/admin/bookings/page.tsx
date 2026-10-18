@@ -4,6 +4,7 @@ import { SETTINGS_ROLES } from "@/lib/auth/roles";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Booking } from "@/models/Booking";
 import { getBookingsSummary } from "@/lib/admin/bookings-summary";
+import { ensureBookingStatusUpdatedAt } from "@/lib/admin/booking-activity-backfill";
 import "@/models/User";
 import "@/models/Product";
 import { BookingsClient } from "@/components/admin/bookings-client";
@@ -17,15 +18,16 @@ export default async function AdminBookingsPage() {
   const canManageSettings = Boolean(currentUser && SETTINGS_ROLES.includes(currentUser.role));
 
   await connectToDatabase();
+  await ensureBookingStatusUpdatedAt();
 
   const [bookings, total, summaryAgg, statusAgg] = await Promise.all([
-    // Matches the client's default sort (most-recently-booked first) so
-    // the server-rendered first page doesn't flash a different order before
-    // the client takes over.
+    // Matches the client's default sort (latest activity first — newest
+    // created or most recently status-changed) so the server-rendered first
+    // page doesn't flash a different order before the client takes over.
     Booking.find({ deletedAt: null })
       .populate("customer", "name email phone")
       .populate("items.product", "name images")
-      .sort({ bookingDate: -1, createdAt: -1 })
+      .sort({ statusUpdatedAt: -1, createdAt: -1, _id: -1 })
       .limit(PAGE_SIZE)
       .lean(),
     Booking.countDocuments({ deletedAt: null }),
