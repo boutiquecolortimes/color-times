@@ -34,6 +34,18 @@ export interface IUser extends Document {
     postalCode: string;
     isDefault: boolean;
   }[];
+  // Color Times Privé membership (mobile in-app subscription). Written only
+  // by the store webhook (app/api/webhooks/revenuecat) — never by the client.
+  premium?: {
+    isActive: boolean;
+    plan?: string;
+    productId?: string;
+    store?: string;
+    expiresAt?: Date | null;
+    updatedAt?: Date;
+  };
+  // Expo push tokens for the mobile app (one per signed-in device).
+  pushTokens: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -87,6 +99,15 @@ const userSchema = new Schema<IUser>(
     deletedAt: { type: Date, default: null, index: true },
     wishlist: [{ type: Schema.Types.ObjectId, ref: "Product" }],
     addresses: { type: [addressSchema], default: [] },
+    premium: {
+      isActive: { type: Boolean, default: false },
+      plan: { type: String, trim: true },
+      productId: { type: String, trim: true },
+      store: { type: String, trim: true },
+      expiresAt: { type: Date, default: null },
+      updatedAt: { type: Date },
+    },
+    pushTokens: { type: [String], default: [], select: false },
   },
   { timestamps: true }
 );

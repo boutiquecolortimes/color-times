@@ -31,7 +31,7 @@ interface InvoicePdfPayment {
   paidAt: string;
 }
 
-interface InvoicePdfData {
+export interface InvoicePdfData {
   invoiceNumber: string;
   status: InvoiceStatus;
   createdAt: string;
@@ -125,6 +125,16 @@ const LABEL_HEIGHT_MM: Record<LabelKey, number> = {
 };
 
 export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang = "en"): Promise<void> {
+  const doc = await buildInvoicePdf(invoice, lang);
+  doc.save(`${invoice.invoiceNumber}${lang === "hi" ? "-hi" : ""}.pdf`);
+}
+
+/**
+ * Builds the invoice PDF (English or Hindi) in the browser. Used by the
+ * admin's download menu and by the public /bill/[id]/hi page, which the
+ * mobile app opens for the Hindi bill (Hindi needs the browser's canvas).
+ */
+export async function buildInvoicePdf(invoice: InvoicePdfData, lang: PdfLang = "en"): Promise<jsPDF> {
   const doc = new jsPDF({ orientation: "portrait" });
   const logo = await loadImageAsDataUrl("/logo-icon.png");
   const hi = lang === "hi" ? await loadHindiLabels() : null;
@@ -470,7 +480,7 @@ export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang 
     drawTermsAndConditions(doc, 14, cursorY, 182);
   }
 
-  doc.save(`${invoice.invoiceNumber}${lang === "hi" ? "-hi" : ""}.pdf`);
+  return doc;
 
   function drawHindiTerms(startY: number): void {
     const heading = renderHindiText(TERMS_AND_CONDITIONS_HEADING_HI, {

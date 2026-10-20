@@ -1,0 +1,33 @@
+{
+  "migIndex": 1,
+  "data": [
+    {
+      "path": "src/assets/fonts/CormorantGaramond-Bold.ttf",
+      "sha1": "c476b9ea6618c83ad0a64abd542eb3e09c142a49"
+    },
+    {
+      "path": "src/assets/fonts/CormorantGaramond-Medium.ttf",
+      "sha1": "55a98c74fc7eea493391e25bfa6cee770a9fa7f9"
+    },
+    {
+      "path": "src/assets/fonts/CormorantGaramond-SemiBold.ttf",
+      "sha1": "3946cea5d2f369766d54573fdae34cfcebfe7126"
+    },
+    {
+      "path": "src/assets/fonts/Manrope-Bold.ttf",
+      "sha1": "dbc0b874ad8b9f3415d0e9b4e22907890ca72327"
+    },
+    {
+      "path": "src/assets/fonts/Manrope-Medium.ttf",
+      "sha1": "b5e2c6265e0919163142bb8eac9b6450fb91f920"
+    },
+    {
+      "path": "src/assets/fonts/Manrope-Regular.ttf",
+      "sha1": "3f36e4904a42d23273ac346047c1b6bcf067ccfc"
+    },
+    {
+      "path": "src/assets/fonts/Manrope-SemiBold.ttf",
+      "sha1": "f7a023cd6c102b2ffa8bf729579552445970d62d"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "color-times-visual-qa",
+  "private": true,
+  "type": "module",
+  "description": "Renders real app screens in Chromium (react-native-web) with fixture data, in light and dark, for visual QA.",
+  "scripts": {
+    "dev": "vite --port 5173 --strictPort",
+    "shoot": "node shoot.mjs dashboard,bookings,booking,customer,account,home,dress 2000"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.7.0",
+    "playwright-core": "1.56.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-native-web": "0.21.2",
+    "react-native-web-linear-gradient": "1.1.2",
+    "vite": "^6.4.1"
+  }
+}

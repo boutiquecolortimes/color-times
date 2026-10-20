@@ -14,6 +14,7 @@ import {
 } from "@/lib/auth/cookies";
 import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
+import { isMobileClient } from "@/lib/auth/mobile";
 
 export async function POST(request: NextRequest): Promise<Response> {
   const auth = await requireApiRole(ADMIN_ROLES);
@@ -62,7 +63,12 @@ export async function POST(request: NextRequest): Promise<Response> {
       tokenVersion: user.tokenVersion,
     });
 
-    const response = apiSuccess({ changed: true });
+    // Mobile keeps its tokens in secure storage — hand back the fresh pair,
+    // since the tokenVersion bump above just invalidated the old refresh token.
+    const response = apiSuccess({
+      changed: true,
+      ...(isMobileClient(request) ? { accessToken, refreshToken } : {}),
+    });
     response.cookies.set(ACCESS_TOKEN_COOKIE, accessToken, accessTokenCookieOptions);
     response.cookies.set(REFRESH_TOKEN_COOKIE, refreshToken, refreshTokenCookieOptions);
     return response;

@@ -1,0 +1,4 @@
+<resources>
+    <!-- Night = Midnight Luxury. Selected by Appearance.setColorScheme / the system. -->
+    <color name="app_bg">#141512</color>
+</resources>

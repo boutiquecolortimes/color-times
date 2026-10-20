@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // React Native app — has its own lint/TS config.
+    "mobile/**",
   ]),
 ]);
 

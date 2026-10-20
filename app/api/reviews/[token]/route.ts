@@ -19,6 +19,36 @@ interface RouteParams {
 const MIN_PHOTOS = 1;
 const MAX_PHOTOS = 4;
 
+// Read-only summary for the mobile app's native review screen (the web
+// page renders the same data server-side). Same token-as-access model.
+export async function GET(_request: NextRequest, { params }: RouteParams): Promise<Response> {
+  try {
+    const { token } = await params;
+    await connectToDatabase();
+    const booking = await Booking.findOne({ reviewToken: token })
+      .populate("customer", "name")
+      .populate("items.product", "name images")
+      .lean();
+    if (!booking) return apiError("This review link is invalid or has expired", 404);
+    const existing = await BookingReview.findOne({ booking: booking._id }).lean();
+    return apiSuccess({
+      bookingNumber: booking.bookingNumber,
+      customerName: (booking.customer as unknown as { name?: string } | null)?.name ?? "",
+      items: booking.items.map((item) => {
+        const product = item.product as unknown as { name?: string; images?: string[] } | null;
+        return { name: product?.name ?? "Dress", image: product?.images?.[0] ?? "" };
+      }),
+      minPhotos: MIN_PHOTOS,
+      maxPhotos: MAX_PHOTOS,
+      review: existing
+        ? { rating: existing.rating, comment: existing.comment ?? "", images: existing.images, createdAt: existing.createdAt }
+        : null,
+    });
+  } catch (error) {
+    return apiErrorFromUnknown(error);
+  }
+}
+
 // Public, unauthenticated endpoint — the review token itself (an
 // unguessable 24-byte hex string) is the only access control, mirroring
 // the /api/bookings/track pattern used for public order tracking.

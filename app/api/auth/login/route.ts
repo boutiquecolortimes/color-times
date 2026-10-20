@@ -11,6 +11,7 @@ import {
 } from "@/lib/auth/cookies";
 import { loginSchema } from "@/lib/validations/auth";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
+import { isMobileClient } from "@/lib/auth/mobile";
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;
@@ -83,6 +84,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       name: user.name,
       email: user.email,
       role: user.role,
+      ...(isMobileClient(request) ? { accessToken, refreshToken } : {}),
     });
     response.cookies.set(ACCESS_TOKEN_COOKIE, accessToken, accessTokenCookieOptions);
     response.cookies.set(REFRESH_TOKEN_COOKIE, refreshToken, refreshTokenCookieOptions);

@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { Booking } from "@/models/Booking";
 import { Product } from "@/models/Product";
 import { ServiceOrder } from "@/models/ServiceOrder";
+import { BookingReview } from "@/models/BookingReview";
 import "@/models/User";
 import {
   bookingStatusSchema,
@@ -35,16 +36,23 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
   const { id } = await params;
   await connectToDatabase();
 
-  const booking = await Booking.findById(id)
-    .populate("customer", "name email phone")
-    .populate("items.product", "name images sku")
-    .lean();
+  const [booking, review] = await Promise.all([
+    Booking.findById(id)
+      .populate("customer", "name email phone")
+      .populate("items.product", "name images sku")
+      .lean(),
+    // The customer's review for this booking (shown on the booking page) —
+    // the web page loads it server-side; the mobile app reads it from here.
+    BookingReview.findOne({ booking: id })
+      .select("customerName rating comment images createdAt")
+      .lean(),
+  ]);
 
   if (!booking) {
     return apiError("Booking not found", 404);
   }
 
-  return apiSuccess({ booking });
+  return apiSuccess({ booking, review: review ?? null });
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams): Promise<Response> {

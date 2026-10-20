@@ -12,6 +12,7 @@ import {
 import { registerSchema } from "@/lib/validations/auth";
 import { sendVerificationEmail } from "@/lib/notifications/verification-email";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
+import { isMobileClient } from "@/lib/auth/mobile";
 
 export async function POST(request: NextRequest): Promise<Response> {
   try {
@@ -48,7 +49,13 @@ export async function POST(request: NextRequest): Promise<Response> {
     });
 
     const response = apiSuccess(
-      { id: user._id.toString(), name: user.name, email: user.email, role: user.role },
+      {
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        ...(isMobileClient(request) ? { accessToken, refreshToken } : {}),
+      },
       201
     );
     response.cookies.set(ACCESS_TOKEN_COOKIE, accessToken, accessTokenCookieOptions);

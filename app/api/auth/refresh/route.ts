@@ -9,13 +9,18 @@ import {
   refreshTokenCookieOptions,
 } from "@/lib/auth/cookies";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
+import { isMobileClient } from "@/lib/auth/mobile";
 
 type RefreshResult =
   | { ok: true; accessToken: string; refreshToken: string }
   | { ok: false; message: string; status: number };
 
-async function renewSession(request: NextRequest): Promise<RefreshResult> {
-  const refreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value;
+async function renewSession(
+  request: NextRequest,
+  bodyToken?: string
+): Promise<RefreshResult> {
+  // Web: httpOnly cookie. Mobile: the refresh token is posted in the body.
+  const refreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value ?? bodyToken;
   if (!refreshToken) {
     return { ok: false, message: "No refresh token provided", status: 401 };
   }
@@ -64,8 +69,21 @@ async function renewSession(request: NextRequest): Promise<RefreshResult> {
 // Used by the admin panel's background keepalive and its fetch retry.
 export async function POST(request: NextRequest): Promise<Response> {
   try {
-    const result = await renewSession(request);
+    let bodyToken: string | undefined;
+    if (isMobileClient(request)) {
+      const body = (await request.json().catch(() => null)) as { refreshToken?: unknown } | null;
+      if (typeof body?.refreshToken === "string") bodyToken = body.refreshToken;
+    }
+    const result = await renewSession(request, bodyToken);
     if (!result.ok) return apiError(result.message, result.status);
+
+    if (isMobileClient(request)) {
+      return apiSuccess({
+        refreshed: true,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      });
+    }
 
     const response = apiSuccess({ refreshed: true });
     response.cookies.set(ACCESS_TOKEN_COOKIE, result.accessToken, accessTokenCookieOptions);

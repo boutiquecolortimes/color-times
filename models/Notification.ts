@@ -9,7 +9,8 @@ export type NotificationType =
   | "low_stock"
   | "service_ready"
   | "customisation_bill_sent"
-  | "sale_bill_sent";
+  | "sale_bill_sent"
+  | "customer_enquiry";
 
 export interface INotification extends Document {
   _id: Types.ObjectId;
@@ -40,6 +41,7 @@ const notificationSchema = new Schema<INotification>(
         "service_ready",
         "customisation_bill_sent",
         "sale_bill_sent",
+        "customer_enquiry",
       ],
       required: true,
     },
