@@ -39,12 +39,19 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     const inputBuffer = Buffer.from(await file.arrayBuffer());
 
-    let optimizedBuffer: Buffer;
+    // Resizing is a nice-to-have (the admin UI already downscales photos on
+    // the device before sending). If sharp itself fails on the server —
+    // e.g. its native Linux binary isn't available in the deployment —
+    // store the original rather than failing the whole upload with a 500.
+    let optimizedBuffer: Buffer = inputBuffer;
     try {
       optimizedBuffer = await optimizeImage(inputBuffer, file.type);
     } catch (error) {
-      console.error("[upload] image processing failed", { name: file.name, type: file.type, size: file.size }, error);
-      return apiError("Couldn't read this photo. Try a different photo or take a screenshot of it.", 422);
+      console.error(
+        "[upload] image processing failed — uploading original",
+        { name: file.name, type: file.type, size: file.size },
+        error
+      );
     }
     const uploadBuffer = toUploadableBuffer(optimizedBuffer);
 

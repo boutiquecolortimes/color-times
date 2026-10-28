@@ -1,5 +1,11 @@
 import "server-only";
-import sharp from "sharp";
+
+// Loaded lazily so a missing/broken native sharp binary in the deployment
+// throws inside optimizeImage() (where callers can catch it and fall back
+// to the original image) instead of crashing the whole route at import.
+async function loadSharp() {
+  return (await import("sharp")).default;
+}
 
 export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 export const MAX_IMAGE_SIZE_BYTES = 8 * 1024 * 1024;
@@ -9,6 +15,7 @@ const MAX_DIMENSION = 2000;
  * either side, shared by every route that accepts image uploads (admin
  * product photos, customer review photos, ...). */
 export async function optimizeImage(buffer: Buffer, contentType: string): Promise<Buffer> {
+  const sharp = await loadSharp();
   const metadata = await sharp(buffer).metadata();
   const needsResize =
     (metadata.width ?? 0) > MAX_DIMENSION || (metadata.height ?? 0) > MAX_DIMENSION;
