@@ -13,9 +13,26 @@ const nativeOnly = [
   '@react-native-async-storage/async-storage',
 ];
 
+// Metro's `require('./x.png')` -> an RN-web image source the browser can load.
+const rnImages = {
+  name: 'rn-image-require',
+  enforce: 'pre' as const,
+  transform(code: string, id: string) {
+    if (!/\.(tsx?|jsx?)$/.test(id) || !code.includes('.png')) return null;
+    let n = 0;
+    const imports: string[] = [];
+    const out = code.replace(/require\((['"])([^'"]+\.png)\1\)/g, (_m, _q, p) => {
+      const v = `__rnimg${n++}`;
+      imports.push(`import ${v} from ${JSON.stringify(p)};`);
+      return `{ uri: ${v} }`;
+    });
+    return n ? { code: imports.join('\n') + '\n' + out, map: null } : null;
+  },
+};
+
 export default defineConfig({
   root: H,
-  plugins: [react({ include: /\.(tsx?|jsx?)$/ })],
+  plugins: [rnImages, react({ include: /\.(tsx?|jsx?)$/ })],
   define: { __DEV__: 'true', 'process.env.NODE_ENV': '"development"', global: 'globalThis' },
   resolve: {
     extensions: ['.web.tsx', '.web.ts', '.web.js', '.tsx', '.ts', '.js', '.jsx', '.mjs', '.json'],

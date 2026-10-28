@@ -1,61 +1,172 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StatusBar, StyleSheet, View } from 'react-native';
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
-import { Button, IconButton, Input, Sheet, T, Tap, toast } from '../../components/ui';
+import { Button, IconButton, Input, T, Tap } from '../../components/ui';
 import { Monogram } from '../../components/brand/Monogram';
-import { colors, gradients, space } from '../../theme';
+import { colors, fonts, gradients, space } from '../../theme';
 import { useAuth } from '../../auth/AuthContext';
 import { useNav } from '../../navigation/nav';
-import { DEV_LOGIN_EMAIL } from '../../config';
+import { BRAND, DEV_LOGIN_EMAIL } from '../../config';
 import { NetLogSheet } from '../../components/NetLogSheet';
-import { api, errorMessage } from '../../api/client';
+import { errorMessage } from '../../api/client';
 
+// Website sign-in page colours (app/(auth)/login/page.tsx) - the same in both themes.
+const ON_WINE = '#FFFFFF';
+const ON_WINE_MUTED = '#C9A6B4';
+const ON_WINE_LINK = '#D9B876';
+const GOLD_LINE = '#C9A45C';
+
+/**
+ * Sign-in / sign-up layout, matching colortimesboutique.com/login: the deep
+ * wine backdrop with a soft gold glow, the logo badge and name, and the form
+ * on a raised card with a gold hairline. The card follows the app theme
+ * (ivory by day, midnight by night); the backdrop is brand and never changes.
+ */
 export function AuthShell({
   title,
   kicker,
+  subtitle,
   children,
+  footer,
   back,
 }: {
   title: string;
-  kicker: string;
+  kicker?: string;
+  subtitle?: string;
   children: React.ReactNode;
+  /** Shown under the card, on the wine backdrop. */
+  footer?: React.ReactNode;
   back?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const nav = useNav();
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <LinearGradient colors={[...gradients.ink]} style={[StyleSheet.absoluteFill, { height: 380 }]} />
+    <View style={{ flex: 1, backgroundColor: gradients.wine[1] }}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient
+        colors={[...gradients.wine]}
+        locations={[0, 0.6, 1]}
+        start={{ x: 0.45, y: 0 }}
+        end={{ x: 0.55, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <Svg width="100%" height="100%" style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Defs>
+          <RadialGradient id="authGlow" cx="50%" cy="0%" r="65%">
+            <Stop offset="0" stopColor={GOLD_LINE} stopOpacity="0.16" />
+            <Stop offset="1" stopColor={GOLD_LINE} stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill="url(#authGlow)" />
+      </Svg>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{
-            paddingTop: insets.top + space.md,
+            flexGrow: 1,
+            justifyContent: 'center',
+            paddingTop: insets.top + space.sm,
             paddingHorizontal: space.xl,
-            paddingBottom: insets.bottom + space.xxl,
+            paddingBottom: insets.bottom + space.xl,
           }}
         >
           <View style={{ height: 44, justifyContent: 'center' }}>
             {back && nav.canGoBack() ? (
-              <IconButton icon="ChevronLeft" onPress={() => nav.goBack()} accessibilityLabel="Back" />
+              <IconButton
+                icon="ChevronLeft"
+                color={ON_WINE}
+                filled={false}
+                onPress={() => nav.goBack()}
+                accessibilityLabel="Back"
+              />
             ) : null}
           </View>
-          <View style={{ alignItems: 'flex-start', marginTop: space.lg }}>
-            <Monogram size={64} />
-            <T variant="caption" gold style={{ marginTop: space.xl }}>
-              {kicker}
-            </T>
-            <T variant="hero" style={{ marginTop: space.xs }}>
-              {title}
+
+          <View style={{ alignItems: 'center', marginBottom: space.xl }}>
+            <Monogram size={84} />
+            <T
+              style={{
+                marginTop: space.md,
+                color: ON_WINE,
+                fontFamily: fonts.display,
+                fontSize: 24,
+                lineHeight: 30,
+                letterSpacing: 0.4,
+              }}
+            >
+              {BRAND.fullName}
             </T>
           </View>
-          <View style={{ marginTop: space.xxl }}>{children}</View>
+
+          <View style={[authStyles.card, { backgroundColor: colors.bgElevated }]}>
+            <View style={authStyles.hairline} />
+            {kicker ? (
+              <T variant="caption" align="center" color={colors.textFaint}>
+                {kicker}
+              </T>
+            ) : null}
+            <T variant="h1" align="center" style={{ marginTop: kicker ? space.xs : 0 }}>
+              {title}
+            </T>
+            {subtitle ? (
+              <T variant="small" align="center" style={{ marginTop: space.xs }}>
+                {subtitle}
+              </T>
+            ) : null}
+            <View style={{ marginTop: space.xl }}>{children}</View>
+          </View>
+
+          {footer ? <View style={{ marginTop: space.xl, alignItems: 'center' }}>{footer}</View> : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
 }
+
+/** Text link for the wine backdrop under the card. */
+export function WineLink({ label, onPress, muted }: { label: string; onPress: () => void; muted?: boolean }) {
+  return (
+    <Tap onPress={onPress} hapticOnPress={false} style={{ paddingVertical: space.xs }}>
+      <T
+        variant={muted ? 'small' : 'smallStrong'}
+        align="center"
+        style={{ color: muted ? ON_WINE_MUTED : ON_WINE_LINK }}
+      >
+        {label}
+      </T>
+    </Tap>
+  );
+}
+
+export function WineNote({ children }: { children: React.ReactNode }) {
+  return (
+    <T variant="small" align="center" style={{ color: ON_WINE_MUTED, marginTop: space.sm }}>
+      {children}
+    </T>
+  );
+}
+
+const authStyles = StyleSheet.create({
+  card: {
+    borderRadius: 20,
+    paddingHorizontal: space.xl,
+    paddingTop: space.xl,
+    paddingBottom: space.xl,
+    boxShadow: '0 30px 70px rgba(10,2,7,0.35)',
+  },
+  hairline: {
+    position: 'absolute',
+    top: 0,
+    left: '14%',
+    right: '14%',
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: GOLD_LINE,
+    opacity: 0.85,
+  },
+});
 
 export function LoginScreen() {
   const nav = useNav();
@@ -64,9 +175,7 @@ export function LoginScreen() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [serverOpen, setServerOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
-  const [server, setServer] = useState(api.baseUrl);
 
   const submit = async () => {
     if (!email.trim() || !password) {
@@ -85,7 +194,11 @@ export function LoginScreen() {
   };
 
   return (
-    <AuthShell kicker="Welcome back" title="Sign in" back>
+    <AuthShell
+      title="Sign in"
+      back
+      footer={__DEV__ ? <WineLink muted label="API log" onPress={() => setLogOpen(true)} /> : undefined}
+    >
       <Input
         label="Email"
         value={email}
@@ -105,6 +218,20 @@ export function LoginScreen() {
         returnKeyType="go"
         onSubmitEditing={submit}
       />
+      <Tap
+        onPress={() => nav.navigate('ForgotPassword', { email: email.trim() })}
+        hapticOnPress={false}
+        style={{
+          alignSelf: 'flex-end',
+          marginTop: -space.sm,
+          marginBottom: space.lg,
+          paddingVertical: space.xs,
+        }}
+      >
+        <T variant="smallStrong" gold>
+          Forgot password?
+        </T>
+      </Tap>
       {error ? (
         <T variant="small" color={colors.danger} style={{ marginBottom: space.md }}>
           {error}
@@ -123,68 +250,7 @@ export function LoginScreen() {
           </T>
         </T>
       </Tap>
-      <T variant="small" align="center" color={colors.textFaint} style={{ marginTop: space.xxl }}>
-        Staff and owners sign in with the same account they use on the web admin.
-      </T>
-      <Tap
-        onPress={() => nav.navigate('InfoHub')}
-        hapticOnPress={false}
-        style={{ alignSelf: 'center', marginTop: space.lg }}
-      >
-        <T variant="smallStrong" gold>
-          About Color Times · Offers · Track a booking
-        </T>
-      </Tap>
-      {__DEV__ ? (
-        <Tap
-          onPress={() => setServerOpen(true)}
-          hapticOnPress={false}
-          style={{ alignSelf: 'center', marginTop: space.md }}
-        >
-          <T variant="small" color={colors.textFaint}>
-            Server: {api.baseUrl}
-          </T>
-        </Tap>
-      ) : null}
-      {__DEV__ ? (
-        <Tap
-          onPress={() => setLogOpen(true)}
-          hapticOnPress={false}
-          style={{ alignSelf: 'center', marginTop: space.sm }}
-        >
-          <T variant="smallStrong" gold>
-            API log (requests & responses)
-          </T>
-        </Tap>
-      ) : null}
       {__DEV__ ? <NetLogSheet visible={logOpen} onClose={() => setLogOpen(false)} /> : null}
-      <Sheet
-        visible={serverOpen}
-        onClose={() => setServerOpen(false)}
-        title="API server"
-        subtitle="Debug builds only — where the Next.js app is running."
-        footer={
-          <Button
-            title="Save"
-            onPress={async () => {
-              await api.setBaseUrl(server.trim());
-              setServerOpen(false);
-              toast.success('Server updated');
-            }}
-          />
-        }
-      >
-        <Input
-          label="Base URL"
-          value={server}
-          onChangeText={setServer}
-          autoCapitalize="none"
-          keyboardType="url"
-        />
-        <T variant="small">
-          Android emulator: http://10.0.2.2:3000 · Phone on Wi-Fi: http://&lt;your Mac's IP&gt;:3000
-        </T>
-      </Sheet>
     </AuthShell>
   );
 }

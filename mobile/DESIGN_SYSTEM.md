@@ -1,6 +1,6 @@
 # Color Times design system (mobile)
 
-Quiet luxury: warm paper or warm charcoal, one bronze/champagne accent, editorial serif
+Quiet luxury: warm paper or warm charcoal, one accent taken from colortimesboutique.com (deep wine by day, warm gold by night), editorial serif
 headings (Cormorant Garamond) over a clean sans (Manrope). Every screen uses semantic tokens,
 so it works in both themes without special cases.
 
@@ -17,16 +17,16 @@ so it works in both themes without special cases.
 | `textMuted` | `#64635C` | `#B0B0A7` |
 | `textFaint` captions, meta | `#6E6C65` | `#94948A` |
 | `textDisabled` | `#A9A69D` | `#62635B` |
-| `gold` brand accent | `#7A6239` (bronze) | `#C4A675` (champagne) |
-| `goldBright` / `goldDeep` | `#9C8052` / `#5F4C2C` | `#DCC08F` / `#8F7748` |
-| `onGold` text on accent fills | `#FFFFFF` | `#1B1810` |
-| `accentBg` accent wash | `#EDE4D5` | `#353024` |
+| `gold` brand accent (name is historical) | `#6B2A45` (wine) | `#E3B36E` (website gold) |
+| `goldBright` / `goldDeep` | `#8A3A5C` / `#3D1229` | `#EFCB8E` / `#C9A45C` |
+| `onGold` text on accent fills | `#FFFFFF` | `#28081A` |
+| `primary` / `onPrimary` buttons (the website's) | `#3D1229` wine / `#FFFFFF` | `#E3B36E` gold / `#28081A` |
+| `accentBg` accent wash | `#F3E6EB` | `#353024` |
 | `success` `warning` `danger` `info` `rose` | `#2B7149` `#8A5E00` `#B3261E` `#2F5D8A` `#9A4F43` | `#7DBA8C` `#E0B35C` `#E58A7E` `#8FB0D4` `#D39A8B` |
 | `successBg` … `infoBg` | 8–10% washes | 14% washes |
 | `overlay` / `scrim` / `viewer` | modal backdrop / icon chip on photos / photo viewer | — |
 
-The light accent is a touch deeper than the brief's `#8B7045`, because `#8B7045` is only
-4.25:1 on ivory. `#7A6239` passes AA as body text.
+**One accent everywhere.** Every page takes its accent from these tokens: links, status pills, selected chips and tabs, buttons, icons, charts, spinners and progress. So every page matches the website, light and dark. Don't hard-code a colour in a screen.
 
 **Contrast is tested.** `__tests__/theme.test.ts` fails the build if any body-text token
 (`text`, `textMuted`, `textFaint`, `gold`, the status colours) falls below **4.5:1** on `bg`,
@@ -34,7 +34,9 @@ The light accent is a touch deeper than the brief's `#8B7045`, because `#8B7045`
 on accent fills to be ≥ 4.5:1.
 
 Gradients (`gradients.*`) follow the theme too:
-- `gold` is the primary button.
+- `primary` is the main button and the floating create button: the website's wine gradient by day, its warm gold by night.
+- `gold` is quick-action icons, rank badges and chart bars.
+- `wine` (`#3D1229 → #28081A → #190510`) is the brand backdrop of the splash and sign-in / sign-up, the same in both themes, as on colortimesboutique.com/login.
 - `veil` fades a photo into the page.
 - `shade` darkens the top of a photo so header icons stay legible.
 - `prive` is the membership card and dashboard hero.
@@ -72,6 +74,13 @@ Rules:
 - The setting lives under **Account → Appearance** for every role.
 - Native: iOS no longer forces Dark in `Info.plist`. Android's window colour comes from `values/` and `values-night/` `app_bg`. The splash and launch screen stay brand ink in both themes.
 - `src/lib/motion.ts` follows the system Reduce Motion setting. When it's on, the screen reveal, tab-pill bloom, press scale and skeleton shimmer are all skipped.
+
+## Logo & launch
+
+- The logo is the website's own artwork (`public/logo.png`, `public/logo-icon.png`), never redrawn. `src/assets/brand/logo-badge.png` is the monogram on a white circle, like the website's sign-in badge. It reads on every background, in both themes. `<Monogram size>` renders it.
+- App icons (Android adaptive + round, iOS 1024) and the launch screens are generated from the same artwork. Launch is the badge centred on deep wine (`#28081A`): Android 12+ system splash, pre-12 `launch_screen.xml`, iOS `LaunchScreen.storyboard`.
+- `BrandSplash` starts on exactly that frame. The badge lifts, a gold halo breathes out once, and the name and "Wear the Moment" rise in. It then fades into the app, showing at least 1.7 s on a cold start, once per launch. Under Reduce Motion it doesn't move.
+- The tagline is the website's (`siteConfig.tagline`): **Wear the Moment**.
 
 ## Type
 

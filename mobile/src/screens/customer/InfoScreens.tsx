@@ -187,8 +187,8 @@ export function AboutScreen() {
                   gap={space.md}
                   style={{ alignItems: 'flex-start', marginBottom: space.lg }}
                 >
-                  <LinearGradient colors={[...gradients.gold]} style={styles.round}>
-                    <Icon name={w.icon} size={18} color={colors.onGold} strokeWidth={2} />
+                  <LinearGradient colors={[...gradients.primary]} style={styles.round}>
+                    <Icon name={w.icon} size={18} color={colors.onPrimary} strokeWidth={2} />
                   </LinearGradient>
                   <View style={{ flex: 1 }}>
                     <T variant="bodyStrong">{w.title}</T>
@@ -218,8 +218,8 @@ export function OffersScreen() {
             {c.offers.map((o) => (
               <Card key={o.code} style={{ marginBottom: space.md }}>
                 <Row gap={space.md} style={{ alignItems: 'flex-start' }}>
-                  <LinearGradient colors={[...gradients.gold]} style={styles.round}>
-                    <Icon name={o.icon} size={18} color={colors.onGold} strokeWidth={2} />
+                  <LinearGradient colors={[...gradients.primary]} style={styles.round}>
+                    <Icon name={o.icon} size={18} color={colors.onPrimary} strokeWidth={2} />
                   </LinearGradient>
                   <View style={{ flex: 1 }}>
                     <T variant="h3">{o.title}</T>

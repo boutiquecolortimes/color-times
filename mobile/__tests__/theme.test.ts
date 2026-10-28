@@ -58,8 +58,16 @@ describe.each(SCHEMES)('%s palette contrast', (scheme) => {
     expect(contrast(p.text, p.bg)).toBeGreaterThanOrEqual(7);
   });
 
-  it('text on accent fills (buttons, active tabs) meets AA', () => {
+  it('text on accent fills (active tabs, badges) meets AA', () => {
     expect(contrast(p.onGold, p.gold)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('button text meets AA on every stop of the primary (website wine / gold) gradient', () => {
+    applyScheme(scheme);
+    for (const stop of gradients.primary) {
+      expect(contrast(p.onPrimary, stop)).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(gradients.primary[1]).toBe(p.primary);
   });
 
   it('muted text still reads on pressed / selected surfaces', () => {

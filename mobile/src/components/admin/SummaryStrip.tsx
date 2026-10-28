@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { T } from '../ui';
 import { colors, radius, space, themed } from '../../theme';
-import { inrCompact } from '../../lib/format';
+import { inr } from '../../lib/format';
 
 const LABELS: Record<string, string> = {
   totalAmount: 'Total',
@@ -24,11 +24,16 @@ export function SummaryStrip({ summary }: { summary?: Record<string, unknown> | 
     <View style={styles.row}>
       {entries.map(([key, value]) => (
         <View key={key} style={styles.cell}>
-          <T variant="caption" style={{ fontSize: 9 }}>
+          <T variant="caption" numberOfLines={1}>
             {LABELS[key]}
           </T>
-          <T variant="bodyStrong" color={key === 'dueAmount' && value > 0 ? colors.warning : colors.text}>
-            {inrCompact(value)}
+          <T
+            variant="bodyStrong"
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            color={key === 'dueAmount' && value > 0 ? colors.warning : colors.text}
+          >
+            {inr(value)}
           </T>
         </View>
       ))}

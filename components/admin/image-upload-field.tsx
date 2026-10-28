@@ -9,6 +9,52 @@ import { Input } from "@/components/ui/input";
 import { ImagePreviewDialog } from "@/components/admin/image-preview-dialog";
 import { cn } from "@/lib/utils";
 
+// Vercel rejects request bodies over ~4.5MB before our route even runs, and
+// a phone camera photo is routinely 4–10MB — so the upload used to fail
+// with a non-JSON 413 that surfaced as "Network error". Downscale and
+// re-encode on the device first: 2000px is the same cap the server applies
+// anyway (see optimize-image.ts), so nothing visible is lost.
+const MAX_UPLOAD_DIMENSION = 2000;
+const TARGET_UPLOAD_BYTES = 3.5 * 1024 * 1024;
+
+async function compressForUpload(file: File): Promise<File> {
+  // Small images in a server-supported format go up untouched.
+  const supported = ["image/jpeg", "image/png", "image/webp", "image/avif"].includes(file.type);
+  if (supported && file.size <= TARGET_UPLOAD_BYTES) return file;
+
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  } catch {
+    // Browser can't decode it (e.g. HEIC on Android Chrome) — let the
+    // server's own validation produce a clear message.
+    return file;
+  }
+
+  const scale = Math.min(1, MAX_UPLOAD_DIMENSION / Math.max(bitmap.width, bitmap.height));
+  const width = Math.round(bitmap.width * scale);
+  const height = Math.round(bitmap.height * scale);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return file;
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+
+  let quality = 0.85;
+  let blob: Blob | null = null;
+  while (quality >= 0.5) {
+    blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+    if (!blob || blob.size <= TARGET_UPLOAD_BYTES) break;
+    quality -= 0.1;
+  }
+  if (!blob) return file;
+
+  const baseName = file.name.replace(/\.[^.]+$/, "") || "photo";
+  return new File([blob], `${baseName}.jpg`, { type: "image/jpeg" });
+}
+
 interface ImageUploadFieldProps {
   images: string[];
   onChange: (images: string[]) => void;
@@ -35,14 +81,23 @@ export function ImageUploadField({ images, onChange, multiple = false }: ImageUp
 
     setIsUploading(true);
     try {
+      const uploadFile = await compressForUpload(file);
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", uploadFile);
 
       const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
-      const json = await res.json();
+      // Platform-level rejections (e.g. 413 from Vercel) come back as plain
+      // text/HTML, not our JSON envelope — don't let res.json() throw and
+      // masquerade as a network error.
+      const json = await res.json().catch(() => null);
 
-      if (!res.ok) {
-        toast.error(json.error ?? "Upload failed");
+      if (!res.ok || !json?.data?.url) {
+        toast.error(
+          json?.error ??
+            (res.status === 413
+              ? "Photo is too large to upload. Try a smaller photo."
+              : `Upload failed (${res.status})`)
+        );
         return;
       }
 
@@ -115,7 +170,7 @@ export function ImageUploadField({ images, onChange, multiple = false }: ImageUp
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/avif"
+          accept="image/*"
           className="hidden"
           onChange={handleFileSelect}
         />

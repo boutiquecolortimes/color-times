@@ -23,6 +23,12 @@ export interface IUser extends Document {
   // serverless instances, which don't share memory.
   failedLoginAttempts: number;
   lockedUntil?: Date;
+  // Forgot password: a 6-digit code emailed to the user. Only its hash is
+  // stored; it expires, allows a few attempts, and resends are rate-limited.
+  passwordResetCodeHash?: string;
+  passwordResetExpires?: Date;
+  passwordResetAttempts?: number;
+  passwordResetRequestedAt?: Date;
   deletedAt?: Date | null;
   wishlist: Types.ObjectId[];
   addresses: {
@@ -96,6 +102,10 @@ const userSchema = new Schema<IUser>(
     tokenVersion: { type: Number, default: 0, select: false },
     failedLoginAttempts: { type: Number, default: 0, select: false },
     lockedUntil: { type: Date, select: false },
+    passwordResetCodeHash: { type: String, select: false },
+    passwordResetExpires: { type: Date, select: false },
+    passwordResetAttempts: { type: Number, default: 0, select: false },
+    passwordResetRequestedAt: { type: Date, select: false },
     deletedAt: { type: Date, default: null, index: true },
     wishlist: [{ type: Schema.Types.ObjectId, ref: "Product" }],
     addresses: { type: [addressSchema], default: [] },

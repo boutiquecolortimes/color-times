@@ -58,7 +58,11 @@ function Row({ e }: { e: NetEntry }) {
         <T variant="smallStrong" style={{ width: 52 }}>
           {e.method}
         </T>
-        <T variant="small" numberOfLines={open ? undefined : 1} style={{ flex: 1, fontFamily: mono, fontSize: 12 }}>
+        <T
+          variant="small"
+          numberOfLines={open ? undefined : 1}
+          style={{ flex: 1, fontFamily: mono, fontSize: 12 }}
+        >
           {e.path}
         </T>
         <T variant="small" color={colors.textFaint}>

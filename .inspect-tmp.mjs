@@ -1,0 +1,13 @@
+import fs from "fs"; import mongoose from "mongoose";
+const env = Object.fromEntries(fs.readFileSync(".env.local","utf8").split("\n").filter(l=>l.includes("=")&&!l.startsWith("#")).map(l=>{const i=l.indexOf("=");return [l.slice(0,i).trim(), l.slice(i+1).trim().replace(/^["']|["']$/g,"")]}));
+const uri = env.MONGODB_URI || env.MONGO_URI || env.DATABASE_URL;
+await mongoose.connect(uri, {serverSelectionTimeoutMS: 15000});
+const db = mongoose.connection.db;
+const b = db.collection("bookings");
+console.log("total", await b.countDocuments());
+const docs = await b.find({status:{$in:["pending_payment","confirmed","in_use"]}}).project({bookingNumber:1,status:1,rentalStartDate:1,rentalEndDate:1,deletedAt:1,"items.product":1}).toArray();
+const rows = docs.map(d=>({n:d.bookingNumber,s:d.status,st:d.rentalStartDate,en:d.rentalEndDate,days:Math.round((new Date(d.rentalEndDate)-new Date(d.rentalStartDate))/864e5),del:!!d.deletedAt,items:d.items?.length}));
+rows.sort((a,b)=>b.days-a.days); console.log("active",rows.length); console.table(rows.slice(0,15));
+const statuses = await b.aggregate([{$group:{_id:"$status",c:{$sum:1}}}]).toArray(); console.log(statuses);
+const p = await db.collection("products").find({name:/chiku/i}).project({name:1,sku:1,color:1,dressType:1}).toArray(); console.log(p);
+await mongoose.disconnect();

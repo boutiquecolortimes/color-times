@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Pre-Android 12 launch window: warm ink with the gold monogram + wordmark. -->
+<!-- Pre-Android 12 launch window: deep wine with the logo badge (same as the first in-app splash frame). -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android" android:opacity="opaque">
     <item android:drawable="@color/brand_ink" />
     <item>

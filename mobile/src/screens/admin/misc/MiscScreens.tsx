@@ -36,7 +36,7 @@ import {
 } from '../../../components/ui';
 import { colors, fonts, radius, space, themed } from '../../../theme';
 import { useNav, routeForLink } from '../../../navigation/nav';
-import { fmtDate, fmtDateTime, inr, inrCompact, isoDay, relativeTime, titleCase } from '../../../lib/format';
+import { fmtDate, fmtDateTime, inr, isoDay, relativeTime, titleCase } from '../../../lib/format';
 import { BOOKING_STATUS, CUSTOMISATION_STATUS, INVOICE_STATUS, SERVICE_STATUS } from '../../../lib/labels';
 import { exportTable, type ExportFormat } from '../../../lib/files';
 import { call, openUrl, whatsapp } from '../../../lib/share';
@@ -243,7 +243,7 @@ export function ReportsScreen() {
                 <Stat
                   key={k}
                   label={humanKey(k)}
-                  value={MONEY_KEY.test(k) && !/margin/i.test(k) ? inrCompact(v as number) : fmtValue(k, v)}
+                  value={MONEY_KEY.test(k) && !/margin/i.test(k) ? inr(v as number) : fmtValue(k, v)}
                 />
               ))}
           </View>
@@ -919,7 +919,7 @@ export function SettingsScreen() {
   const [retailX, setRetailX] = useState('');
   const [autoArchive, setAutoArchive] = useState(false);
   useEffect(() => {
-    if (pm.data) setMethods(pm.data.settings.options.join(', '));
+    if (pm.data?.settings?.options) setMethods(pm.data.settings.options.join(', '));
   }, [pm.data]);
   useEffect(() => {
     if (inv.data) {
@@ -1229,14 +1229,14 @@ const styles = themed(() =>
       backgroundColor: colors.surface,
       marginBottom: space.sm,
     },
-    unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.gold, marginTop: 7 },
+    unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary, marginTop: 7 },
     bubble: {
       maxWidth: '82%',
       paddingVertical: space.sm,
       paddingHorizontal: space.md,
       borderRadius: radius.lg,
     },
-    mine: { alignSelf: 'flex-end', backgroundColor: colors.gold, borderBottomRightRadius: 4 },
+    mine: { alignSelf: 'flex-end', backgroundColor: colors.primary, borderBottomRightRadius: 4 },
     theirs: { alignSelf: 'flex-start', backgroundColor: colors.surfaceHigh, borderBottomLeftRadius: 4 },
     composer: {
       flexDirection: 'row',

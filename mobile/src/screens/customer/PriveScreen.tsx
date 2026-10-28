@@ -137,8 +137,8 @@ export function PriveScreen() {
         <View style={{ marginTop: space.xxl, gap: space.lg }}>
           {PRIVE_PERKS.map((perk) => (
             <View key={perk.title} style={{ flexDirection: 'row', gap: space.md }}>
-              <LinearGradient colors={[...gradients.gold]} style={styles.perkIcon}>
-                <Icon name={perk.icon} size={18} color={colors.onGold} strokeWidth={2} />
+              <LinearGradient colors={[...gradients.primary]} style={styles.perkIcon}>
+                <Icon name={perk.icon} size={18} color={colors.onPrimary} strokeWidth={2} />
               </LinearGradient>
               <View style={{ flex: 1 }}>
                 <T variant="bodyStrong">{perk.title}</T>
@@ -243,7 +243,7 @@ const styles = themed(() =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.gold },
+    radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
     footer: {
       position: 'absolute',
       left: 0,

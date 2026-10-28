@@ -5,7 +5,7 @@
         <item name="android:windowBackground">@color/app_bg</item>
     </style>
 
-    <!-- Android 12+ system splash: gold monogram on warm ink (no white flash, no default robot). -->
+    <!-- Android 12+ system splash: logo badge on deep wine (no white flash, no default robot). -->
     <style name="AppTheme.Launch" parent="AppTheme">
         <item name="android:windowSplashScreenBackground">@color/brand_ink</item>
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>

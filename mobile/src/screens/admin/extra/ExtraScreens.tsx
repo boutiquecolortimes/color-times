@@ -296,7 +296,7 @@ export function AnalyticsScreen() {
                     {m.bookings}
                   </T>
                   <T variant="smallStrong" gold style={monthStyles.num}>
-                    {inrCompact(m.revenue)}
+                    {inr(m.revenue)}
                   </T>
                   <T variant="small" style={monthStyles.num}>
                     {m.newCustomers}
@@ -357,7 +357,7 @@ export function AnalyticsScreen() {
               {a.topProducts.map((p, i) => (
                 <Row key={p.name} style={{ paddingVertical: space.sm }}>
                   <LinearGradient
-                    colors={[...gradients.gold]}
+                    colors={[...gradients.primary]}
                     style={{
                       width: 28,
                       height: 28,
@@ -366,7 +366,7 @@ export function AnalyticsScreen() {
                       justifyContent: 'center',
                     }}
                   >
-                    <T variant="smallStrong" color={colors.onGold}>
+                    <T variant="smallStrong" color={colors.onPrimary}>
                       {i + 1}
                     </T>
                   </LinearGradient>

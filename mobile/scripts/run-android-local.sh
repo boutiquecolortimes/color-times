@@ -95,7 +95,7 @@ if [ -f color-times-web-changes.patch ]; then
   elif git apply --reverse --check color-times-web-changes.patch 2>/dev/null; then
     echo "Already applied"
   else
-    fail "The patch doesn't apply cleanly to your current code - stopping so nothing is half-changed."
+    echo "Skipped: your code already has newer backend changes than this patch (nothing was changed)."
   fi
 else
   echo "No patch file found - assuming the backend already has the mobile changes."

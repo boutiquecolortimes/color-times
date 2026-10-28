@@ -31,7 +31,7 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
     Product.findById(id).select("purchasePrice stitchingCost transportCost otherCost").lean(),
     Booking.find({ "items.product": id })
       .populate("customer", "name")
-      .select("bookingNumber customer status rentalStartDate rentalEndDate totalAmount items createdAt")
+      .select("bookingNumber customer status rentalStartDate rentalEndDate totalAmount items createdAt deletedAt")
       .sort({ rentalStartDate: -1 })
       .limit(50)
       .lean(),
@@ -84,13 +84,15 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
       status: b.status,
       rentalStartDate: b.rentalStartDate.toISOString(),
       rentalEndDate: b.rentalEndDate.toISOString(),
+      deleted: Boolean(b.deletedAt),
       totalAmount: b.totalAmount,
       productRevenue,
     };
   });
 
   const activeRanges = mappedBookings
-    .filter((b) => ACTIVE_BOOKING_STATUSES.includes(b.status))
+    // Trashed bookings stay in the history list but no longer block dates.
+    .filter((b) => !b.deleted && ACTIVE_BOOKING_STATUSES.includes(b.status))
     .map((b) => ({
       bookingNumber: b.bookingNumber,
       rentalStartDate: b.rentalStartDate,

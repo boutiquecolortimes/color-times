@@ -554,8 +554,8 @@ function MediaBubble({ message, mine }: { message: WaMessage; mine: boolean }) {
   return (
     <Tap onPress={() => openUrl(media.downloadUrl ?? media.url!)} hapticOnPress={false}>
       <Row>
-        <Icon name="FileText" size={18} color={mine ? colors.onGold : colors.gold} />
-        <T variant="smallStrong" color={mine ? colors.onGold : colors.text}>
+        <Icon name="FileText" size={18} color={mine ? colors.onPrimary : colors.gold} />
+        <T variant="smallStrong" color={mine ? colors.onPrimary : colors.text}>
           {media.filename ?? titleCase(message.type ?? 'File')}
         </T>
       </Row>
@@ -628,21 +628,21 @@ export function ConversationScreen() {
             <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
               {m.media ? <MediaBubble message={m} mine={mine} /> : null}
               {m.text || m.media?.caption || !m.media ? (
-                <T variant="body" color={mine ? colors.onGold : colors.text}>
+                <T variant="body" color={mine ? colors.onPrimary : colors.text}>
                   {m.text ||
                     m.media?.caption ||
                     (m.templateName ? `[Template: ${m.templateName}]` : `[${m.type ?? 'message'}]`)}
                 </T>
               ) : null}
               {m.errorMessage ? (
-                <T variant="small" color={mine ? colors.onGold : colors.danger}>
+                <T variant="small" color={mine ? colors.onPrimary : colors.danger}>
                   {m.errorMessage}
                 </T>
               ) : null}
               <T
                 variant="small"
                 style={{ fontSize: 10, marginTop: 2, alignSelf: 'flex-end' }}
-                color={mine ? alpha(colors.onGold, 0.75) : colors.textFaint}
+                color={mine ? alpha(colors.onPrimary, 0.75) : colors.textFaint}
               >
                 {fmtDateTime(m.timestamp)}
                 {mine && m.status ? ` · ${m.status}` : ''}
@@ -855,14 +855,14 @@ export function WaSendScreen() {
           ))}
           <Section title="Preview" style={{ marginTop: space.sm }}>
             <View style={[styles.bubble, styles.mine, { maxWidth: '100%' }]}>
-              <T variant="body" color={colors.onGold}>
+              <T variant="body" color={colors.onPrimary}>
                 {preview}
               </T>
               {(comp(template, 'BUTTONS')?.buttons ?? []).map((b, i) => (
                 <T
                   key={i}
                   variant="smallStrong"
-                  color={alpha(colors.onGold, 0.75)}
+                  color={alpha(colors.onPrimary, 0.75)}
                   align="center"
                   style={{ marginTop: space.sm }}
                 >
@@ -1238,15 +1238,15 @@ export function WaCreateTemplateScreen() {
       <Section title="Preview">
         <View style={[styles.bubble, styles.mine, { maxWidth: '100%' }]}>
           {headerText ? (
-            <T variant="bodyStrong" color={colors.onGold}>
+            <T variant="bodyStrong" color={colors.onPrimary}>
               {fill(headerText, [headerExample])}
             </T>
           ) : null}
-          <T variant="body" color={colors.onGold}>
+          <T variant="body" color={colors.onPrimary}>
             {fill(body || 'Your message…', examples)}
           </T>
           {footer ? (
-            <T variant="small" color={alpha(colors.onGold, 0.75)}>
+            <T variant="small" color={alpha(colors.onPrimary, 0.75)}>
               {footer}
             </T>
           ) : null}
@@ -1888,7 +1888,7 @@ const styles = themed(() =>
       borderRadius: radius.lg,
       gap: 4,
     },
-    mine: { alignSelf: 'flex-end', backgroundColor: colors.gold, borderBottomRightRadius: 4 },
+    mine: { alignSelf: 'flex-end', backgroundColor: colors.primary, borderBottomRightRadius: 4 },
     theirs: { alignSelf: 'flex-start', backgroundColor: colors.surfaceHigh, borderBottomLeftRadius: 4 },
     composer: {
       flexDirection: 'row',
@@ -1957,7 +1957,7 @@ function MetaAnalytics({ analytics }: { analytics: Overview['analytics'] }) {
             <Row style={{ justifyContent: 'space-between', marginBottom: space.md }}>
               <Row gap={space.md}>
                 <Row gap={6}>
-                  <View style={[waStyles.legend, { backgroundColor: colors.gold }]} />
+                  <View style={[waStyles.legend, { backgroundColor: colors.primary }]} />
                   <T variant="small">Sent</T>
                 </Row>
                 <Row gap={6}>
@@ -1980,7 +1980,7 @@ function MetaAnalytics({ analytics }: { analytics: Overview['analytics'] }) {
                     <View
                       style={[
                         waStyles.bar,
-                        { height: `${(p.sent / max) * 100}%`, backgroundColor: colors.gold },
+                        { height: `${(p.sent / max) * 100}%`, backgroundColor: colors.primary },
                       ]}
                     />
                     <View

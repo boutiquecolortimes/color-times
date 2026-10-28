@@ -762,7 +762,8 @@ export function DressScreen() {
               {p.category.name}
             </T>
           ) : null}
-          <T variant="hero" style={{ marginTop: space.xs }}>
+          {/* Long names step down a size so the price stays on the first screen. */}
+          <T variant={p.name.length > 26 ? 'h1' : 'hero'} style={{ marginTop: space.xs }} numberOfLines={3}>
             {p.name}
           </T>
           {p.designer ? (
@@ -779,15 +780,19 @@ export function DressScreen() {
             </Row>
           ) : null}
 
-          <Row gap={space.sm} style={{ marginTop: space.xl }}>
+          <Row gap={space.sm} style={{ marginTop: space.xl, alignItems: 'stretch' }}>
             <Card style={{ flex: 1 }}>
-              <T variant="caption">Rent</T>
+              <T variant="caption" numberOfLines={1}>
+                Rent
+              </T>
               <T variant="number" gold>
                 {inr(p.rentalPricePerDay)}
               </T>
             </Card>
             <Card style={{ flex: 1 }}>
-              <T variant="caption">Refundable deposit</T>
+              <T variant="caption" numberOfLines={1}>
+                Deposit · refundable
+              </T>
               <T variant="number">{inr(p.securityDeposit)}</T>
             </Card>
           </Row>
@@ -1189,9 +1194,12 @@ export function MyBookingScreen() {
                 style={{ alignItems: 'flex-start', marginBottom: i < 2 ? space.lg : 0 }}
               >
                 <View
-                  style={[styles.dot, reached && { backgroundColor: colors.gold, borderColor: colors.gold }]}
+                  style={[
+                    styles.dot,
+                    reached && { backgroundColor: colors.primary, borderColor: colors.primary },
+                  ]}
                 >
-                  {reached ? <Icon name="Check" size={12} color={colors.onGold} strokeWidth={3} /> : null}
+                  {reached ? <Icon name="Check" size={12} color={colors.onPrimary} strokeWidth={3} /> : null}
                 </View>
                 <View style={{ flex: 1 }}>
                   <T variant="bodyStrong" color={reached ? colors.text : colors.textMuted}>

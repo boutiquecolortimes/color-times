@@ -103,12 +103,12 @@ export function MonthCalendar({
                   isSel && styles.selected,
                 ]}
               >
-                <T variant="smallStrong" color={isSel ? colors.onGold : colors.text}>
+                <T variant="smallStrong" color={isSel ? colors.onPrimary : colors.text}>
                   {date.getDate()}
                 </T>
                 <View style={styles.dots}>
                   {(mark?.dots ?? []).slice(0, 3).map((c, j) => (
-                    <View key={j} style={[styles.dot, { backgroundColor: isSel ? colors.onGold : c }]} />
+                    <View key={j} style={[styles.dot, { backgroundColor: isSel ? colors.onPrimary : c }]} />
                   ))}
                 </View>
               </View>
@@ -133,7 +133,7 @@ const styles = themed(() =>
     cellW: { width: `${100 / 7}%` },
     cell: { height: 46, margin: 2, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
     today: { borderWidth: 1, borderColor: colors.goldDeep },
-    selected: { backgroundColor: colors.gold },
+    selected: { backgroundColor: colors.primary },
     dots: { flexDirection: 'row', gap: 2, height: 5, marginTop: 2 },
     dot: { width: 5, height: 5, borderRadius: 2.5 },
   })

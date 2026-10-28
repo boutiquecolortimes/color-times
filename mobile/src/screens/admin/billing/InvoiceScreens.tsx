@@ -261,7 +261,7 @@ export function InvoiceDetailScreen() {
           </Row>
           <T variant="small">Due {fmtDate(inv.dueDate)}</T>
         </Row>
-        <T variant="hero" style={{ marginTop: space.md }}>
+        <T variant="number" style={{ marginTop: space.md, fontSize: 34, lineHeight: 40 }}>
           {inr(inv.total)}
         </T>
         <Row gap={space.lg} style={{ marginTop: space.xs }}>

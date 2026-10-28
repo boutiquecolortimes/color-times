@@ -30,12 +30,11 @@ function Label({ label, required, hint }: { label?: string; required?: boolean; 
         marginBottom: 6,
       }}
     >
-      <T variant="caption" style={{ color: colors.textMuted }}>
+      <T variant="smallStrong" style={{ color: colors.textMuted }}>
         {label}
         {required ? (
-          <T variant="caption" gold>
-            {' '}
-            *
+          <T variant="smallStrong" color={colors.danger}>
+            {' *'}
           </T>
         ) : null}
       </T>
@@ -67,6 +66,7 @@ interface InputProps {
   icon?: string;
   onSubmitEditing?: () => void;
   returnKeyType?: React.ComponentProps<typeof TextInput>['returnKeyType'];
+  maxLength?: number;
 }
 
 export function Input({
@@ -88,6 +88,7 @@ export function Input({
   icon,
   onSubmitEditing,
   returnKeyType,
+  maxLength,
 }: InputProps) {
   const [focused, setFocused] = useState(false);
   const [reveal, setReveal] = useState(false);
@@ -131,6 +132,7 @@ export function Input({
           onBlur={() => setFocused(false)}
           onSubmitEditing={onSubmitEditing}
           returnKeyType={returnKeyType}
+          maxLength={maxLength}
           keyboardAppearance={currentScheme()}
         />
         {secure ? (
@@ -250,6 +252,7 @@ export function SelectField({
   onChange,
   placeholder = 'Select',
   required,
+  hint,
   searchable,
   onSearch,
   loading,
@@ -261,6 +264,8 @@ export function SelectField({
   onChange: (value: string, option: Option) => void;
   placeholder?: string;
   required?: boolean;
+  /** Right-aligned note beside the label, e.g. "Optional". */
+  hint?: string;
   searchable?: boolean;
   /** Remote search: called as the user types (options should update from outside). */
   onSearch?: (query: string) => void;
@@ -278,7 +283,7 @@ export function SelectField({
 
   return (
     <View style={[{ marginBottom: space.lg }, style]}>
-      <Label label={label} required={required} />
+      <Label label={label} required={required} hint={hint} />
       <Tap onPress={() => setOpen(true)} style={styles.field} scaleTo={0.99}>
         <T
           variant="body"
@@ -444,8 +449,10 @@ export function Chips<V extends string>({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      style={[{ flexGrow: 0 }, style]}
-      contentContainerStyle={{ gap: space.sm, paddingHorizontal: space.lg }}
+      // A horizontal ScrollView grows and shrinks by default; pin it to its content height
+      // so a long list underneath can never squeeze the chips into it.
+      style={[{ flexGrow: 0, flexShrink: 0 }, style]}
+      contentContainerStyle={{ gap: space.sm, paddingHorizontal: space.lg, alignItems: 'center' }}
     >
       {options.map((option) => {
         const active = option.value === value;
@@ -465,7 +472,7 @@ export function Chips<V extends string>({
               style={{
                 fontFamily: fonts.bodySemi,
                 fontSize: 13,
-                color: active ? colors.onGold : colors.textMuted,
+                color: active ? colors.onPrimary : colors.textMuted,
               }}
             >
               {option.label}
@@ -506,8 +513,8 @@ export function Segmented<V extends string>({
             style={[
               styles.segment,
               active && {
-                backgroundColor: colors.surfaceHigh,
-                borderColor: colors.goldDeep,
+                backgroundColor: colors.primary,
+                borderColor: colors.primary,
               },
             ]}
           >
@@ -515,7 +522,7 @@ export function Segmented<V extends string>({
               style={{
                 fontFamily: fonts.bodySemi,
                 fontSize: 13,
-                color: active ? colors.gold : colors.textMuted,
+                color: active ? colors.onPrimary : colors.textMuted,
               }}
               align="center"
             >
@@ -583,7 +590,7 @@ const styles = themed(() =>
       borderColor: colors.borderStrong,
       backgroundColor: colors.surface,
     },
-    chipActive: { backgroundColor: colors.gold, borderColor: colors.gold },
+    chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     segmented: {
       flexDirection: 'row',
       gap: 6,

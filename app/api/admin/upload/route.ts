@@ -38,16 +38,31 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
 
     const inputBuffer = Buffer.from(await file.arrayBuffer());
-    const optimizedBuffer = await optimizeImage(inputBuffer, file.type);
+
+    let optimizedBuffer: Buffer;
+    try {
+      optimizedBuffer = await optimizeImage(inputBuffer, file.type);
+    } catch (error) {
+      console.error("[upload] image processing failed", { name: file.name, type: file.type, size: file.size }, error);
+      return apiError("Couldn't read this photo. Try a different photo or take a screenshot of it.", 422);
+    }
     const uploadBuffer = toUploadableBuffer(optimizedBuffer);
 
-    const blob = await put(`products/${Date.now()}-${file.name}`, uploadBuffer, {
-      access: "public",
-      addRandomSuffix: true,
-      contentType: file.type,
-    });
-
-    return apiSuccess({ url: blob.url }, 201);
+    try {
+      const blob = await put(`products/${Date.now()}-${file.name}`, uploadBuffer, {
+        access: "public",
+        addRandomSuffix: true,
+        contentType: file.type,
+      });
+      return apiSuccess({ url: blob.url }, 201);
+    } catch (error) {
+      // Storage errors (bad/expired token, store set to private, suspended
+      // store) carry no secrets — surface them so staff can report the
+      // real reason instead of a generic "Something went wrong".
+      console.error("[upload] Vercel Blob put failed", error);
+      const message = error instanceof Error ? error.message : String(error);
+      return apiError(`Image storage error: ${message}`, 502);
+    }
   } catch (error) {
     return apiErrorFromUnknown(error);
   }

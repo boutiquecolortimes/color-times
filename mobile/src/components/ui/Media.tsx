@@ -9,7 +9,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { alpha, colors, fonts, radius, space, themed } from '../../theme';
+import { alpha, colors, gradients, fonts, radius, space, themed } from '../../theme';
 import { T } from './Text';
 import { Icon } from './Icon';
 import { Tap } from './Pressable';
@@ -72,16 +72,16 @@ export function Avatar({ name, size = 40, gold }: { name?: string | null; size?:
         borderRadius: size / 2,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: gold ? colors.gold : colors.surfaceHigh,
+        backgroundColor: gold ? colors.primary : colors.surfaceHigh,
         borderWidth: StyleSheet.hairlineWidth,
-        borderColor: gold ? colors.goldBright : colors.borderStrong,
+        borderColor: gold ? colors.primary : colors.borderStrong,
       }}
     >
       <T
         style={{
           fontFamily: fonts.displayBold,
           fontSize: size * 0.4,
-          color: gold ? colors.onGold : colors.gold,
+          color: gold ? colors.onPrimary : colors.gold,
         }}
       >
         {initials(name)}
@@ -159,11 +159,19 @@ export function Bars({
   data,
   height = 120,
   format,
+  onDark,
 }: {
   data: { label: string; value: number }[];
   height?: number;
   format?: (v: number) => string;
+  /** Drawn on the wine brand card: gold peak, soft ivory bars, light labels. */
+  onDark?: boolean;
 }) {
+  const peakColors = onDark ? ['#EFCB8E', '#C9A45C'] : [...gradients.primary.slice(0, 2)];
+  const restColors = onDark
+    ? ['rgba(255,255,255,0.26)', 'rgba(255,255,255,0.12)']
+    : [alpha(colors.primary, 0.22), alpha(colors.primary, 0.1)];
+  const labelColor = onDark ? 'rgba(255,255,255,0.62)' : undefined;
   const max = Math.max(1, ...data.map((d) => d.value));
   const peak = data.reduce((best, d, i) => (d.value > (data[best]?.value ?? -1) ? i : best), 0);
   return (
@@ -183,7 +191,7 @@ export function Bars({
               {i === peak && format ? (
                 <T
                   variant="small"
-                  color={colors.gold}
+                  color={onDark ? '#EFCB8E' : colors.primary}
                   style={{ fontSize: 10, marginBottom: 2 }}
                   numberOfLines={1}
                 >
@@ -191,11 +199,7 @@ export function Bars({
                 </T>
               ) : null}
               <LinearGradient
-                colors={
-                  i === peak
-                    ? [colors.goldBright, colors.goldDeep]
-                    : [alpha(colors.gold, 0.38), alpha(colors.gold, 0.2)]
-                }
+                colors={i === peak ? peakColors : restColors}
                 style={{ width: '100%', height: h, borderRadius: 6 }}
               />
             </View>
@@ -209,6 +213,7 @@ export function Bars({
             variant="small"
             align="center"
             style={{ flex: 1, fontSize: 10 }}
+            color={labelColor}
             numberOfLines={1}
           >
             {d.label}

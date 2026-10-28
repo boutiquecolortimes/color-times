@@ -6,6 +6,7 @@ import { Icon, T, Tap } from '../components/ui';
 import { colors, fonts, radius, shadow, space, themed } from '../theme';
 import { haptic } from '../lib/haptics';
 import { reduceMotion } from '../lib/motion';
+import { TAB_BAR_MIN_BOTTOM } from './tabSpace';
 
 export const TAB_ICONS: Record<string, string> = {
   Dashboard: 'LayoutDashboard',
@@ -20,12 +21,12 @@ export const TAB_ICONS: Record<string, string> = {
   Profile: 'Users',
 };
 
-/** Floating pill tab bar with a gold active state. */
+/** Floating pill tab bar; the active tab uses the brand primary (wine by day, gold by night). */
 export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   return (
     <View
-      style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, space.md) }]}
+      style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, TAB_BAR_MIN_BOTTOM) }]}
       pointerEvents="box-none"
     >
       <View style={[styles.bar, shadow]}>
@@ -60,7 +61,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                   fontFamily: focused ? fonts.bodySemi : fonts.bodyMedium,
                   fontSize: 10,
                   marginTop: 3,
-                  color: focused ? colors.gold : colors.textFaint,
+                  color: focused ? colors.primary : colors.textFaint,
                 }}
                 numberOfLines={1}
               >
@@ -104,7 +105,7 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
       <Icon
         name={name}
         size={20}
-        color={focused ? colors.onGold : colors.textMuted}
+        color={focused ? colors.onPrimary : colors.textMuted}
         strokeWidth={focused ? 2.1 : 1.7}
       />
     </View>
@@ -125,6 +126,6 @@ const styles = themed(() =>
     },
     item: { flex: 1, alignItems: 'center' },
     iconWrap: { width: 44, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-    iconActive: { backgroundColor: colors.gold, borderRadius: 15 },
+    iconActive: { backgroundColor: colors.primary, borderRadius: 15 },
   })
 );

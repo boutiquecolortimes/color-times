@@ -10,6 +10,24 @@ export function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 
+/**
+ * Word-by-word, case-insensitive search: every word typed must appear in at
+ * least one of the given fields, in any order. So "chiku blue" or
+ * "chiku blue lehenga" finds "Chiku Pink Blue Flower" (a Lehenga), which a
+ * single whole-phrase regex never matched. Returns Mongo clauses meant to
+ * be spread into a `$and`.
+ */
+export function buildWordSearchClauses(
+  search: string,
+  fields: string[]
+): Record<string, unknown>[] {
+  const words = search.trim().split(/\s+/).filter(Boolean).slice(0, 10);
+  return words.map((word) => {
+    const regex = new RegExp(escapeRegex(word), "i");
+    return { $or: fields.map((field) => ({ [field]: regex })) };
+  });
+}
+
 /** Turns a name into a URL-safe slug, e.g. "Red Silk Saree" -> "red-silk-saree". */
 export function slugify(value: string): string {
   return value

@@ -12,9 +12,10 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTabBarSpace } from '../../navigation/tabSpace';
 import { useNavigation } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
-import { alpha, colors, fonts, gradients, radius, space, themed } from '../../theme';
+import { alpha, colors, fonts, radius, space, themed } from '../../theme';
 import { T } from './Text';
 import { IconButton } from './Button';
 import { Icon } from './Icon';
@@ -131,6 +132,8 @@ export function Screen({
   ...rest
 }: ScreenProps) {
   const insets = useSafeAreaInsets();
+  // Inside the tabs, content must scroll clear of the floating tab bar.
+  const bottom = useTabBarSpace() || insets.bottom;
   return (
     <View style={styles.screen}>
       {header}
@@ -142,7 +145,7 @@ export function Screen({
           contentContainerStyle={[
             padded && { paddingHorizontal: space.lg },
             {
-              paddingBottom: (footer ? 110 : 40) + insets.bottom,
+              paddingBottom: (footer ? 110 : 40) + bottom,
               paddingTop: space.sm,
             },
             contentContainerStyle,
@@ -165,7 +168,7 @@ export function Screen({
         <Reveal style={[{ flex: 1 }, padded && { paddingHorizontal: space.lg }]}>{children}</Reveal>
       )}
       {footer ? (
-        <View style={[styles.footer, { paddingBottom: insets.bottom + space.md }]}>
+        <View style={[styles.footer, { paddingBottom: bottom + space.md }]}>
           <LinearGradient
             colors={[alpha(colors.bg, 0), colors.bg]}
             style={StyleSheet.absoluteFill}
@@ -189,14 +192,8 @@ export function Card({
   onPress?: () => void;
   padded?: boolean;
 }) {
-  const body = (
-    <LinearGradient
-      colors={[...gradients.card]}
-      style={[styles.card, padded && { padding: space.lg }, style]}
-    >
-      {children}
-    </LinearGradient>
-  );
+  // Flat: one surface and a hairline. Shadows are kept for things that float.
+  const body = <View style={[styles.card, padded && { padding: space.lg }, style]}>{children}</View>;
   return onPress ? <Tap onPress={onPress}>{body}</Tap> : body;
 }
 
@@ -216,7 +213,7 @@ export function Section({
   return (
     <View style={[{ marginTop: space.xxl }, style]}>
       <View style={styles.sectionHead}>
-        <T variant="caption">{title}</T>
+        <T variant="overline">{title}</T>
         {action ? (
           <Tap onPress={onAction} hapticOnPress={false}>
             <T variant="smallStrong" gold>
@@ -226,6 +223,22 @@ export function Section({
         ) : null}
       </View>
       {children}
+    </View>
+  );
+}
+
+/**
+ * Secondary status beside a record's main badge: a small coloured dot and
+ * quiet text. One Pill per row is the status; everything else is a Meta.
+ */
+export function Meta({ label, tone = 'muted' }: { label: string; tone?: Tone }) {
+  const c = toneColor[tone];
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c }} />
+      <T variant="small" color={tone === 'danger' || tone === 'warning' ? c : colors.textMuted}>
+        {label}
+      </T>
     </View>
   );
 }
@@ -476,6 +489,7 @@ const styles = themed(() =>
     },
     card: {
       borderRadius: radius.lg,
+      backgroundColor: colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.border,
       overflow: 'hidden',

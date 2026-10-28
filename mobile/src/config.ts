@@ -40,7 +40,8 @@ export const PREMIUM_ENTITLEMENT = 'prive';
 export const BRAND = {
   name: 'Color Times',
   fullName: 'Color Times Boutique',
-  tagline: 'Couture, on loan.',
+  /** The website's tagline (lib/config/site.ts). */
+  tagline: 'Wear the Moment',
   phone: '',
   whatsapp: '',
 };

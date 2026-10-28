@@ -91,13 +91,35 @@ const bookingFieldsSchema = z.object({
   notes: z.string().trim().optional().or(z.literal("")),
 });
 
-export const bookingCreateSchema = bookingFieldsSchema.refine(
-  (data) => new Date(data.rentalEndDate) >= new Date(data.rentalStartDate),
-  {
-    message: "Rental end date must be on or after the start date",
-    path: ["rentalEndDate"],
-  }
-);
+// A dress rental is a matter of days. Without an upper bound, an end date
+// picked in the wrong year (the picker's year list runs two years ahead)
+// silently held the dress as "Booked" for every day after pickup.
+export const MAX_RENTAL_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const END_AFTER_START = {
+  message: "Rental end date must be on or after the start date",
+  path: ["rentalEndDate"],
+};
+const WITHIN_MAX_DAYS = {
+  message: `Rental period can't be longer than ${MAX_RENTAL_DAYS} days — please check the end date (especially the year)`,
+  path: ["rentalEndDate"],
+};
+
+function endIsAfterStart(data: { rentalStartDate: string; rentalEndDate: string }): boolean {
+  return new Date(data.rentalEndDate) >= new Date(data.rentalStartDate);
+}
+
+function isWithinMaxDays(data: { rentalStartDate: string; rentalEndDate: string }): boolean {
+  return (
+    new Date(data.rentalEndDate).getTime() - new Date(data.rentalStartDate).getTime() <=
+    MAX_RENTAL_DAYS * DAY_MS
+  );
+}
+
+export const bookingCreateSchema = bookingFieldsSchema
+  .refine(endIsAfterStart, END_AFTER_START)
+  .refine(isWithinMaxDays, WITHIN_MAX_DAYS);
 
 export type BookingCreateInput = z.infer<typeof bookingCreateSchema>;
 
@@ -105,12 +127,8 @@ export type BookingCreateInput = z.infer<typeof bookingCreateSchema>;
 // always resubmits every field (it's the same controlled form as Create),
 // so this stays a full object rather than .partial(); it's a separate
 // schema only so the date-order check can share the base fields cleanly.
-export const bookingUpdateSchema = bookingFieldsSchema.refine(
-  (data) => new Date(data.rentalEndDate) >= new Date(data.rentalStartDate),
-  {
-    message: "Rental end date must be on or after the start date",
-    path: ["rentalEndDate"],
-  }
-);
+export const bookingUpdateSchema = bookingFieldsSchema
+  .refine(endIsAfterStart, END_AFTER_START)
+  .refine(isWithinMaxDays, WITHIN_MAX_DAYS);
 
 export type BookingUpdateInput = z.infer<typeof bookingUpdateSchema>;

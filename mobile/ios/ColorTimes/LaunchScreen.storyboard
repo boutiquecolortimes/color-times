@@ -7,7 +7,7 @@
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <scenes>
-        <!--Color Times launch: the gold monogram + wordmark on warm ink, matching the app's first frame.-->
+        <!--Color Times launch: the website's logo badge on deep wine, matching the app's first splash frame.-->
         <scene sceneID="EHf-IW-A2E">
             <objects>
                 <viewController id="01J-lp-oVM" sceneMemberID="viewController">
@@ -16,15 +16,15 @@
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="LaunchLogo" translatesAutoresizingMaskIntoConstraints="NO" id="CTl-og-0001">
-                                <rect key="frame" x="86.5" y="301" width="220" height="250"/>
+                                <rect key="frame" x="116.5" y="346" width="160" height="160"/>
                                 <constraints>
-                                    <constraint firstAttribute="width" constant="220" id="CTl-w-0001"/>
-                                    <constraint firstAttribute="height" constant="250" id="CTl-h-0001"/>
+                                    <constraint firstAttribute="width" constant="160" id="CTl-w-0001"/>
+                                    <constraint firstAttribute="height" constant="160" id="CTl-h-0001"/>
                                 </constraints>
                             </imageView>
                         </subviews>
                         <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
-                        <color key="backgroundColor" red="0.078431372549019607" green="0.082352941176470587" blue="0.070588235294117646" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <color key="backgroundColor" red="0.15686274509803921" green="0.031372549019607843" blue="0.10196078431372549" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <constraints>
                             <constraint firstItem="CTl-og-0001" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="CTl-cx-0001"/>
                             <constraint firstItem="CTl-og-0001" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="CTl-cy-0001"/>
@@ -37,6 +37,6 @@
         </scene>
     </scenes>
     <resources>
-        <image name="LaunchLogo" width="220" height="250"/>
+        <image name="LaunchLogo" width="160" height="160"/>
     </resources>
 </document>

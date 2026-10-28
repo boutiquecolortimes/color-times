@@ -799,7 +799,7 @@ export function ExpensesScreen() {
           label="Paid via"
           value={editing?.paymentMethod ?? ''}
           onChange={(v) => setEditing((s) => ({ ...s, paymentMethod: v }))}
-          options={(methods.data?.settings.options ?? ['Cash', 'Online']).map((o) => ({
+          options={(methods.data?.settings?.options ?? ['Cash', 'Online']).map((o) => ({
             value: o,
             label: o,
           }))}

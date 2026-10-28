@@ -12,7 +12,7 @@ for (const screen of screens) for (const scheme of schemes) {
   const errors = [];
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.goto(`http://localhost:5173/?screen=${screen}&scheme=${scheme}`, { waitUntil: 'networkidle' });
+  await page.goto(`http://localhost:5173/?screen=${screen}&scheme=${scheme}${process.env.QA_QUERY ?? ''}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1800);
   await page.screenshot({ path: `shots/${screen}-${scheme}.png` });
   const boot = await page.$('#boot-error');

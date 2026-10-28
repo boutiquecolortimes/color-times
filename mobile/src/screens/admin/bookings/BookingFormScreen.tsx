@@ -377,7 +377,7 @@ export function BookingFormScreen() {
             label="Paid via"
             value={method}
             onChange={setMethod}
-            options={(methods.data?.settings.options ?? ['Cash', 'Online']).map((o) => ({
+            options={(methods.data?.settings?.options ?? ['Cash', 'Online']).map((o) => ({
               value: o,
               label: o,
             }))}

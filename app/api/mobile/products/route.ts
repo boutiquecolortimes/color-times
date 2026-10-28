@@ -6,7 +6,7 @@ import { User } from "@/models/User";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ALL_ROLES } from "@/lib/auth/roles";
 import { apiSuccess, apiErrorFromUnknown } from "@/lib/api/response";
-import { escapeRegex } from "@/lib/utils";
+import { buildWordSearchClauses } from "@/lib/utils";
 import {
   PUBLIC_PRODUCT_FIELDS,
   PUBLIC_PRODUCT_FILTER,
@@ -50,10 +50,15 @@ export async function GET(request: NextRequest): Promise<Response> {
     }
     if (designer) filter.designer = designer;
     if (search) {
-      const regex = new RegExp(escapeRegex(search), "i");
-      filter.$and = [
-        { $or: [{ name: regex }, { designer: regex }, { color: regex }, { fabric: regex }, { tags: regex }] },
-      ];
+      // Every typed word must match somewhere, in any order.
+      filter.$and = buildWordSearchClauses(search, [
+        "name",
+        "designer",
+        "dressType",
+        "color",
+        "fabric",
+        "tags",
+      ]);
     }
 
     const [products, total] = await Promise.all([

@@ -13,11 +13,14 @@ export function CustomerPicker({
   onChange,
   label = 'Customer',
   initial,
+  optional,
 }: {
   value: string;
   onChange: (id: string, customer: Option) => void;
   label?: string;
   initial?: Option | null;
+  /** Not required: shows "Optional" instead of the required mark. */
+  optional?: boolean;
 }) {
   const [q, setQ] = useState('');
   const term = useDebounced(q);
@@ -35,7 +38,8 @@ export function CustomerPicker({
   return (
     <SelectField
       label={label}
-      required
+      required={!optional}
+      hint={optional ? 'Optional' : undefined}
       value={value}
       options={options}
       onSearch={setQ}

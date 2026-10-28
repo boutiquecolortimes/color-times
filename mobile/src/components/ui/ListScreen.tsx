@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTabBarSpace } from '../../navigation/tabSpace';
 import LinearGradient from 'react-native-linear-gradient';
 import { useInvalidate, useList } from '../../api/hooks';
 import { colors, gradients, radius, shadow, space, themed } from '../../theme';
@@ -117,6 +118,7 @@ export function ListScreen<T extends { _id?: string }>({
   numColumns,
 }: ListScreenProps<T>) {
   const insets = useSafeAreaInsets();
+  const tabSpace = useTabBarSpace();
   const role = useRole();
   const invalidate = useInvalidate();
   const [text, setText] = useState('');
@@ -313,7 +315,8 @@ export function ListScreen<T extends { _id?: string }>({
   };
 
   const filterActive = Boolean(range.from || range.to || sort.sortBy);
-  const showMenu = Boolean(exporter || menu?.length || trash);
+  // Select lives in the More menu, keeping the header to filter + more (plus any screen-specific icon).
+  const showMenu = Boolean(exporter || menu?.length || trash || canSelect);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -335,9 +338,6 @@ export function ListScreen<T extends { _id?: string }>({
                   onPress={() => setFilterOpen(true)}
                   accessibilityLabel="Filters"
                 />
-              ) : null}
-              {canSelect ? (
-                <IconButton icon="Check" onPress={() => setSelecting(true)} accessibilityLabel="Select" />
               ) : null}
               {showMenu ? (
                 <IconButton
@@ -418,7 +418,9 @@ export function ListScreen<T extends { _id?: string }>({
                     accessibilityLabel={isSel ? 'Deselect' : 'Select'}
                   >
                     <View style={[styles.check, isSel && styles.checkOn]}>
-                      {isSel ? <Icon name="Check" size={14} color={colors.onGold} strokeWidth={3} /> : null}
+                      {isSel ? (
+                        <Icon name="Check" size={14} color={colors.onPrimary} strokeWidth={3} />
+                      ) : null}
                     </View>
                   </Tap>
                 </View>
@@ -444,7 +446,8 @@ export function ListScreen<T extends { _id?: string }>({
           }}
           contentContainerStyle={{
             paddingHorizontal: space.lg,
-            paddingBottom: insets.bottom + 140,
+            // Clear the create button and, inside the tabs, the floating tab bar.
+            paddingBottom: (tabSpace || insets.bottom) + 120,
             gap: numColumns ? space.md : undefined,
           }}
           ListHeaderComponent={top && !inTrash ? <>{top(list.meta)}</> : undefined}
@@ -453,6 +456,17 @@ export function ListScreen<T extends { _id?: string }>({
               icon={inTrash ? 'Trash' : empty?.icon}
               title={inTrash ? 'Trash is empty' : empty?.title ?? 'Nothing here yet'}
               body={inTrash ? undefined : empty?.body}
+              action={
+                // A clear next step on an empty list (not while searching or in Trash).
+                onCreate && !inTrash && !text.trim() ? (
+                  <Button
+                    title={createLabel ? `New ${createLabel.toLowerCase()}` : 'Create'}
+                    icon="Plus"
+                    size="sm"
+                    onPress={onCreate}
+                  />
+                ) : undefined
+              }
             />
           }
           ListFooterComponent={
@@ -482,7 +496,22 @@ export function ListScreen<T extends { _id?: string }>({
       )}
 
       {selecting ? (
-        <View style={[styles.bulkBar, { paddingBottom: insets.bottom + space.md }, shadow]}>
+        <View
+          style={[
+            styles.bulkBar,
+            tabSpace
+              ? {
+                  bottom: tabSpace + space.sm,
+                  marginHorizontal: space.lg,
+                  borderRadius: radius.lg,
+                  borderWidth: StyleSheet.hairlineWidth,
+                  borderColor: colors.borderStrong,
+                  paddingBottom: space.md,
+                }
+              : { paddingBottom: insets.bottom + space.md },
+            shadow,
+          ]}
+        >
           <Row style={{ justifyContent: 'space-between', marginBottom: space.sm }}>
             <T variant="smallStrong">{selected.size} selected</T>
             <Tap
@@ -528,6 +557,18 @@ export function ListScreen<T extends { _id?: string }>({
       ) : null}
 
       <Sheet visible={menuOpen} onClose={() => setMenuOpen(false)} title={title}>
+        {canSelect && !inTrash ? (
+          <Button
+            title="Select records"
+            icon="Check"
+            variant="outline"
+            style={{ marginBottom: space.lg }}
+            onPress={() => {
+              setMenuOpen(false);
+              setSelecting(true);
+            }}
+          />
+        ) : null}
         {exporter ? (
           <>
             <T variant="caption" style={{ marginBottom: space.sm }}>
@@ -678,21 +719,22 @@ export function Fab({
   icon?: string;
 }) {
   const insets = useSafeAreaInsets();
+  const tabSpace = useTabBarSpace();
   return (
     <Tap
       onPress={onPress}
-      style={[styles.fab, { bottom: insets.bottom + space.xl }, shadow]}
+      style={[styles.fab, { bottom: tabSpace ? tabSpace + space.md : insets.bottom + space.xl }, shadow]}
       accessibilityLabel={label ?? 'Create'}
     >
       <LinearGradient
-        colors={[...gradients.gold]}
+        colors={[...gradients.primary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.fabInner}
       >
-        <Icon name={icon} size={20} color={colors.onGold} strokeWidth={2.2} />
+        <Icon name={icon} size={20} color={colors.onPrimary} strokeWidth={2.2} />
         {label ? (
-          <T style={{ color: colors.onGold, fontFamily: 'Manrope-Bold', fontSize: 14 }}>{label}</T>
+          <T style={{ color: colors.onPrimary, fontFamily: 'Manrope-Bold', fontSize: 14 }}>{label}</T>
         ) : null}
       </LinearGradient>
     </Tap>
@@ -723,7 +765,7 @@ const styles = themed(() =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    checkOn: { backgroundColor: colors.gold, borderColor: colors.gold },
+    checkOn: { backgroundColor: colors.primary, borderColor: colors.primary },
     selectedRow: { opacity: 0.75 },
     bulkBar: {
       position: 'absolute',

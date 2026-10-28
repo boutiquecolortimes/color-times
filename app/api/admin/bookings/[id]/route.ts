@@ -317,13 +317,26 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
           });
         }
       } else {
-        await Product.updateMany({ _id: { $in: productIds } }, { status: "available" });
+        // Only free a dress that no other booking still holds — the same
+        // dress can be booked for several different dates.
+        for (const productId of productIds) {
+          const stillActive = await Booking.exists({
+            "items.product": productId,
+            status: { $in: ACTIVE_BOOKING_STATUSES },
+            deletedAt: null,
+            _id: { $ne: booking._id },
+          });
+          await Product.findByIdAndUpdate(productId, {
+            status: stillActive ? "reserved" : "available",
+          });
+        }
       }
     } else if (input.status === "cancelled") {
       for (const productId of productIds) {
         const stillActive = await Booking.exists({
           "items.product": productId,
           status: { $in: ACTIVE_BOOKING_STATUSES },
+          deletedAt: null,
           _id: { $ne: booking._id },
         });
         if (!stillActive) {
@@ -532,6 +545,7 @@ async function updateBookingDetails(
         const stillActive = await Booking.exists({
           "items.product": productId,
           status: { $in: ACTIVE_BOOKING_STATUSES },
+          deletedAt: null,
           _id: { $ne: booking._id },
         });
         if (!stillActive) {

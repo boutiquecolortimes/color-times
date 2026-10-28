@@ -1,7 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import type { Booking } from '../../../api/types';
-import { Img, ListScreen, Pill, Row, T, Tap, Card, IconButton } from '../../../components/ui';
+import { Img, ListScreen, Meta, Pill, Row, T, Tap, Card } from '../../../components/ui';
 import { colors, space } from '../../../theme';
 import { useNav, useParams } from '../../../navigation/nav';
 import { fmtDate, fmtRange, inr } from '../../../lib/format';
@@ -69,8 +69,8 @@ export function BookingCard({ booking, onPress }: { booking: Booking; onPress: (
               </T>
             </Row>
             {deposit !== 'none' ? (
-              <View style={{ alignSelf: 'flex-start', marginTop: 6 }}>
-                <Pill label={depositBadge(booking)} tone={DEPOSIT_STATE[deposit].tone} small />
+              <View style={{ marginTop: 6 }}>
+                <Meta label={depositBadge(booking)} tone={DEPOSIT_STATE[deposit].tone} />
               </View>
             ) : null}
           </View>
@@ -100,13 +100,6 @@ export function BookingsScreen() {
           ? [{ label: 'Booking settings', icon: 'Settings', onPress: () => nav.navigate('Settings') }]
           : []),
       ]}
-      headerRight={
-        <IconButton
-          icon="Calendar"
-          onPress={() => nav.navigate('BookingCalendar')}
-          accessibilityLabel="Calendar"
-        />
-      }
       chips={CHIPS}
       defaultChip={params.status ?? 'all'}
       counts={(meta) => meta?.statusCounts as Record<string, number> | undefined}

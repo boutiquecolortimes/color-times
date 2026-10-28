@@ -83,6 +83,8 @@ export async function unlockWithBiometrics(): Promise<boolean> {
 type PrefKey =
   | 'onboarded'
   | 'biometricLock'
+  | 'mpinLock'
+  | 'mpinOffered'
   | 'apiUrl'
   | 'pushToken'
   | 'recentSearches'

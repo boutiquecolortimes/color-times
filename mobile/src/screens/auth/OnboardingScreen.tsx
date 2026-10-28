@@ -168,6 +168,6 @@ const styles = themed(() =>
     },
     bottom: { paddingHorizontal: space.xl },
     dots: { flexDirection: 'row', gap: 6, marginBottom: space.xl },
-    dot: { height: 6, borderRadius: 3, backgroundColor: colors.gold },
+    dot: { height: 6, borderRadius: 3, backgroundColor: colors.primary },
   })
 );

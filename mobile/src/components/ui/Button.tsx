@@ -34,7 +34,7 @@ export function Button({
   const height = size === 'sm' ? 38 : size === 'lg' ? 56 : 48;
   const fg =
     variant === 'gold'
-      ? colors.onGold
+      ? colors.onPrimary
       : variant === 'danger'
       ? colors.danger
       : variant === 'outline' || variant === 'ghost'
@@ -72,10 +72,14 @@ export function Button({
     >
       {variant === 'gold' ? (
         <LinearGradient
-          colors={[...gradients.gold]}
+          colors={[...gradients.primary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.base, { borderRadius: radius.pill }]}
+          style={[
+            styles.base,
+            { borderRadius: radius.pill },
+            !disabled && { boxShadow: `0 6px 18px ${alpha(colors.primary, 0.28)}` },
+          ]}
         >
           {content}
         </LinearGradient>
@@ -159,7 +163,7 @@ export function IconButton({
               style={{
                 fontSize: 10,
                 lineHeight: 13,
-                color: colors.onGold,
+                color: colors.onPrimary,
                 fontFamily: fonts.bodyBold,
               }}
             >
@@ -189,7 +193,7 @@ const styles = themed(() =>
       height: 18,
       paddingHorizontal: 4,
       borderRadius: 9,
-      backgroundColor: colors.gold,
+      backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
     },

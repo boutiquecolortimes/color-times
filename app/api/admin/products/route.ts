@@ -7,7 +7,7 @@ import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
-import { escapeRegex } from "@/lib/utils";
+import { buildWordSearchClauses } from "@/lib/utils";
 import { PRODUCT_STATUSES, type ProductStatus } from "@/models/Product";
 
 const SORTABLE_FIELDS = new Set([
@@ -65,17 +65,19 @@ export async function GET(request: NextRequest): Promise<Response> {
     // other descriptive fields — $text only did whole-word stemmed matches
     // on name/description/tags and never covered SKU, so typing a code or
     // half a dress name returned nothing.
-    const regex = new RegExp(escapeRegex(search), "i");
-    filter.$or = [
-      { name: regex },
-      { sku: regex },
-      { designer: regex },
-      { dressType: regex },
-      { color: regex },
-      { fabric: regex },
-      { work: regex },
-      { tags: regex },
-    ];
+    // Each word is matched on its own, in any order, so "chiku blue"
+    // finds "Chiku Pink Blue Flower" and "chiku lehenga" matches on the
+    // dress type too.
+    filter.$and = buildWordSearchClauses(search, [
+      "name",
+      "sku",
+      "designer",
+      "dressType",
+      "color",
+      "fabric",
+      "work",
+      "tags",
+    ]);
   }
   if (category) {
     filter.category = category;

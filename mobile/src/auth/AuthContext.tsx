@@ -8,6 +8,7 @@ import { configurePurchases, resetPurchases } from '../lib/purchases';
 import { queryClient } from '../api/queryClient';
 import { idleExpired } from '../lib/session';
 import { toast } from '../components/ui/Toast';
+import { clearMpin, hasMpin, verifyMpin, type MpinCheck } from '../lib/mpin';
 
 interface AuthTokensResponse {
   id: string;
@@ -25,7 +26,13 @@ interface AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   register: (input: { name: string; email: string; phone?: string; password: string }) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Face ID / fingerprint. */
   unlock: () => Promise<boolean>;
+  /** MPIN unlock. Too many wrong PINs signs out (attemptsLeft 0). */
+  unlockWithPin: (pin: string) => Promise<MpinCheck>;
+  /** True right after a password sign-in when no MPIN is set yet: offer to create one. */
+  mpinOffer: boolean;
+  dismissMpinOffer: () => void;
   finishOnboarding: () => Promise<void>;
   /** After a password change the server issues a new token pair. */
   replaceTokens: (accessToken: string, refreshToken: string) => Promise<void>;
@@ -93,6 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const userRef = useRef<SessionUser | null>(null);
   userRef.current = user;
   const signOutRef = useRef<(() => Promise<void>) | null>(null);
+  const [mpinOffer, setMpinOffer] = useState(false);
 
   const afterSignIn = useCallback(async (session: SessionUser) => {
     setUser(session);
@@ -104,11 +112,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Boot: restore the session from the keychain.
   useEffect(() => {
     (async () => {
-      const [stored, onboardedFlag, lockFlag, lastActive] = await Promise.all([
+      const [stored, onboardedFlag, lockFlag, lastActive, pinFlag] = await Promise.all([
         api.init(),
         prefs.get('onboarded'),
         prefs.get('biometricLock'),
         prefs.get('lastActive'),
+        prefs.get('mpinLock'),
       ]);
       setOnboarded(onboardedFlag === '1');
       const session = stored ? decodeJwt(stored.accessToken) : null;
@@ -129,7 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       prefs.set('lastActive', String(Date.now()));
       setUser(session);
-      if (lockFlag === '1') {
+      if (lockFlag === '1' || pinFlag === '1') {
         setStatus('locked');
       } else {
         await afterSignIn(session);
@@ -165,7 +174,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         prefs.set('lastActive', String(Date.now()));
         if (Date.now() - backgroundedAt > RELOCK_AFTER_MS) {
-          if ((await prefs.get('biometricLock')) === '1' && api.hasSession()) setStatus('locked');
+          const locks = await Promise.all([prefs.get('biometricLock'), prefs.get('mpinLock')]);
+          if (locks.includes('1') && api.hasSession()) setStatus('locked');
         }
       }
     });
@@ -189,6 +199,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: data.email,
         role: data.role,
       });
+      if (!(await hasMpin()) && (await prefs.get('mpinOffered')) !== '1') setMpinOffer(true);
     },
     [afterSignIn]
   );
@@ -212,6 +223,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
+    // The MPIN unlocks this session only; the next sign-in sets up its own.
+    await clearMpin();
+    setMpinOffer(false);
     await unregisterPush();
     await resetPurchases();
     await api.post('/api/auth/logout').catch(() => {});
@@ -227,6 +241,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (ok && user) await afterSignIn(user);
     return ok;
   }, [afterSignIn, user]);
+
+  const unlockWithPin = useCallback(
+    async (pin: string) => {
+      const result = await verifyMpin(pin);
+      if (result.ok) {
+        if (user) await afterSignIn(user);
+      } else if (result.attemptsLeft === 0) {
+        await signOutRef.current?.();
+        toast.info('Signed out', 'Too many wrong MPINs. Sign in with your password.');
+      }
+      return result;
+    },
+    [afterSignIn, user]
+  );
+
+  const dismissMpinOffer = useCallback(() => {
+    setMpinOffer(false);
+    prefs.set('mpinOffered', '1');
+  }, []);
 
   const finishOnboarding = useCallback(async () => {
     await prefs.set('onboarded', '1');
@@ -255,11 +288,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       register,
       signOut,
       unlock,
+      unlockWithPin,
+      mpinOffer,
+      dismissMpinOffer,
       finishOnboarding,
       replaceTokens,
       refreshUser,
     }),
-    [status, user, onboarded, signIn, register, signOut, unlock, finishOnboarding, replaceTokens, refreshUser]
+    [
+      status,
+      user,
+      onboarded,
+      signIn,
+      register,
+      signOut,
+      unlock,
+      unlockWithPin,
+      mpinOffer,
+      dismissMpinOffer,
+      finishOnboarding,
+      replaceTokens,
+      refreshUser,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

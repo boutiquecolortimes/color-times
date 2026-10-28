@@ -1,7 +1,7 @@
 <resources>
-    <!-- Brand: launch screen and splash stay "ink" in both themes. -->
-    <color name="brand_ink">#141512</color>
-    <color name="brand_gold">#C4A675</color>
+    <!-- Brand: launch screen and splash use the website's deep wine in both themes. -->
+    <color name="brand_ink">#28081A</color>
+    <color name="brand_gold">#E3B36E</color>
     <!-- Window behind the app — follows the in-app theme (day = Luxury Ivory). -->
     <color name="app_bg">#F7F4EE</color>
 </resources>

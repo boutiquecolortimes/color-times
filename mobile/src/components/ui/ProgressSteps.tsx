@@ -37,18 +37,18 @@ export function ProgressSteps({
                 <View
                   style={[
                     styles.line,
-                    { backgroundColor: !cancelled && i <= idx ? colors.gold : colors.border },
+                    { backgroundColor: !cancelled && i <= idx ? colors.primary : colors.border },
                   ]}
                 />
               ) : null}
               <View
                 style={[
                   styles.node,
-                  done && { backgroundColor: colors.gold, borderColor: colors.gold },
-                  now && { borderColor: colors.gold, borderWidth: 2, backgroundColor: colors.accentBg },
+                  done && { backgroundColor: colors.primary, borderColor: colors.primary },
+                  now && { borderColor: colors.primary, borderWidth: 2, backgroundColor: colors.accentBg },
                 ]}
               >
-                {done ? <Icon name="Check" size={12} color={colors.onGold} strokeWidth={3} /> : null}
+                {done ? <Icon name="Check" size={12} color={colors.onPrimary} strokeWidth={3} /> : null}
                 {now ? <View style={styles.dot} /> : null}
               </View>
             </React.Fragment>
@@ -91,7 +91,7 @@ const styles = themed(() =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.gold },
+    dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
     labels: { flexDirection: 'row', marginTop: space.xs },
     label: { flex: 1, fontSize: 11, lineHeight: 14 },
   })

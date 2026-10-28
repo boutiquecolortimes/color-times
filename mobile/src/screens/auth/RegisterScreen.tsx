@@ -5,14 +5,8 @@ import { colors, space } from '../../theme';
 import { useAuth } from '../../auth/AuthContext';
 import { useNav } from '../../navigation/nav';
 import { errorMessage } from '../../api/client';
-import { AuthShell } from './LoginScreen';
-
-function passwordIssues(password: string): string | null {
-  if (password.length < 8) return 'At least 8 characters';
-  if (!/[A-Z]/.test(password)) return 'Add an uppercase letter';
-  if (!/[0-9]/.test(password)) return 'Add a number';
-  return null;
-}
+import { AuthShell, WineNote } from './LoginScreen';
+import { passwordIssues } from '../../lib/password';
 
 export function RegisterScreen() {
   const nav = useNav();
@@ -50,7 +44,11 @@ export function RegisterScreen() {
   };
 
   return (
-    <AuthShell kicker="Join Color Times" title="Create account" back>
+    <AuthShell
+      title="Create account"
+      back
+      footer={<WineNote>By continuing you agree to Color Times’ terms and privacy policy.</WineNote>}
+    >
       <Input
         label="Full name"
         value={name}
@@ -107,9 +105,6 @@ export function RegisterScreen() {
           </T>
         </Tap>
       </View>
-      <T variant="small" align="center" color={colors.textFaint} style={{ marginTop: space.xl }}>
-        By continuing you agree to Color Times’ terms and privacy policy.
-      </T>
     </AuthShell>
   );
 }

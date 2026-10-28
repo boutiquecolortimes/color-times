@@ -12,6 +12,7 @@ type Variant =
   | 'small'
   | 'smallStrong'
   | 'caption'
+  | 'overline'
   | 'number';
 
 interface Props extends TextProps {

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { api, errorMessage } from '../../api/client';
 import { NetLogSheet } from '../../components/NetLogSheet';
+import { MpinSetup } from '../../components/MpinSetup';
+import { clearMpin, hasMpin } from '../../lib/mpin';
 import { useApi, useInvalidate } from '../../api/hooks';
 import type { Me } from '../../api/types';
 import {
@@ -40,6 +42,8 @@ export function AccountScreen() {
   const [bioKind, setBioKind] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
+  const [mpin, setMpinOn] = useState(false);
+  const [mpinSetup, setMpinSetup] = useState<'create' | 'change' | null>(null);
   const [pwOpen, setPwOpen] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -48,6 +52,7 @@ export function AccountScreen() {
 
   useEffect(() => {
     prefs.get('biometricLock').then((v) => setBio(v === '1'));
+    hasMpin().then(setMpinOn);
     biometryType().then(setBioKind);
   }, []);
   useEffect(() => {
@@ -206,7 +211,7 @@ export function AccountScreen() {
                 } right now.`
               : theme.mode === 'dark'
               ? 'Midnight — warm charcoal with champagne gold.'
-              : 'Ivory — warm paper with bronze accents.'}
+              : 'Ivory — warm paper with deep wine accents.'}
           </T>
         </Card>
       </Section>
@@ -220,7 +225,40 @@ export function AccountScreen() {
             onChange={toggleBio}
           />
         </Card>
+        <ListRow
+          icon="KeyRound"
+          title={mpin ? 'Change MPIN' : 'Set up MPIN'}
+          subtitle={mpin ? 'On · 4-digit PIN to open the app' : 'A 4-digit PIN to open the app quickly'}
+          onPress={() => setMpinSetup(mpin ? 'change' : 'create')}
+        />
+        {mpin ? (
+          <ListRow
+            icon="X"
+            title="Turn off MPIN"
+            onPress={async () => {
+              const ok = await confirm({
+                title: 'Turn off MPIN?',
+                message: 'The app will open without a PIN.',
+                confirmText: 'Turn off',
+                destructive: true,
+              });
+              if (!ok) return;
+              await clearMpin();
+              setMpinOn(false);
+              toast.success('MPIN off');
+            }}
+          />
+        ) : null}
       </Section>
+      <MpinSetup
+        visible={mpinSetup !== null}
+        mode={mpinSetup ?? 'create'}
+        onDone={() => {
+          setMpinSetup(null);
+          setMpinOn(true);
+        }}
+        onCancel={() => setMpinSetup(null)}
+      />
 
       <Section title="About">
         <Card>

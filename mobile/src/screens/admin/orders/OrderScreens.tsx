@@ -26,6 +26,7 @@ import {
   KV,
   ListRow,
   ListScreen,
+  Meta,
   Loading,
   MoneyInput,
   Pill,
@@ -322,7 +323,8 @@ function WalkInCustomer({
       <CustomerPicker
         key={picked?.value ?? 'none'}
         initial={picked}
-        label="Existing customer (optional)"
+        label="Existing customer"
+        optional
         value={customerId}
         onChange={fetchCustomer}
       />
@@ -1096,12 +1098,12 @@ export function ServiceDetailScreen() {
           <View style={{ flex: 1 }}>
             <T variant="h3">{o.product?.name}</T>
             <T variant="small">{o.product?.sku}</T>
-            <Row gap={space.xs} style={{ flexWrap: 'wrap' }}>
+            <Row gap={space.sm} style={{ flexWrap: 'wrap', marginTop: space.xs }}>
               <Pill label={st.label} tone={st.tone} small />
               {o.status !== 'completed' &&
               o.status !== 'cancelled' &&
               new Date(o.expectedReturnDate) < new Date() ? (
-                <Pill label="Overdue" tone="danger" small />
+                <Meta label="Overdue" tone="danger" />
               ) : null}
             </Row>
           </View>

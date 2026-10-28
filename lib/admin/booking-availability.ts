@@ -40,6 +40,9 @@ export async function findBookedProductIds(
 ): Promise<string[]> {
   const filter: Record<string, unknown> = {
     status: { $in: ACTIVE_BOOKING_STATUSES },
+    // Trashed bookings keep their status (so they can be restored), but
+    // they must not keep holding the dress for those dates.
+    deletedAt: null,
     ...overlapFilter(rentalStartDate, rentalEndDate),
   };
   if (excludeBookingId) {
@@ -59,6 +62,7 @@ export async function findBookingConflicts(
   const filter: Record<string, unknown> = {
     "items.product": productId,
     status: { $in: ACTIVE_BOOKING_STATUSES },
+    deletedAt: null,
     ...overlapFilter(rentalStartDate, rentalEndDate),
   };
   if (excludeBookingId) {

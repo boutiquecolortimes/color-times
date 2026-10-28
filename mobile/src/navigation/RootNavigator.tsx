@@ -11,18 +11,21 @@ import {
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../auth/AuthContext';
-import { colors, currentScheme, fonts } from '../theme';
+import { colors, currentScheme, fonts, gradients } from '../theme';
 import { useTheme } from '../theme/ThemeProvider';
 import { isAdmin } from '../lib/roles';
 import { listenForPush } from '../lib/push';
 import { toast } from '../components/ui';
-import { Monogram } from '../components/brand/Monogram';
+import { BrandSplash } from '../components/brand/BrandSplash';
+import { MpinSetup } from '../components/MpinSetup';
 import { TabBar } from './TabBar';
+import { InTabsContext } from './tabSpace';
 import { routeForLink, type AnyParams } from './nav';
 
 import { OnboardingScreen } from '../screens/auth/OnboardingScreen';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { RegisterScreen } from '../screens/auth/RegisterScreen';
+import { ForgotPasswordScreen } from '../screens/auth/ForgotPasswordScreen';
 import { LockScreen } from '../screens/auth/LockScreen';
 
 import { DashboardScreen } from '../screens/admin/DashboardScreen';
@@ -168,17 +171,20 @@ const stackOptions = () => ({
 // ----------------------------------------------------------------- Admin ---
 
 function AdminTabs() {
+  // Tab screens know to keep content and bottom bars clear of the floating tab bar.
   return (
-    <Tabs.Navigator
-      tabBar={(props) => <TabBar {...props} />}
-      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.bg } }}
-    >
-      <Tabs.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Dashboard' }} />
-      <Tabs.Screen name="BookingsTab" component={BookingsScreen} options={{ title: 'Bookings' }} />
-      <Tabs.Screen name="Catalogue" component={ProductsScreen} options={{ title: 'Products' }} />
-      <Tabs.Screen name="Billing" component={InvoicesScreen} options={{ title: 'Invoices' }} />
-      <Tabs.Screen name="More" component={MoreScreen} options={{ title: 'More' }} />
-    </Tabs.Navigator>
+    <InTabsContext.Provider value>
+      <Tabs.Navigator
+        tabBar={(props) => <TabBar {...props} />}
+        screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.bg } }}
+      >
+        <Tabs.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Dashboard' }} />
+        <Tabs.Screen name="BookingsTab" component={BookingsScreen} options={{ title: 'Bookings' }} />
+        <Tabs.Screen name="Catalogue" component={ProductsScreen} options={{ title: 'Products' }} />
+        <Tabs.Screen name="Billing" component={InvoicesScreen} options={{ title: 'Invoices' }} />
+        <Tabs.Screen name="More" component={MoreScreen} options={{ title: 'More' }} />
+      </Tabs.Navigator>
+    </InTabsContext.Provider>
   );
 }
 
@@ -281,17 +287,20 @@ function AdminStack() {
 // -------------------------------------------------------------- Customer ---
 
 function CustomerTabs() {
+  // Tab screens know to keep content and bottom bars clear of the floating tab bar.
   return (
-    <Tabs.Navigator
-      tabBar={(props) => <TabBar {...props} />}
-      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.bg } }}
-    >
-      <Tabs.Screen name="Home" component={CustomerHomeScreen} options={{ title: 'Home' }} />
-      <Tabs.Screen name="Explore" component={ExploreScreen} options={{ title: 'Explore' }} />
-      <Tabs.Screen name="WishlistTab" component={WishlistScreen} options={{ title: 'Wishlist' }} />
-      <Tabs.Screen name="MyBookings" component={MyBookingsScreen} options={{ title: 'Bookings' }} />
-      <Tabs.Screen name="Profile" component={AccountScreen} options={{ title: 'Profile' }} />
-    </Tabs.Navigator>
+    <InTabsContext.Provider value>
+      <Tabs.Navigator
+        tabBar={(props) => <TabBar {...props} />}
+        screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.bg } }}
+      >
+        <Tabs.Screen name="Home" component={CustomerHomeScreen} options={{ title: 'Home' }} />
+        <Tabs.Screen name="Explore" component={ExploreScreen} options={{ title: 'Explore' }} />
+        <Tabs.Screen name="WishlistTab" component={WishlistScreen} options={{ title: 'Wishlist' }} />
+        <Tabs.Screen name="MyBookings" component={MyBookingsScreen} options={{ title: 'Bookings' }} />
+        <Tabs.Screen name="Profile" component={AccountScreen} options={{ title: 'Profile' }} />
+      </Tabs.Navigator>
+    </InTabsContext.Provider>
   );
 }
 
@@ -328,17 +337,15 @@ function AuthStack({ onboarded }: { onboarded: boolean }) {
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       {infoScreens()}
     </Stack.Navigator>
   );
 }
 
+/** Behind the animated splash while the session loads: the launch screen's wine, so nothing flashes. */
 function Splash() {
-  return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
-      <Monogram size={96} />
-    </View>
-  );
+  return <View style={{ flex: 1, backgroundColor: gradients.wine[1] }} />;
 }
 
 // Survives the remount a theme switch causes, so the user stays on the same screen.
@@ -346,7 +353,7 @@ const navState: { current: NavigationState | undefined } = { current: undefined 
 
 export function RootNavigator() {
   const { scheme } = useTheme();
-  const { status, user, onboarded } = useAuth();
+  const { status, user, onboarded, mpinOffer, dismissMpinOffer } = useAuth();
 
   // Push: in-app toast while open, deep link when tapped.
   useEffect(() => {
@@ -359,27 +366,39 @@ export function RootNavigator() {
   }, [status]);
 
   // Theme switches remount the tree (key) — carry the navigation state across.
+  // The launch animation sits outside it, so it plays once and never replays on a theme switch.
   return (
-    <NavigationContainer
-      key={scheme}
-      ref={navigationRef}
-      theme={navTheme()}
-      initialState={navState.current}
-      onStateChange={(state) => {
-        navState.current = state;
-      }}
-    >
-      {status === 'loading' ? (
-        <Splash />
-      ) : status === 'signedOut' ? (
-        <AuthStack onboarded={onboarded} />
-      ) : status === 'locked' ? (
-        <LockScreen />
-      ) : isAdmin(user?.role) ? (
-        <AdminStack />
-      ) : (
-        <CustomerStack />
-      )}
-    </NavigationContainer>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <NavigationContainer
+        key={scheme}
+        ref={navigationRef}
+        theme={navTheme()}
+        initialState={navState.current}
+        onStateChange={(state) => {
+          navState.current = state;
+        }}
+      >
+        {status === 'loading' ? (
+          <Splash />
+        ) : status === 'signedOut' ? (
+          <AuthStack onboarded={onboarded} />
+        ) : status === 'locked' ? (
+          <LockScreen />
+        ) : isAdmin(user?.role) ? (
+          <AdminStack />
+        ) : (
+          <CustomerStack />
+        )}
+      </NavigationContainer>
+      {/* One-time offer after a password sign-in: set an MPIN for quick unlock. */}
+      <MpinSetup
+        visible={mpinOffer && status === 'signedIn'}
+        mode="create"
+        offer
+        onDone={dismissMpinOffer}
+        onCancel={dismissMpinOffer}
+      />
+      <BrandSplash ready={status !== 'loading'} />
+    </View>
   );
 }

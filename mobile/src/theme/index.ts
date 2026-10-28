@@ -6,12 +6,12 @@ import { Platform, type TextStyle, type ViewStyle } from 'react-native';
  * Two palettes share one set of semantic names, so components never ask
  * "am I in dark mode?" — they ask for `colors.surface`, `colors.textMuted`…
  *
- *  • Luxury Ivory (light) — warm paper, ink type, a bronze accent.
- *  • Midnight Luxury (dark) — warm charcoal, soft ivory type, champagne gold.
+ *  • Luxury Ivory (light) — warm paper, ink type, the website's deep wine accent.
+ *  • Midnight Luxury (dark) — warm charcoal, soft ivory type, the website's warm gold.
  *
  * Every text/surface pairing is checked against WCAG AA in
  * __tests__/theme.test.ts. The token names are historical: `gold` is the
- * brand accent in both palettes (bronze on ivory, champagne on midnight).
+ * brand accent in both palettes (wine on ivory, warm gold on midnight).
  *
  * `colors`, `gradients` and `shadow` are live objects: ThemeProvider swaps
  * their contents when the scheme changes, then re-renders the app. Styles
@@ -50,6 +50,13 @@ export interface Palette {
   onGold: string;
   /** Soft accent wash behind accent content (selected chips, banners). */
   accentBg: string;
+  /**
+   * Primary action colour, matching the website's buttons: deep wine on ivory,
+   * warm gold on midnight. Buttons use the `primary` gradient built from it.
+   */
+  primary: string;
+  /** Text / icons on a primary fill. */
+  onPrimary: string;
 
   rose: string;
   success: string;
@@ -91,11 +98,14 @@ export const palettes: Record<Scheme, Palette> = {
     textFaint: '#6E6C65',
     textDisabled: '#A9A69D',
 
-    gold: '#7A6239',
-    goldBright: '#9C8052',
-    goldDeep: '#5F4C2C',
+    // Accent = the website's wine family (colortimesboutique.com admin theme).
+    gold: '#6B2A45',
+    goldBright: '#8A3A5C',
+    goldDeep: '#3D1229',
     onGold: '#FFFFFF',
-    accentBg: '#EDE4D5',
+    accentBg: '#F3E6EB',
+    primary: '#3D1229',
+    onPrimary: '#FFFFFF',
 
     rose: '#9A4F43',
     success: '#2B7149',
@@ -111,7 +121,7 @@ export const palettes: Record<Scheme, Palette> = {
     scrim: 'rgba(20,21,18,0.42)',
     onImage: '#FFFFFF',
     tabBar: 'rgba(255,255,255,0.97)',
-    sheen: 'rgba(139,112,69,0.10)',
+    sheen: 'rgba(107,42,69,0.08)',
     viewer: '#0B0B0A',
     transparent: 'transparent',
   },
@@ -128,11 +138,14 @@ export const palettes: Record<Scheme, Palette> = {
     textFaint: '#94948A',
     textDisabled: '#62635B',
 
-    gold: '#C4A675',
-    goldBright: '#DCC08F',
-    goldDeep: '#8F7748',
-    onGold: '#1B1810',
+    // Accent = the website's dark-mode gold (#E3B36E), exactly.
+    gold: '#E3B36E',
+    goldBright: '#EFCB8E',
+    goldDeep: '#C9A45C',
+    onGold: '#28081A',
     accentBg: '#353024',
+    primary: '#E3B36E',
+    onPrimary: '#28081A',
 
     rose: '#D39A8B',
     success: '#7DBA8C',
@@ -155,8 +168,10 @@ export const palettes: Record<Scheme, Palette> = {
 };
 
 export interface Gradients {
-  /** Accent fill for primary buttons and quick actions. */
+  /** Accent fill for quick-action icons, rank badges and chart bars. */
   gold: string[];
+  /** Primary buttons and the floating create button (the website's wine / gold). */
+  primary: string[];
   /** Page wash behind hero sections. */
   ink: string[];
   /** Photo → page background fade (hero images, cards). */
@@ -166,31 +181,37 @@ export interface Gradients {
   card: string[];
   /** Privé membership card. */
   prive: string[];
+  /** The website's deep-wine brand backdrop (sign-in page, splash). Same in both themes. */
+  wine: string[];
 }
 
 const gradientSets: Record<Scheme, Gradients> = {
   light: {
-    gold: ['#9C8052', '#7A6239', '#5F4C2C'],
+    gold: ['#8A3A5C', '#6B2A45', '#3D1229'],
+    primary: ['#5B1D3D', '#3D1229', '#28081A'],
     ink: ['#FFFFFF', '#F7F4EE'],
     veil: ['rgba(247,244,238,0)', 'rgba(247,244,238,0.6)', 'rgba(247,244,238,0.97)'],
     shade: ['rgba(20,21,18,0.45)', 'rgba(20,21,18,0)'],
     card: ['#FFFFFF', '#FAF7F1'],
-    prive: ['#EDE4D5', '#F7F1E6'],
+    prive: ['#F3E6EB', '#FBF6F8'],
+    wine: ['#3D1229', '#28081A', '#190510'],
   },
   dark: {
-    gold: ['#E3CB9C', '#C4A675', '#8F7748'],
+    gold: ['#EFCB8E', '#E3B36E', '#C9A45C'],
+    primary: ['#EFCB8E', '#E3B36E', '#C9A45C'],
     ink: ['#22241F', '#141512'],
     veil: ['rgba(20,21,18,0)', 'rgba(20,21,18,0.55)', 'rgba(20,21,18,0.96)'],
     shade: ['rgba(20,21,18,0.6)', 'rgba(20,21,18,0)'],
     card: ['#23251F', '#1A1C18'],
     prive: ['#3A3326', '#1F201B'],
+    wine: ['#3D1229', '#28081A', '#190510'],
   },
 };
 
 const shadowSets: Record<Scheme, ViewStyle> = {
   light: Platform.select<ViewStyle>({
     ios: {
-      shadowColor: '#3B3226',
+      shadowColor: '#3D1229',
       shadowOpacity: 0.08,
       shadowRadius: 16,
       shadowOffset: { width: 0, height: 6 },
@@ -304,18 +325,50 @@ export type TypeVariant =
   | 'small'
   | 'smallStrong'
   | 'caption'
+  | 'overline'
   | 'number';
 
+/** Digits of equal width, so amounts and counts line up in lists and tables. */
+const TABULAR: TextStyle['fontVariant'] = ['tabular-nums'];
+
 export const type: Record<TypeVariant, TextStyle> = themed(() => ({
+  // Serif (Cormorant) for titles and names only; everything you read or compare is Manrope.
   hero: { fontFamily: fonts.display, fontSize: 40, lineHeight: 44, color: colors.text, letterSpacing: 0.2 },
   h1: { fontFamily: fonts.display, fontSize: 32, lineHeight: 36, color: colors.text },
   h2: { fontFamily: fonts.display, fontSize: 25, lineHeight: 30, color: colors.text },
   h3: { fontFamily: fonts.displayMedium, fontSize: 20, lineHeight: 24, color: colors.text },
-  body: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22, color: colors.text },
-  bodyStrong: { fontFamily: fonts.bodySemi, fontSize: 15, lineHeight: 22, color: colors.text },
-  small: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.textMuted },
-  smallStrong: { fontFamily: fonts.bodySemi, fontSize: 13, lineHeight: 18, color: colors.text },
+  body: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22, color: colors.text, fontVariant: TABULAR },
+  bodyStrong: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.text,
+    fontVariant: TABULAR,
+  },
+  small: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.textMuted,
+    fontVariant: TABULAR,
+  },
+  smallStrong: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.text,
+    fontVariant: TABULAR,
+  },
+  /** Field and card labels: quiet, sentence case. */
   caption: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12,
+    lineHeight: 16,
+    color: colors.textFaint,
+    letterSpacing: 0.2,
+  },
+  /** Section headers only: small spaced capitals. */
+  overline: {
     fontFamily: fonts.bodyMedium,
     fontSize: 11,
     lineHeight: 14,
@@ -323,7 +376,15 @@ export const type: Record<TypeVariant, TextStyle> = themed(() => ({
     letterSpacing: 1.4,
     textTransform: 'uppercase',
   },
-  number: { fontFamily: fonts.display, fontSize: 28, lineHeight: 32, color: colors.text },
+  /** Amounts and counts: clean sans, equal-width digits. */
+  number: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 24,
+    lineHeight: 30,
+    color: colors.text,
+    letterSpacing: -0.3,
+    fontVariant: TABULAR,
+  },
 }));
 
 /** Extra touch area so 36–40pt icons still meet the 44pt target. */

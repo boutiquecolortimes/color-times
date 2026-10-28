@@ -21,7 +21,7 @@ import {
   T,
   Tap,
 } from '../../components/ui';
-import { colors, fonts, gradients, radius, space, themed } from '../../theme';
+import { colors, gradients, radius, space, themed } from '../../theme';
 import { useAuth } from '../../auth/AuthContext';
 import { useNav } from '../../navigation/nav';
 import { inr, inrCompact, fmtRange } from '../../lib/format';
@@ -39,6 +39,15 @@ function greeting(): string {
   const h = new Date().getHours();
   return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
 }
+
+/** Text on the wine brand card (same in both themes, like the website's sign-in page). */
+const ON_WINE = {
+  text: '#FFFFFF',
+  muted: 'rgba(255,255,255,0.72)',
+  kicker: '#D9B876',
+  up: '#9FD9AE',
+  down: '#F2A79D',
+};
 
 export function DashboardScreen() {
   const insets = useSafeAreaInsets();
@@ -83,13 +92,19 @@ export function DashboardScreen() {
       >
         <View style={styles.pad}>
           <Row style={{ justifyContent: 'space-between' }}>
-            <Row gap={space.md}>
+            <Row gap={space.md} style={{ flexShrink: 1 }}>
               <Tap onPress={() => nav.navigate('Account')}>
                 <Avatar name={user?.name} size={44} gold />
               </Tap>
-              <View>
+              <View style={{ flexShrink: 1 }}>
                 <T variant="small">{greeting()},</T>
-                <T variant="h3">{user?.name?.split(' ')[0]}</T>
+                {/* Name and role together, so the role reads as part of the greeting. */}
+                <Row gap={space.sm} style={{ flexWrap: 'wrap' }}>
+                  <T variant="h3" numberOfLines={1}>
+                    {user?.name?.split(' ')[0]}
+                  </T>
+                  <Pill label={ROLE_LABELS[user?.role ?? 'staff']} tone="gold" small />
+                </Row>
               </View>
             </Row>
             <Row>
@@ -102,7 +117,6 @@ export function DashboardScreen() {
               />
             </Row>
           </Row>
-          <Pill label={ROLE_LABELS[user?.role ?? 'staff']} tone="gold" small />
         </View>
 
         {stats.isLoading ? (
@@ -114,15 +128,19 @@ export function DashboardScreen() {
             {/* Hero: this month's revenue */}
             <View style={[styles.pad, { marginTop: space.xl }]}>
               <LinearGradient
-                colors={[...gradients.prive]}
+                colors={[...gradients.wine]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.hero}
               >
-                <T variant="caption" gold>
+                <T variant="caption" color={ON_WINE.kicker}>
                   Revenue this month
                 </T>
-                <T variant="hero" style={{ marginTop: space.sm }}>
+                <T
+                  variant="number"
+                  color={ON_WINE.text}
+                  style={{ marginTop: space.sm, fontSize: 38, lineHeight: 44 }}
+                >
                   {inr(s.monthlyRevenueTotal)}
                 </T>
                 {pct(s.monthlyRevenueTotal, s.previousMonthRevenueTotal) !== null ? (
@@ -136,13 +154,13 @@ export function DashboardScreen() {
                       size={16}
                       color={
                         (pct(s.monthlyRevenueTotal, s.previousMonthRevenueTotal) ?? 0) >= 0
-                          ? colors.success
-                          : colors.danger
+                          ? ON_WINE.up
+                          : ON_WINE.down
                       }
                     />
-                    <T variant="small">
+                    <T variant="small" color={ON_WINE.muted}>
                       {Math.abs(pct(s.monthlyRevenueTotal, s.previousMonthRevenueTotal) ?? 0).toFixed(0)}% vs
-                      last month ({inrCompact(s.previousMonthRevenueTotal)})
+                      last month ({inr(s.previousMonthRevenueTotal)})
                     </T>
                   </Row>
                 ) : null}
@@ -154,6 +172,7 @@ export function DashboardScreen() {
                     }))}
                     format={inrCompact}
                     height={110}
+                    onDark
                   />
                 </View>
               </LinearGradient>
@@ -193,8 +212,8 @@ export function DashboardScreen() {
               <View style={styles.quickGrid}>
                 {quick.map((q) => (
                   <Tap key={q.label} style={styles.quick} onPress={() => nav.navigate(q.route)}>
-                    <LinearGradient colors={[...gradients.gold]} style={styles.quickIcon}>
-                      <Icon name={q.icon} size={18} color={colors.onGold} strokeWidth={2} />
+                    <LinearGradient colors={[...gradients.primary]} style={styles.quickIcon}>
+                      <Icon name={q.icon} size={18} color={colors.onPrimary} strokeWidth={2} />
                     </LinearGradient>
                     <T variant="small" color={colors.text} numberOfLines={1}>
                       {q.label}
@@ -303,10 +322,10 @@ export function DashboardScreen() {
                       : null
                   }
                 />
-                <Stat label="Outstanding" value={inrCompact(s.outstandingBalance)} icon="Wallet" />
+                <Stat label="Outstanding" value={inr(s.outstandingBalance)} icon="Wallet" />
                 <Stat
                   label="Lifetime revenue"
-                  value={inrCompact(s.totalRevenue)}
+                  value={inr(s.totalRevenue)}
                   icon="ChartBar"
                   onPress={() => nav.navigate('Reports')}
                 />
@@ -328,7 +347,7 @@ export function DashboardScreen() {
                         </Row>
                         <View style={styles.track}>
                           <LinearGradient
-                            colors={[...gradients.gold]}
+                            colors={[...gradients.primary]}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={[styles.fill, { width: `${(c.bookings / max) * 100}%` }]}
@@ -458,10 +477,10 @@ function PeriodPulse({ manager }: { manager: boolean }) {
             >
               <T variant="caption">{t.label}</T>
               <T
-                variant="h3"
+                variant="number"
                 numberOfLines={1}
                 adjustsFontSizeToFit
-                style={{ marginTop: 4, fontFamily: fonts.display, color: t.tone ?? colors.text }}
+                style={{ marginTop: 4, fontSize: 20, lineHeight: 26, color: t.tone ?? colors.text }}
               >
                 {t.value}
               </T>
@@ -484,8 +503,7 @@ const styles = themed(() =>
     hero: {
       borderRadius: radius.xl,
       padding: space.xl,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.goldDeep,
+      boxShadow: '0 18px 40px rgba(40,8,26,0.28)',
     },
     today: {
       flex: 1,

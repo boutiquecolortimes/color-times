@@ -1,35 +1,36 @@
 import React from 'react';
-import Svg, { Circle, Defs, LinearGradient, Path, Stop, Text as SvgText } from 'react-native-svg';
-import { alpha, colors, fonts, palettes } from '../../theme';
+import { Image, View } from 'react-native';
+import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
+import { colors } from '../../theme';
 
-/** "CT" monogram inside a fine double ring — the app's mark. */
+/** The website's logo (public/logo.png), framed in a white circle like its sign-in badge. */
+export const LOGO_BADGE = require('../../assets/brand/logo-badge.png');
+/** The website's transparent navbar mark (public/logo-icon.png). */
+export const LOGO_MARK = require('../../assets/brand/logo-mark.png');
+
+/**
+ * The Color Times logo - the CT monogram with the gown - on its white badge,
+ * exactly as colortimesboutique.com shows it on the sign-in page. The badge
+ * keeps the purple / pink artwork legible in both themes and over photos.
+ * `onImage` is kept for call sites over photographs (adds a deeper shadow).
+ */
 export function Monogram({ size = 96, onImage = false }: { size?: number; onImage?: boolean }) {
-  // Over photographs the light champagne mark always reads; on the page, follow the theme.
-  const stops = onImage ? palettes.dark : colors;
   return (
-    <Svg width={size} height={size} viewBox="0 0 100 100">
-      <Defs>
-        <LinearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor={stops.goldBright} />
-          <Stop offset="0.55" stopColor={stops.gold} />
-          <Stop offset="1" stopColor={stops.goldDeep} />
-        </LinearGradient>
-      </Defs>
-      {onImage ? <Circle cx="50" cy="50" r="49" fill={alpha(palettes.dark.bg, 0.45)} /> : null}
-      <Circle cx="50" cy="50" r="47" stroke="url(#g)" strokeWidth="1.2" fill="none" />
-      <Circle cx="50" cy="50" r="42" stroke="url(#g)" strokeWidth="0.5" fill="none" opacity={0.7} />
-      <SvgText
-        x="50"
-        y="61"
-        fontSize="34"
-        fontFamily={fonts.displayBold}
-        fill="url(#g)"
-        textAnchor="middle"
-        letterSpacing="1"
-      >
-        CT
-      </SvgText>
-    </Svg>
+    <View
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel="Color Times Boutique"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        boxShadow: `0 ${Math.round(size / 16)}px ${Math.round(size / 5)}px rgba(10,2,7,${
+          onImage ? 0.4 : 0.22
+        })`,
+      }}
+    >
+      <Image source={LOGO_BADGE} style={{ width: size, height: size }} resizeMode="contain" />
+    </View>
   );
 }
 

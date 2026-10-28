@@ -21,10 +21,16 @@ function rangeBounds(range: DateRange): { start: Date; end: Date } {
 }
 
 // The return day is a handover day — the dress can go out again that same
-// day — so it only counts as booked for a single-day rental.
+// day — so it only counts as booked for a single-day rental. That case
+// must match the one day exactly: the old `day >= start && (… || start === end)`
+// was true for every day after a same-day booking, so a single 14 Dec
+// rental showed the dress as booked for the rest of time.
 function isBookedOn(day: Date, range: DateRange): boolean {
   const { start, end } = rangeBounds(range);
-  return day >= start && (day < end || start.getTime() === end.getTime());
+  if (start.getTime() === end.getTime()) {
+    return day.getTime() === start.getTime();
+  }
+  return day >= start && day < end;
 }
 
 function isReturnDay(day: Date, range: DateRange): boolean {
@@ -116,6 +122,26 @@ export function ProductAvailabilityCalendar({ activeRanges }: { activeRanges: Da
           );
         })}
       </div>
+
+      {/* Tooltips don't exist on touch screens, so list the bookings that
+          are holding dates — makes a wrong end date obvious at a glance. */}
+      {activeRanges.length > 0 && (
+        <ul className="mt-3 space-y-1 text-xs">
+          {activeRanges.map((range) => {
+            const { start, end } = rangeBounds(range);
+            const fmt = (d: Date) =>
+              d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+            return (
+              <li key={range.bookingNumber} className="flex justify-between gap-2">
+                <span className="font-medium">{range.bookingNumber}</span>
+                <span className="text-muted-foreground">
+                  {fmt(start)} → {fmt(end)}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
       <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
