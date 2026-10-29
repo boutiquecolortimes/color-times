@@ -587,8 +587,11 @@ export function BookingForm({
     if (!item.product) return sum;
     return sum + (item.pricePerDay || 0);
   }, 0);
-  const grandTotal = rentTotal + securityDepositValue;
-  const dueAmount = grandTotal - advancePaidValue - pickupPaid;
+  // Paid beyond the rent → held as security (same rule the server applies).
+  const totalPaid = advancePaidValue + pickupPaid;
+  const extraAsSecurity = Math.max(0, totalPaid - rentTotal - securityDepositValue);
+  const grandTotal = rentTotal + securityDepositValue + extraAsSecurity;
+  const dueAmount = Math.max(0, grandTotal - totalPaid);
 
   // How many item rows (in this unsaved form) currently have each product
   // selected — used to stop the same one-in-stock dress being picked twice
@@ -952,10 +955,17 @@ export function BookingForm({
 
           <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
             <span className="text-sm text-muted-foreground">
-              Total Amount{securityDepositValue > 0 ? " (rent + security)" : " (rent)"}
+              Total Amount{securityDepositValue + extraAsSecurity > 0 ? " (rent + security)" : " (rent)"}
             </span>
             <span className="font-heading text-xl">{formatCurrency(grandTotal)}</span>
           </div>
+
+          {extraAsSecurity > 0 && (
+            <div className="mt-2 flex items-center justify-between rounded-md bg-amber-50 px-3 py-2 text-amber-900">
+              <span className="text-sm">Extra paid &rarr; held as security (refund at return)</span>
+              <span className="font-medium">{formatCurrency(extraAsSecurity)}</span>
+            </div>
+          )}
 
           <div className="mt-2 flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Due Amount (total &minus; paid)</span>

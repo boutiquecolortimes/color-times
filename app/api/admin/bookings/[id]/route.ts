@@ -11,7 +11,11 @@ import {
   computeBookingSettlement,
 } from "@/lib/validations/booking";
 import { ACTIVE_BOOKING_STATUSES, findBookingConflicts } from "@/lib/admin/booking-availability";
-import { BOOKING_STATUS_TRANSITIONS, STATUS_LABELS } from "@/lib/admin/booking-status";
+import {
+  BOOKING_STATUS_TRANSITIONS,
+  STATUS_LABELS,
+  securityIncludingExcess,
+} from "@/lib/admin/booking-status";
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES, MANAGER_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog, diffObjects } from "@/lib/audit/log";
@@ -137,9 +141,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       // (often a phone inquiry) may not match what's actually being charged
       // and collected now, so let staff correct all three right here before
       // the invoice is generated.
-      const securityDeposit = input.securityDeposit ?? before.securityDeposit;
       const currentRentTotal = before.totalAmount - before.securityDeposit;
       const rentAmount = input.rentAmount ?? currentRentTotal;
+      const securityDeposit = securityIncludingExcess(
+        rentAmount,
+        input.advancePaid ?? before.advancePaid ?? 0,
+        input.securityDeposit ?? before.securityDeposit
+      );
       update.securityDeposit = securityDeposit;
       update.totalAmount = rentAmount + securityDeposit;
       if (typeof input.advancePaid === "number") {
@@ -175,7 +183,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       // up, or only partially collected at booking). Total is recomputed so
       // Billing keeps showing rentalFees + securityDeposit consistently.
       const rentalFeesTotal = before.totalAmount - before.securityDeposit;
-      const securityDeposit = input.securityDeposit ?? before.securityDeposit;
+      // Never settle against less than what was actually paid beyond rent —
+      // otherwise an over-payment at booking is never refunded.
+      const securityDeposit = securityIncludingExcess(
+        rentalFeesTotal,
+        before.advancePaid ?? 0,
+        input.securityDeposit ?? before.securityDeposit
+      );
       const damageCharges = input.damageCharges ?? 0;
       const pendingRentAmount =
         input.pendingRentAmount ?? Math.max(0, rentalFeesTotal - (before.advancePaid ?? 0));
@@ -211,13 +225,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       // — same principle as the correction allowed at Return. The
       // rental-fee portion of the total never changes; only the deposit,
       // and in turn the total.
-      if (
-        typeof input.securityDeposit === "number" &&
-        input.securityDeposit !== before.securityDeposit
-      ) {
-        const rentalFeesTotal = before.totalAmount - before.securityDeposit;
-        update.securityDeposit = input.securityDeposit;
-        update.totalAmount = rentalFeesTotal + input.securityDeposit;
+      // Whatever has been paid beyond the rent (at booking + at pickup) is
+      // security held, so the deposit can never be recorded below that.
+      const rentalFeesTotal = before.totalAmount - before.securityDeposit;
+      const paidAfterPickup = (before.advancePaid ?? 0) + (input.pickupPaymentAmount ?? 0);
+      const securityDeposit = securityIncludingExcess(
+        rentalFeesTotal,
+        paidAfterPickup,
+        typeof input.securityDeposit === "number" ? input.securityDeposit : before.securityDeposit
+      );
+      if (securityDeposit !== before.securityDeposit) {
+        update.securityDeposit = securityDeposit;
+        update.totalAmount = rentalFeesTotal + securityDeposit;
       }
     }
 
@@ -493,8 +512,23 @@ async function updateBookingDetails(
       });
     }
 
-    const securityDeposit = input.securityDeposit ?? before.securityDeposit;
-    const totalAmount = items.reduce((sum, item) => sum + item.rentalFee, 0) + securityDeposit;
+    const rentTotal = items.reduce((sum, item) => sum + item.rentalFee, 0);
+    const advancePaid =
+      input.advancePaid !== undefined
+        ? input.advancePaid + (before.pickupPaid ?? 0)
+        : before.advancePaid;
+    // Before pickup, the only security on file is whatever was over-paid
+    // beyond rent (plus any deposit set directly, e.g. by a historical
+    // import). Recompute that over-payment from the edited rent/advance so
+    // lowering the advance also lowers it, instead of leaving a stale figure.
+    const beforeRent = before.totalAmount - before.securityDeposit;
+    const beforeExcess = Math.max(0, (before.advancePaid ?? 0) - beforeRent);
+    const isBeforePickup = ["inquiry", "pending_payment", "confirmed"].includes(before.status);
+    const securityOnFile = isBeforePickup
+      ? Math.max(0, before.securityDeposit - beforeExcess)
+      : input.securityDeposit ?? before.securityDeposit;
+    const securityDeposit = securityIncludingExcess(rentTotal, advancePaid ?? 0, securityOnFile);
+    const totalAmount = rentTotal + securityDeposit;
 
     const update = {
       billNumber: input.billNumber,
@@ -508,10 +542,7 @@ async function updateBookingDetails(
       totalAmount,
       // The edit form shows the advance only; whatever was collected at
       // pickup (pickupPaid) stays on top of it, so editing never wipes it.
-      advancePaid:
-        input.advancePaid !== undefined
-          ? input.advancePaid + (before.pickupPaid ?? 0)
-          : before.advancePaid,
+      advancePaid,
       advancePaymentMethod: input.advancePaymentMethod || undefined,
       measurements: input.measurements,
       deliveryAddress: input.deliveryAddress,

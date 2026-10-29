@@ -78,6 +78,22 @@ export const INVOICE_STAGE_LABELS_HI: Record<string, string> = {
  * (plus damage charges) is first taken from the security deposit — only the
  * part the deposit didn't cover is still due. Matches the booking invoice.
  */
+/**
+ * Money received is applied to rent first; anything paid beyond the rent is
+ * the customer's security deposit (refundable at Return). Returns the
+ * security deposit a booking must record so that extra is never lost — the
+ * larger of the deposit already on file and the over-payment.
+ *
+ * E.g. rent ₹1,700, customer pays ₹2,000 at booking → security ₹300.
+ */
+export function securityIncludingExcess(
+  rentTotal: number,
+  amountPaid: number,
+  securityOnFile: number
+): number {
+  return Math.max(0, securityOnFile, amountPaid - rentTotal);
+}
+
 export function bookingRemainingDue(booking: {
   status?: string;
   totalAmount: number;

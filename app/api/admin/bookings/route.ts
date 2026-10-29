@@ -13,6 +13,7 @@ import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 import { escapeRegex } from "@/lib/utils";
 import { getBookingsSummary } from "@/lib/admin/bookings-summary";
 import { ensureBookingStatusUpdatedAt } from "@/lib/admin/booking-activity-backfill";
+import { securityIncludingExcess } from "@/lib/admin/booking-status";
 
 export async function GET(request: NextRequest): Promise<Response> {
   const auth = await requireApiRole(ADMIN_ROLES);
@@ -225,8 +226,16 @@ export async function POST(request: NextRequest): Promise<Response> {
     // pickup-booking-dialog.tsx and the "confirmed"/"in_use" transitions in
     // app/api/admin/bookings/[id]/route.ts). `input.securityDeposit` is kept
     // here only so a bulk historical import can still set one directly.
-    const securityDeposit = input.securityDeposit ?? 0;
-    const totalAmount = items.reduce((sum, item) => sum + item.rentalFee, 0) + securityDeposit;
+    // Anything paid upfront beyond the rent is held as security (e.g. rent
+    // ₹1,700, paid ₹2,000 → ₹300 security) so it shows on the booking and is
+    // refunded at Return instead of silently vanishing into "advance".
+    const rentTotal = items.reduce((sum, item) => sum + item.rentalFee, 0);
+    const securityDeposit = securityIncludingExcess(
+      rentTotal,
+      input.advancePaid ?? 0,
+      input.securityDeposit ?? 0
+    );
+    const totalAmount = rentTotal + securityDeposit;
     const bookingNumber = await generateBookingNumber();
 
     const booking = await Booking.create({
