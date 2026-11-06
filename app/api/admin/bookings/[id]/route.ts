@@ -19,6 +19,7 @@ import {
 import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES, MANAGER_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog, diffObjects } from "@/lib/audit/log";
+import { scaleItemRentalFees } from "@/lib/admin/booking-status";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 import {
   notifyBookingConfirmed,
@@ -178,11 +179,20 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       if (input.returnCondition) update.returnCondition = input.returnCondition;
       if (input.returnNotes) update.returnNotes = input.returnNotes;
 
-      // The rental-fee portion never changes here — only the security
-      // deposit itself can be corrected at return time (e.g. it was topped
-      // up, or only partially collected at booking). Total is recomputed so
-      // Billing keeps showing rentalFees + securityDeposit consistently.
-      const rentalFeesTotal = before.totalAmount - before.securityDeposit;
+      // The security deposit can be corrected here (e.g. it was topped up,
+      // or only partially collected at booking). The rental-fee portion only
+      // changes through an explicit rent refund — part of the rent handed
+      // back (e.g. one dress wasn't worn). That must lower the rent itself;
+      // raising the deposit instead leaves rent overstated in every report.
+      // Total is recomputed so Billing keeps showing rentalFees + deposit.
+      const originalRentTotal = Math.max(0, before.totalAmount - before.securityDeposit);
+      const rentRefund = Math.min(Math.max(0, input.rentRefund ?? 0), originalRentTotal);
+      const rentalFeesTotal = originalRentTotal - rentRefund;
+      if (rentRefund > 0) {
+        update.items = scaleItemRentalFees(before.items, originalRentTotal, rentalFeesTotal);
+      }
+      update.rentRefundAmount = rentRefund;
+      update.depositBeforeRentRefund = rentRefund > 0 ? before.securityDeposit : null;
       // Never settle against less than what was actually paid beyond rent —
       // otherwise an over-payment at booking is never refunded.
       const securityDeposit = securityIncludingExcess(
@@ -264,7 +274,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       });
     }
     if (
-      input.status === "confirmed" &&
+      (input.status === "confirmed" || input.status === "returned") &&
       typeof update.totalAmount === "number" &&
       update.totalAmount !== before.totalAmount
     ) {
@@ -284,6 +294,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
         from: before.advancePaid ?? 0,
         to: update.advancePaid,
       });
+    }
+    if (input.status === "returned" && typeof update.rentRefundAmount === "number" && update.rentRefundAmount > 0) {
+      statusChanges.push({ field: "rentRefundAmount", from: 0, to: update.rentRefundAmount });
     }
     if (statusChanges.length > 0) {
       await recordAuditLog({

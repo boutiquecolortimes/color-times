@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import type { ReturnCondition } from "@/models/Booking";
 import { cn } from "@/lib/utils";
+import { securityIncludingExcess } from "@/lib/admin/booking-status";
 
 const CONDITION_OPTIONS: { value: ReturnCondition; label: string }[] = [
   { value: "good", label: "Good — no issues" },
@@ -65,6 +66,7 @@ export function ReturnBookingDialog({
   const [damageCharges, setDamageCharges] = useState(0);
   const [pendingRentOverride, setPendingRentOverride] = useState<number | null>(null);
   const [securityDepositOverride, setSecurityDepositOverride] = useState<number | null>(null);
+  const [rentRefund, setRentRefund] = useState(0);
   const [depositRefunded, setDepositRefunded] = useState(true);
   const [showInvoicePrompt, setShowInvoicePrompt] = useState(false);
 
@@ -84,10 +86,25 @@ export function ReturnBookingDialog({
     enabled: open && Boolean(bookingId),
   });
 
-  const securityDeposit = securityDepositOverride ?? (financials?.securityDeposit ?? 0);
-  const pendingRentDefault = financials
-    ? Math.max(0, financials.totalAmount - financials.securityDeposit - financials.advancePaid)
-    : 0;
+  const rentTotal = financials ? Math.max(0, financials.totalAmount - financials.securityDeposit) : 0;
+  const advancePaid = financials?.advancePaid ?? 0;
+  // Rent given back (e.g. one dress not worn) lowers the rent itself.
+  const effectiveRentRefund = Math.min(rentRefund, rentTotal);
+  const rentAfterRefund = rentTotal - effectiveRentRefund;
+  // Money paid beyond the (reduced) rent is the customer's deposit.
+  const collectedBeyondRent = Math.max(0, advancePaid - rentAfterRefund);
+  const securityOnFile = securityDepositOverride ?? (financials?.securityDeposit ?? 0);
+  // Same rule the server applies: never settle against less than was paid beyond rent.
+  const securityDeposit = securityIncludingExcess(rentAfterRefund, advancePaid, securityOnFile);
+  // Raising the deposit above what was actually collected is the old
+  // workaround for giving rent back — it leaves rent overstated. Flag it.
+  const depositRaisedBeyondCollected =
+    securityDepositOverride !== null &&
+    financials !== undefined &&
+    financials !== null &&
+    securityOnFile > financials.securityDeposit &&
+    securityOnFile > collectedBeyondRent;
+  const pendingRentDefault = financials ? Math.max(0, rentAfterRefund - advancePaid) : 0;
   const pendingRentAmount = pendingRentOverride ?? pendingRentDefault;
   const amountOwed = damageCharges + pendingRentAmount;
   const netPosition = amountOwed - securityDeposit;
@@ -102,6 +119,7 @@ export function ReturnBookingDialog({
     setDamageCharges(0);
     setPendingRentOverride(null);
     setSecurityDepositOverride(null);
+    setRentRefund(0);
     setDepositRefunded(true);
     setShowInvoicePrompt(false);
   }
@@ -120,6 +138,7 @@ export function ReturnBookingDialog({
           securityDeposit,
           damageCharges,
           pendingRentAmount,
+          rentRefund: effectiveRentRefund,
           depositRefunded,
         }),
       });
@@ -317,14 +336,14 @@ export function ReturnBookingDialog({
           </div>
 
           <div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="text-sm font-medium">Security deposit (&#8377;)</label>
                 <Input
                   className="mt-2"
                   type="number"
                   min={0}
-                  value={securityDeposit === 0 ? "" : securityDeposit}
+                  value={securityOnFile === 0 ? "" : securityOnFile}
                   onChange={(event) =>
                     setSecurityDepositOverride(Math.max(0, Number(event.target.value) || 0))
                   }
@@ -342,6 +361,23 @@ export function ReturnBookingDialog({
                 />
               </div>
               <div>
+                <label className="text-sm font-medium">Rent refund (&#8377;)</label>
+                <Input
+                  className="mt-2"
+                  type="number"
+                  min={0}
+                  max={rentTotal}
+                  placeholder="0"
+                  value={rentRefund === 0 ? "" : rentRefund}
+                  onChange={(event) => {
+                    setRentRefund(Math.max(0, Number(event.target.value) || 0));
+                    // Pending rent follows the reduced rent unless typed by hand.
+                    setPendingRentOverride(null);
+                  }}
+                  disabled={isLoadingFinancials}
+                />
+              </div>
+              <div>
                 <label className="text-sm font-medium">Pending rent (&#8377;)</label>
                 <Input
                   className="mt-2"
@@ -355,8 +391,17 @@ export function ReturnBookingDialog({
             <p className="mt-1 text-xs text-muted-foreground">
               Security deposit defaults to what&rsquo;s recorded on the booking &mdash; correct it
               here if a different amount was actually collected or topped up. The
-              refund/settlement below always uses this value.
+              refund/settlement below always uses this value. To give back part of the rent
+              (e.g. a dress wasn&rsquo;t worn), use <strong>Rent refund</strong> &mdash; rent becomes
+              &#8377;{Math.round(rentAfterRefund).toLocaleString("en-IN")}.
             </p>
+            {depositRaisedBeyondCollected && (
+              <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                Only {formatCurrency(collectedBeyondRent)} was collected beyond the rent. Raising the
+                deposit to {formatCurrency(securityOnFile)} does not reduce the rent &mdash; if you are
+                giving part of the rent back, enter it in Rent refund instead and leave the deposit as is.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -386,6 +431,16 @@ export function ReturnBookingDialog({
                     <span className="text-muted-foreground">Security To Be Returned</span>
                     <span>{formatCurrency(securityDeposit)}</span>
                   </div>
+                  {effectiveRentRefund > 0 && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">
+                        Rent {formatCurrency(rentTotal)} &rarr; {formatCurrency(rentAfterRefund)}
+                      </span>
+                      <span className="text-muted-foreground">
+                        &minus;{formatCurrency(effectiveRentRefund)}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Damage + pending rent</span>
                     <span>{formatCurrency(amountOwed)}</span>

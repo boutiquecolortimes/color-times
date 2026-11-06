@@ -311,6 +311,9 @@ export function BookingDetailScreen() {
           {m.depositHeld ? <KV label="Security held" value={inr(m.depositHeld)} tone="info" /> : null}
           {b.status === 'returned' ? (
             <>
+              {(b.rentRefundAmount ?? 0) > 0 ? (
+                <KV label="Rent refund (already off the rent)" value={`−${inr(b.rentRefundAmount ?? 0)}`} />
+              ) : null}
               <KV label="Damage charges" value={inr(b.damageCharges ?? 0)} />
               {m.depositUsed ? <KV label="Deposit used for rent/damage" value={inr(m.depositUsed)} /> : null}
             </>
@@ -670,19 +673,27 @@ function ReturnFlow({ booking, visible, onClose, onDone }: FlowProps) {
   const [stitch, setStitch] = useState(false);
   const [damage, setDamage] = useState('');
   const [deposit, setDeposit] = useState(String(booking.securityDeposit || 0));
-  const pendingDefault = Math.max(
-    0,
-    booking.totalAmount - booking.securityDeposit - (booking.advancePaid ?? 0)
-  );
+  const [rentRefund, setRentRefund] = useState('');
+  const rentTotal = Math.max(0, booking.totalAmount - booking.securityDeposit);
+  const advancePaid = booking.advancePaid ?? 0;
+  // Rent given back (e.g. one dress not worn) lowers the rent itself — same as web.
+  const effectiveRentRefund = Math.min(num(rentRefund) ?? 0, rentTotal);
+  const rentAfterRefund = rentTotal - effectiveRentRefund;
+  const collectedBeyondRent = Math.max(0, advancePaid - rentAfterRefund);
+  const pendingDefault = Math.max(0, rentAfterRefund - advancePaid);
   const [pending, setPending] = useState(String(pendingDefault));
   const [refunded, setRefunded] = useState(true);
   const [busy, setBusy] = useState(false);
+  // Same rule the server applies: never settle against less than was paid beyond rent.
+  const depositEffective = Math.max(0, num(deposit) ?? 0, collectedBeyondRent);
+  const depositRaisedBeyondCollected =
+    (num(deposit) ?? 0) > booking.securityDeposit && (num(deposit) ?? 0) > collectedBeyondRent;
 
   const calc = useMemo(() => {
     const owed = (num(damage) ?? 0) + (num(pending) ?? 0);
-    const net = owed - (num(deposit) ?? 0);
+    const net = owed - depositEffective;
     return { refund: net < 0 ? -net : 0, collect: net > 0 ? net : 0 };
-  }, [damage, pending, deposit]);
+  }, [damage, pending, depositEffective]);
 
   const submit = async () => {
     setBusy(true);
@@ -696,6 +707,7 @@ function ReturnFlow({ booking, visible, onClose, onDone }: FlowProps) {
         securityDeposit: num(deposit) ?? 0,
         damageCharges: num(damage) ?? 0,
         pendingRentAmount: num(pending) ?? 0,
+        rentRefund: effectiveRentRefund,
         depositRefunded: refunded,
       });
       const invoiceId = await syncInvoice(booking._id);
@@ -746,8 +758,32 @@ function ReturnFlow({ booking, visible, onClose, onDone }: FlowProps) {
         ]}
       />
       <MoneyInput label="Damage charges" value={damage} onChangeText={setDamage} />
+      <MoneyInput
+        label="Rent refund"
+        value={rentRefund}
+        onChangeText={(v) => {
+          setRentRefund(v);
+          // Unpaid rent follows the reduced rent.
+          const after = rentTotal - Math.min(num(v) ?? 0, rentTotal);
+          setPending(String(Math.max(0, after - advancePaid)));
+        }}
+        hint={
+          effectiveRentRefund > 0
+            ? `Rent ${inr(rentTotal)} → ${inr(rentAfterRefund)}`
+            : 'Part of the rent given back (e.g. a dress not worn)'
+        }
+      />
       <MoneyInput label="Unpaid rent" value={pending} onChangeText={setPending} />
-      <MoneyInput label="Security deposit held" value={deposit} onChangeText={setDeposit} />
+      <MoneyInput
+        label="Security deposit held"
+        value={deposit}
+        onChangeText={setDeposit}
+        hint={
+          depositRaisedBeyondCollected
+            ? `Only ${inr(collectedBeyondRent)} was collected beyond rent. To give rent back, use Rent refund instead.`
+            : undefined
+        }
+      />
       <Card style={{ marginBottom: space.lg }}>
         {calc.refund > 0 ? (
           <KV label="Refund to customer" value={inr(calc.refund)} strong tone="success" />

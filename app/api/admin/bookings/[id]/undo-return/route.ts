@@ -7,6 +7,7 @@ import { ServiceOrder } from "@/models/ServiceOrder";
 import { requireApiRole } from "@/lib/api/require-role";
 import { MANAGER_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
+import { scaleItemRentalFees } from "@/lib/admin/booking-status";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 
 const undoReturnSchema = z.object({
@@ -68,10 +69,29 @@ export async function POST(
       .select("_id")
       .lean();
 
+    // A rent refund given at this return lowered the rent (items' rentalFee
+    // and totalAmount) — put that rent back, or undoing the return would
+    // silently keep the customer's discount.
+    const rentRefund = Math.max(0, before.rentRefundAmount ?? 0);
+    const rentRestore: Record<string, unknown> = {};
+    if (rentRefund > 0) {
+      const currentRent = Math.max(0, before.totalAmount - before.securityDeposit);
+      const restoredRent = currentRent + rentRefund;
+      // The lower rent made more of the payment count as deposit; go back to
+      // the deposit on file before this return.
+      const restoredDeposit = before.depositBeforeRentRefund ?? before.securityDeposit;
+      rentRestore.items = scaleItemRentalFees(before.items, currentRent, restoredRent);
+      rentRestore.securityDeposit = restoredDeposit;
+      rentRestore.totalAmount = restoredRent + restoredDeposit;
+    }
+
     const booking = await Booking.findByIdAndUpdate(
       id,
       {
         $set: {
+          ...rentRestore,
+          rentRefundAmount: 0,
+          depositBeforeRentRefund: null,
           status: "in_use",
           statusUpdatedAt: new Date(),
           returnedAt: null,
@@ -111,6 +131,13 @@ export async function POST(
         { field: "status", from: "returned", to: "in_use" },
         { field: "damageCharges", from: before.damageCharges ?? 0, to: 0 },
         { field: "depositRefundAmount", from: before.depositRefundAmount ?? 0, to: 0 },
+        ...(rentRefund > 0
+          ? [
+              { field: "rentRefundAmount", from: rentRefund, to: 0 },
+              { field: "totalAmount", from: before.totalAmount, to: rentRestore.totalAmount },
+              { field: "securityDeposit", from: before.securityDeposit, to: rentRestore.securityDeposit },
+            ]
+          : []),
       ],
       metadata: {
         undoReturn: true,
@@ -122,6 +149,7 @@ export async function POST(
           returnNotes: before.returnNotes,
           damageCharges: before.damageCharges,
           pendingRentAmount: before.pendingRentAmount,
+          rentRefundAmount: before.rentRefundAmount,
           depositRefunded: before.depositRefunded,
           depositRefundAmount: before.depositRefundAmount,
           finalSettlementAmount: before.finalSettlementAmount,

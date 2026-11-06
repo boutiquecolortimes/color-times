@@ -24,6 +24,10 @@ export const bookingStatusSchema = z.object({
   stitchingRequired: z.boolean().optional(),
   damageCharges: z.number().min(0).optional(),
   pendingRentAmount: z.number().min(0).optional(),
+  // Part of the rent given back at Return (e.g. customer didn't wear one of
+  // the dresses). Lowers the rent itself — NOT the security deposit — so
+  // reports, invoice and refund all agree on what was actually earned.
+  rentRefund: z.number().min(0).optional(),
   depositRefunded: z.boolean().optional(),
   // Amount collected from the customer at pickup — added on top of whatever
   // advance is already paid, not a replacement for it. Pickup now collects

@@ -65,6 +65,10 @@ export interface IBooking extends Document {
   stitchingRequired?: boolean;
   damageCharges?: number;
   pendingRentAmount?: number;
+  // Rent given back at Return (already deducted from items' rentalFee).
+  rentRefundAmount?: number;
+  // Deposit on file before a rent-refund Return raised it — restored on Undo Return.
+  depositBeforeRentRefund?: number | null;
   depositRefundAmount?: number;
   depositRefunded?: boolean;
   // When the remaining deposit was actually handed back — at Return, or
@@ -147,6 +151,8 @@ const bookingSchema = new Schema<IBooking>(
     stitchingRequired: { type: Boolean, default: false },
     damageCharges: { type: Number, min: 0, default: 0 },
     pendingRentAmount: { type: Number, min: 0, default: 0 },
+    rentRefundAmount: { type: Number, min: 0, default: 0 },
+    depositBeforeRentRefund: { type: Number, min: 0, default: null },
     depositRefundAmount: { type: Number, min: 0, default: 0 },
     depositRefunded: { type: Boolean, default: false },
     depositRefundedAt: { type: Date, default: null },

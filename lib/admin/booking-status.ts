@@ -179,3 +179,18 @@ export function bookingPaidBreakdown(booking: {
   const duePaid = Math.min(pickup, Math.max(0, rentTotal - advance));
   return { advance, duePaid, securityHeld: Math.max(0, totalPaid - rentTotal) };
 }
+
+/**
+ * Re-prices each item's rentalFee so they sum to `to`, keeping each item's
+ * share. Rounding leftovers go on the last item so the sum is exact — the
+ * invoice is built from these per-item fees, not the booking total. Used for
+ * a rent refund at Return and for putting it back on Undo Return.
+ */
+export function scaleItemRentalFees<T extends { rentalFee: number }>(items: T[], from: number, to: number): T[] {
+  if (items.length === 0) return items;
+  if (from <= 0) return items.map((item, index) => ({ ...item, rentalFee: index === 0 ? to : 0 }));
+  const scaled = items.map((item) => ({ ...item, rentalFee: Math.round((item.rentalFee * to) / from) }));
+  const drift = to - scaled.reduce((sum, item) => sum + item.rentalFee, 0);
+  scaled[scaled.length - 1].rentalFee = Math.max(0, scaled[scaled.length - 1].rentalFee + drift);
+  return scaled;
+}

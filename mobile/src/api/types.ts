@@ -80,6 +80,8 @@ export interface Booking {
   stitchingRequired?: boolean;
   damageCharges?: number;
   pendingRentAmount?: number;
+  rentRefundAmount?: number;
+  depositBeforeRentRefund?: number | null;
   depositRefundAmount?: number;
   depositRefunded?: boolean;
   depositRefundedAt?: string | null;

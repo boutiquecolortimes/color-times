@@ -97,6 +97,7 @@ interface BookingDetail {
   dryCleaningRequired?: boolean;
   stitchingRequired?: boolean;
   damageCharges?: number;
+  rentRefundAmount?: number;
   pendingRentAmount?: number;
   depositRefunded?: boolean;
   depositRefundedAt?: string | null;
@@ -646,6 +647,12 @@ export function BookingDetailClient({
                 {booking.returnedAt && (
                   <>
                     <div className="my-2 border-t border-border" />
+                    {(booking.rentRefundAmount ?? 0) > 0 && (
+                      <p className="flex justify-between">
+                        <span className="text-muted-foreground">Rent Refund (already off the rent)</span>
+                        <span>&minus;{formatCurrency(booking.rentRefundAmount ?? 0)}</span>
+                      </p>
+                    )}
                     <p className="flex justify-between">
                       <span className="text-muted-foreground">Damage Charges</span>
                       <span>{formatCurrency(booking.damageCharges ?? 0)}</span>
