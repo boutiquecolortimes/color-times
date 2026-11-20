@@ -12,6 +12,8 @@ import { recordAuditLog } from "@/lib/audit/log";
 import { formatDate } from "@/lib/utils";
 import { STATUS_LABELS } from "@/lib/admin/booking-status";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
+import { notifyBookingConfirmed } from "@/lib/notifications/whatsapp-events";
+import { siteConfig } from "@/lib/config/site";
 
 interface PopulatedCustomer {
   name: string;
@@ -25,6 +27,77 @@ function formatCustomerAddress(customer: PopulatedCustomer | null, deliveryAddre
     customer?.addresses?.find((a) => a.isDefault) ?? customer?.addresses?.[0] ?? null;
   if (!address) return "N/A";
   return `${address.line1}, ${address.city}, ${address.state} ${address.postalCode}`;
+}
+
+// How recently the booking must have become "confirmed" for this invoice
+// sync to count as the confirmation moment. Keeps an ordinary later edit of
+// an old confirmed booking from suddenly messaging the customer.
+const CONFIRMATION_WINDOW_MS = 15 * 60 * 1000;
+
+/**
+ * Sends the "booking confirmed" WhatsApp — the approved template
+ * (confirm_it_is_typed_as_booking_confirmed) has a DOCUMENT header, so it
+ * can only go out once the booking's invoice PDF exists, i.e. here, not in
+ * the status change itself. Claimed atomically via confirmationNotifiedAt so
+ * re-syncs and double clicks never send it twice.
+ */
+async function sendBookingConfirmationOnce(
+  booking: {
+    _id: unknown;
+    status: string;
+    statusUpdatedAt?: Date | null;
+    bookingNumber: string;
+    customer: unknown;
+    items: { product?: unknown }[];
+    eventDate?: Date | null;
+    rentalStartDate: Date;
+    rentalEndDate: Date;
+    totalAmount: number;
+    securityDeposit: number;
+    advancePaid?: number;
+  },
+  invoice: { _id: unknown; invoiceNumber: string }
+): Promise<void> {
+  try {
+    if (booking.status !== "confirmed") return;
+    const changedAt = booking.statusUpdatedAt ? new Date(booking.statusUpdatedAt).getTime() : 0;
+    if (Date.now() - changedAt > CONFIRMATION_WINDOW_MS) return;
+
+    const claimed = await Booking.findOneAndUpdate(
+      { _id: booking._id, confirmationNotifiedAt: null },
+      { $set: { confirmationNotifiedAt: new Date() } }
+    ).lean();
+    if (!claimed) return;
+
+    const customer = booking.customer as PopulatedCustomer | null;
+    const productNames = booking.items
+      .map((item) => (item.product as { name?: string } | null)?.name)
+      .filter(Boolean)
+      .join(", ");
+    // "The total amount due for this booking is ₹{{7}}" — the rent still to
+    // be paid after the advance (security is refundable, so not "due").
+    const rentTotal = Math.max(0, booking.totalAmount - booking.securityDeposit);
+    const amountDue = Math.max(0, rentTotal - (booking.advancePaid ?? 0));
+
+    await notifyBookingConfirmed({
+      customerName: customer?.name ?? "Customer",
+      customerPhone: customer?.phone,
+      relatedEntityType: "Booking",
+      relatedEntityId: String(booking._id),
+      documentUrl: `${siteConfig.url}/api/invoices/${String(invoice._id)}/pdf`,
+      documentFilename: `${invoice.invoiceNumber}.pdf`,
+      variables: {
+        bookingNumber: booking.bookingNumber,
+        productName: productNames,
+        eventDate: formatDate(booking.eventDate ?? booking.rentalStartDate),
+        rentalStartDate: formatDate(booking.rentalStartDate),
+        rentalEndDate: formatDate(booking.rentalEndDate),
+        amountDue: String(amountDue),
+      },
+    });
+  } catch (error) {
+    console.error("[whatsapp] booking confirmation send failed", error);
+  }
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
@@ -211,6 +284,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         });
       }
 
+      if (updated) await sendBookingConfirmationOnce(booking, updated);
       return apiSuccess({ invoice: updated });
     }
 
@@ -290,6 +364,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       console.error("Failed to record sale for invoice", invoiceNumber, saleError);
     }
 
+    await sendBookingConfirmationOnce(booking, invoice);
     return apiSuccess({ invoice }, 201);
   } catch (error) {
     return apiErrorFromUnknown(error);

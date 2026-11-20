@@ -82,6 +82,9 @@ export interface IBooking extends Document {
   // then; a booking that never had a review requested has no token at all.
   reviewToken?: string;
   reviewRequestedAt?: Date | null;
+  // Set once the "booking confirmed" WhatsApp (with the invoice PDF) has
+  // been sent, so re-syncing the invoice never messages the customer twice.
+  confirmationNotifiedAt?: Date | null;
   deletedAt?: Date | null;
   // When the booking last entered its current status — set on creation and
   // bumped on every status change (confirm, pickup, return, cancel, undo).
@@ -160,6 +163,7 @@ const bookingSchema = new Schema<IBooking>(
     settledAt: { type: Date, default: null },
     reviewToken: { type: String, trim: true, unique: true, sparse: true },
     reviewRequestedAt: { type: Date, default: null },
+    confirmationNotifiedAt: { type: Date, default: null },
     deletedAt: { type: Date, default: null, index: true },
     statusUpdatedAt: { type: Date, default: Date.now },
   },

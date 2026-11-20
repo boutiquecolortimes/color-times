@@ -22,7 +22,6 @@ import { recordAuditLog, diffObjects } from "@/lib/audit/log";
 import { scaleItemRentalFees } from "@/lib/admin/booking-status";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 import {
-  notifyBookingConfirmed,
   notifyBookingReturned,
   notifyBookingCancelled,
 } from "@/lib/notifications/whatsapp-events";
@@ -399,7 +398,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
     };
 
     if (input.status === "confirmed") {
-      void notifyBookingConfirmed(notifyContext);
+      // The customer's WhatsApp confirmation is sent from
+      // /api/admin/invoices/from-booking instead — its approved template
+      // needs the invoice PDF attached, which only exists after that call.
       void notifyAccounts(ADMIN_ROLES, {
         type: "booking_confirmed",
         title: "Booking confirmed",

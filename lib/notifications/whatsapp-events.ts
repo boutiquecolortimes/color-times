@@ -15,6 +15,33 @@ import {
 
 const SETTINGS_MODULE = "whatsapp";
 
+// Variables that the approved templates print after a "₹" — sent in Indian
+// grouping ("6,000", "1,23,500") exactly like the approved examples, never
+// raw "6000" / "6000.5", and never with a second ₹ sign.
+const AMOUNT_VARIABLES = new Set([
+  "totalAmount",
+  "amountDue",
+  "amountPaid",
+  "advancePayment",
+  "dueAmount",
+]);
+
+/**
+ * Meta rejects a template send if any body parameter is empty, contains a
+ * newline/tab, or has more than 4 consecutive spaces (error 132000/131008),
+ * so every value is normalised here before it goes out.
+ */
+function toTemplateParameter(key: string, raw: string | undefined): string {
+  let value = (raw ?? "").replace(/[\r\n\t]+/g, " ").replace(/ {2,}/g, " ").trim();
+  if (AMOUNT_VARIABLES.has(key)) {
+    const number = Number(value.replace(/[₹,\s]/g, ""));
+    if (value !== "" && Number.isFinite(number)) {
+      value = number.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+    }
+  }
+  return value || "-";
+}
+
 type AutoSendKey =
   | "autoSendOnBookingConfirmed"
   | "autoSendOnBookingReturned"
@@ -59,7 +86,7 @@ async function sendTemplatedNotification(
     // in which position (it's also what the templates reference doc was
     // generated from, so it matches what's actually approved in Meta).
     const orderedParameters = (TRIGGER_EVENT_VARIABLES[triggerEvent] ?? ["customerName"]).map(
-      (key) => allVariables[key] ?? ""
+      (key) => toTemplateParameter(key, allVariables[key])
     );
 
     if (!context.customerPhone) {

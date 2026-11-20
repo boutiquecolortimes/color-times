@@ -10,7 +10,8 @@ export interface BookingsSummary {
 
 /**
  * Summary tiles on the Bookings page (Total Earnings / Security Held /
- * Advance Collected / Due Amount). Shared by the page's first render and the
+ * Advance Collected / Due Amount). Earnings exclude the security deposit;
+ * Advance Collected is only the pre-pickup advance on open bookings. Shared by the page's first render and the
  * list API so both always show the same numbers.
  */
 export async function getBookingsSummary(filter: Record<string, unknown>): Promise<BookingsSummary> {
@@ -33,7 +34,31 @@ export async function getBookingsSummary(filter: Record<string, unknown>): Promi
     {
       $group: {
         _id: null,
-        totalAmount: { $sum: "$totalAmount" },
+        // "Total Earnings" = money the boutique actually earns, never the
+        // security deposit (that's refundable — it lives in "Security Held").
+        //   cancelled — the advance kept (no-refund policy)
+        //   returned  — rent + damage charges (unpaid rent/damage is taken
+        //               from the deposit, so that part is earned too)
+        //   otherwise — the rent on the booking
+        totalAmount: {
+          $sum: {
+            $switch: {
+              branches: [
+                { case: { $eq: ["$status", "cancelled"] }, then: { $max: [0, { $ifNull: ["$advancePaid", 0] }] } },
+                {
+                  case: { $eq: ["$status", "returned"] },
+                  then: {
+                    $add: [
+                      { $max: [0, { $subtract: ["$totalAmount", "$securityDeposit"] }] },
+                      { $ifNull: ["$damageCharges", 0] },
+                    ],
+                  },
+                },
+              ],
+              default: { $max: [0, { $subtract: ["$totalAmount", "$securityDeposit"] }] },
+            },
+          },
+        },
         // "Security Held" = deposit money still physically with the store —
         // not every deposit ever recorded. Same rule as bookingDepositHeld()
         // in lib/admin/booking-status.ts.
@@ -72,7 +97,25 @@ export async function getBookingsSummary(filter: Record<string, unknown>): Promi
             },
           },
         },
-        advancePaid: { $sum: "$advancePaid" },
+        // "Advance Collected" = advance taken before pickup on bookings that
+        // are still open. advancePaid is the running total of everything
+        // paid, so the pickup payment (pickupPaid, the "Due Paid" column) is
+        // taken off. Once a booking is Returned or Cancelled its advance is
+        // settled into earnings and no longer counts here.
+        advancePaid: {
+          $sum: {
+            $cond: [
+              { $in: ["$status", ["returned", "cancelled"]] },
+              0,
+              {
+                $max: [
+                  0,
+                  { $subtract: [{ $ifNull: ["$advancePaid", 0] }, { $ifNull: ["$pickupPaid", 0] }] },
+                ],
+              },
+            ],
+          },
+        },
         // Same rule as bookingRemainingDue(): rent − paid, and for a
         // returned booking also minus the deposit kept toward rent/damage.
         dueAmount: {

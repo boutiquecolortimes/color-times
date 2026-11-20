@@ -639,15 +639,23 @@ export function BookingForm({
       );
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
-      const saved = json.data.booking as { status?: string };
+      const saved = json.data.booking as { _id?: string; status?: string };
       // An edit (e.g. a dress added after Confirm/Pickup) changes the rent —
       // bring this booking's invoice in line right away instead of leaving
       // it on the old figures until the next stage.
-      if (isEditing && (saved.status === "confirmed" || saved.status === "in_use")) {
+      // A brand-new booking with an advance is created straight as
+      // "confirmed" — generate its invoice now too, which is also what sends
+      // the customer their WhatsApp confirmation with the PDF attached.
+      const savedId = isEditing ? bookingId : (saved as { _id?: string })._id;
+      const isNewConfirmed = !isEditing && saved.status === "confirmed";
+      if (
+        savedId &&
+        (isNewConfirmed || (isEditing && (saved.status === "confirmed" || saved.status === "in_use")))
+      ) {
         const syncRes = await fetch("/api/admin/invoices/from-booking", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bookingId }),
+          body: JSON.stringify({ bookingId: savedId }),
         });
         if (!syncRes.ok) {
           const syncJson = await syncRes.json().catch(() => ({}));

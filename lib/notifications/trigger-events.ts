@@ -28,6 +28,9 @@ export const TRIGGER_EVENT_LABELS: Record<WhatsAppTriggerEvent, string> = {
   custom: "Custom / Manual",
 };
 
+// Order = the approved Meta template's {{1}}, {{2}}, ... (verified against
+// WhatsApp Manager export, Nov 2026). Changing a template in Meta means
+// changing its list here too — Sync shows a warning when the counts differ.
 export const TRIGGER_EVENT_VARIABLES: Record<WhatsAppTriggerEvent, string[]> = {
   booking_confirmed: [
     "customerName",
@@ -36,15 +39,15 @@ export const TRIGGER_EVENT_VARIABLES: Record<WhatsAppTriggerEvent, string[]> = {
     "eventDate",
     "rentalStartDate",
     "rentalEndDate",
-    "totalAmount",
+    "amountDue",
   ],
   booking_reminder: ["customerName", "bookingNumber", "productName", "eventDate", "rentalStartDate"],
   booking_return_reminder: ["customerName", "bookingNumber", "productName", "rentalEndDate"],
   booking_returned: ["customerName", "bookingNumber", "productName"],
   booking_cancelled: ["customerName", "bookingNumber", "productName"],
   invoice_sent: ["customerName", "invoiceNumber", "totalAmount", "amountDue", "dueDate"],
-  payment_received: ["customerName", "invoiceNumber", "amountPaid", "amountDue"],
-  payment_reminder: ["customerName", "invoiceNumber", "amountDue", "dueDate"],
+  payment_received: ["customerName", "amountPaid", "invoiceNumber", "amountDue"],
+  payment_reminder: ["customerName", "amountDue", "invoiceNumber", "dueDate"],
   customisation_bill_sent: ["customerName", "billNumber", "totalAmount", "advancePayment", "dueAmount"],
   sale_bill_sent: ["customerName", "billNumber", "totalAmount"],
   custom: ["customerName"],
