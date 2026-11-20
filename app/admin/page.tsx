@@ -105,7 +105,7 @@ export default async function AdminDashboardPage() {
           <h2 className="font-heading text-lg">Needs Attention</h2>
           <p className="text-xs text-muted-foreground">
             Today: {stats.todaysBookings} new booking{stats.todaysBookings === 1 ? "" : "s"} ·{" "}
-            {stats.returnedToday} returned
+            {stats.pickedUpToday} picked up · {stats.returnedToday} returned
           </p>
         </div>
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

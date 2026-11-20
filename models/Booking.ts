@@ -61,6 +61,8 @@ export interface IBooking extends Document {
   returnCondition?: ReturnCondition;
   returnNotes?: string;
   returnedAt?: Date | null;
+  /** When the dress was handed over (status → Picked Up). */
+  pickedUpAt?: Date | null;
   dryCleaningRequired?: boolean;
   stitchingRequired?: boolean;
   damageCharges?: number;
@@ -153,6 +155,7 @@ const bookingSchema = new Schema<IBooking>(
     returnCondition: { type: String, enum: RETURN_CONDITIONS },
     returnNotes: { type: String },
     returnedAt: { type: Date, default: null, index: true },
+    pickedUpAt: { type: Date, default: null, index: true },
     dryCleaningRequired: { type: Boolean, default: false },
     stitchingRequired: { type: Boolean, default: false },
     damageCharges: { type: Number, min: 0, default: 0 },

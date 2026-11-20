@@ -46,6 +46,7 @@ export interface DashboardStats {
   todaysPickups: number;
   todaysReturns: number;
   returnedToday: number;
+  pickedUpToday: number;
   pendingPaymentsCount: number;
   overdueInvoicesCount: number;
   overdueInvoicesTotal: number;
@@ -105,6 +106,7 @@ async function computeDashboardStats(): Promise<DashboardStats> {
     todaysPickups,
     todaysReturns,
     returnedToday,
+    pickedUpToday,
     pendingPaymentsCount,
     monthlyRevenueTotalResult,
     previousMonthRevenueTotalResult,
@@ -162,6 +164,19 @@ async function computeDashboardStats(): Promise<DashboardStats> {
     Booking.countDocuments({
       returnedAt: { $gte: startOfToday, $lt: startOfTomorrow },
       deletedAt: null,
+    }),
+    // Dresses actually handed over today. Bookings picked up before
+    // pickedUpAt existed fall back to "Picked Up, status changed today".
+    Booking.countDocuments({
+      deletedAt: null,
+      $or: [
+        { pickedUpAt: { $gte: startOfToday, $lt: startOfTomorrow } },
+        {
+          pickedUpAt: null,
+          status: "in_use",
+          statusUpdatedAt: { $gte: startOfToday, $lt: startOfTomorrow },
+        },
+      ],
     }),
     Invoice.countDocuments({
       deletedAt: null,
@@ -405,6 +420,7 @@ async function computeDashboardStats(): Promise<DashboardStats> {
     todaysPickups,
     todaysReturns,
     returnedToday,
+    pickedUpToday,
     pendingPaymentsCount,
     overdueInvoicesCount: overdueInvoicesResult[0]?.count ?? 0,
     overdueInvoicesTotal: overdueInvoicesResult[0]?.total ?? 0,

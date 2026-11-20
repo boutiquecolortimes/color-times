@@ -220,6 +220,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       update.finalSettlementAmount = finalSettlementAmount;
       update.settledAt = new Date();
     } else if (input.status === "in_use") {
+      update.pickedUpAt = new Date();
       // Payment collected when handing over the dress — treated as
       // additional advance paid, on top of whatever's already recorded.
       // The pickup flow now collects the full outstanding due, so this
