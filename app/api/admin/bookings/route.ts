@@ -12,6 +12,7 @@ import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 import { escapeRegex } from "@/lib/utils";
 import { getBookingsSummary } from "@/lib/admin/bookings-summary";
+import { bookingAttentionFilter, isBookingAttention } from "@/lib/admin/attention-filters";
 import { ensureBookingStatusUpdatedAt } from "@/lib/admin/booking-activity-backfill";
 import { securityIncludingExcess } from "@/lib/admin/booking-status";
 
@@ -57,6 +58,11 @@ export async function GET(request: NextRequest): Promise<Response> {
   }
   if (to) {
     filter.rentalStartDate = { $lte: new Date(to) };
+  }
+  // Dashboard "Needs Attention" cards (?attention=returns_overdue, …).
+  const attention = searchParams.get("attention");
+  if (isBookingAttention(attention)) {
+    filter.$and = [bookingAttentionFilter(attention)];
   }
   if (search) {
     // Matches booking/bill number directly, plus customer name/email/phone

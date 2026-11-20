@@ -10,6 +10,7 @@ import { Sale } from "@/models/Sale";
 import { CustomisationOrder } from "@/models/CustomisationOrder";
 import { Settings } from "@/models/Settings";
 import { DEFAULT_INVENTORY_SETTINGS } from "@/lib/validations/inventory-settings";
+import { bookingAttentionFilter, invoiceAttentionFilter } from "@/lib/admin/attention-filters";
 
 const REVENUE_STATUSES = ["confirmed", "in_use", "returned"];
 
@@ -135,11 +136,8 @@ async function computeDashboardStats(): Promise<DashboardStats> {
     Booking.countDocuments({ status: "in_use", deletedAt: null }),
     User.countDocuments({ role: "customer", deletedAt: null }),
     Product.countDocuments({ isActive: true, deletedAt: null }),
-    Booking.countDocuments({
-      status: { $in: ["confirmed", "in_use"] },
-      rentalEndDate: { $lt: new Date() },
-      deletedAt: null,
-    }),
+    // Same rules as the lists the Needs Attention cards open.
+    Booking.countDocuments({ ...bookingAttentionFilter("returns_overdue"), deletedAt: null }),
     Invoice.aggregate([
       {
         $match: {
@@ -159,16 +157,8 @@ async function computeDashboardStats(): Promise<DashboardStats> {
       createdAt: { $gte: startOfToday, $lt: startOfTomorrow },
       deletedAt: null,
     }),
-    Booking.countDocuments({
-      rentalStartDate: { $gte: startOfToday, $lt: startOfTomorrow },
-      status: { $ne: "cancelled" },
-      deletedAt: null,
-    }),
-    Booking.countDocuments({
-      rentalEndDate: { $gte: startOfToday, $lt: startOfTomorrow },
-      status: { $ne: "cancelled" },
-      deletedAt: null,
-    }),
+    Booking.countDocuments({ ...bookingAttentionFilter("pickups_today"), deletedAt: null }),
+    Booking.countDocuments({ ...bookingAttentionFilter("returns_due_today"), deletedAt: null }),
     Booking.countDocuments({
       returnedAt: { $gte: startOfToday, $lt: startOfTomorrow },
       deletedAt: null,
@@ -347,9 +337,8 @@ async function computeDashboardStats(): Promise<DashboardStats> {
     Invoice.aggregate([
       {
         $match: {
+          ...invoiceAttentionFilter("overdue"),
           deletedAt: null,
-          status: { $in: ["sent", "partially_paid"] },
-          dueDate: { $lt: new Date() },
         },
       },
       { $group: { _id: null, total: { $sum: "$amountDue" }, count: { $sum: 1 } } },

@@ -59,6 +59,8 @@ import { useCanEdit } from "@/components/admin/current-user-context";
 import { downloadPdf, downloadExcel } from "@/lib/admin/export";
 import { cn, formatDateTime } from "@/lib/utils";
 import type { ProductStatus } from "@/models/Product";
+import { PRODUCT_ATTENTION_LABELS, isProductAttention } from "@/lib/admin/attention-filters";
+import { AttentionFilterBanner } from "@/components/admin/attention-filter-banner";
 
 interface ProductRow {
   _id: string;
@@ -128,6 +130,7 @@ async function fetchProducts(params: {
   productState: string;
   sortBy: string;
   sortDir: string;
+  attention?: string;
   all?: boolean;
 }): Promise<ProductsResponse> {
   const searchParams = new URLSearchParams({
@@ -141,6 +144,7 @@ async function fetchProducts(params: {
   if (params.productState && params.productState !== "all") {
     searchParams.set("productState", params.productState);
   }
+  if (params.attention) searchParams.set("attention", params.attention);
   if (params.all) searchParams.set("all", "true");
 
   const res = await fetch(`/api/admin/products?${searchParams.toString()}`);
@@ -197,6 +201,11 @@ export function ProductsClient({
   const [productState, setProductState] = useState("all");
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  // Set when opened from the dashboard "Low Stock Items" card (?attention=low_stock).
+  const [attention, setAttention] = useState(() => {
+    const value = searchParams.get("attention");
+    return isProductAttention(value) ? value : "";
+  });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({
     category: true,
@@ -237,11 +246,11 @@ export function ProductsClient({
 
   const isDefaultQuery =
     page === 1 && search === "" && category === "all" && status === "active" &&
-    productState === "all" && sortBy === "createdAt" && sortDir === "desc";
+    productState === "all" && sortBy === "createdAt" && sortDir === "desc" && attention === "";
 
   const { data, isFetching } = useQuery({
-    queryKey: ["admin", "products", { page, search, category, status, productState, sortBy, sortDir }],
-    queryFn: () => fetchProducts({ page, search, category, status, productState, sortBy, sortDir }),
+    queryKey: ["admin", "products", { page, search, category, status, productState, sortBy, sortDir, attention }],
+    queryFn: () => fetchProducts({ page, search, category, status, productState, sortBy, sortDir, attention }),
     initialData: isDefaultQuery
       ? { products: initialProducts, pagination: initialPagination }
       : undefined,
@@ -493,7 +502,7 @@ export function ProductsClient({
 const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Status"];
 
   async function fetchExportRows(): Promise<(string | number)[][]> {
-    const full = await fetchProducts({ page: 1, search, category, status, productState, sortBy, sortDir, all: true });
+    const full = await fetchProducts({ page: 1, search, category, status, productState, sortBy, sortDir, attention, all: true });
     return full.products.map((product, index) => [
       index + 1,
       product.name,
@@ -713,6 +722,15 @@ const exportHeaders = ["Sr No", "Name", "Code", "Category", "Rent", "Status"];
 
   return (
     <div className="space-y-6">
+      {isProductAttention(attention) && (
+        <AttentionFilterBanner
+          label={PRODUCT_ATTENTION_LABELS[attention]}
+          onClear={() => {
+            setAttention("");
+            setPage(1);
+          }}
+        />
+      )}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 flex-col gap-3 sm:flex-row">
           <div className="relative max-w-sm flex-1">

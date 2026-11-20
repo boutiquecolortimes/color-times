@@ -8,6 +8,7 @@ import { MANAGER_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { bulkActionSchema } from "@/lib/validations/bulk-action";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
+import { findRestoreBillClashes, restoreClashMessage } from "@/lib/admin/booking-restore";
 
 export async function POST(request: NextRequest): Promise<Response> {
   const auth = await requireApiRole(MANAGER_ROLES);
@@ -67,6 +68,12 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     // "delete" (soft, move to Trash) and "restore" just hide/unhide — no
     // reference check needed, same as Categories/Customers/Invoices.
+    if (input.action === "restore") {
+      const clashes = await findRestoreBillClashes(input.ids);
+      if (clashes.length > 0) {
+        return apiError(restoreClashMessage(clashes), 409);
+      }
+    }
     const update = input.action === "delete" ? { deletedAt: new Date() } : { deletedAt: null };
     const result = await Booking.updateMany({ _id: { $in: input.ids } }, update);
 

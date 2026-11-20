@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -47,6 +47,8 @@ import { downloadPdf, downloadExcel } from "@/lib/admin/export";
 import { getInvoiceDueBreakdown } from "@/lib/admin/invoice-totals";
 import { customerContact, formatDate } from "@/lib/utils";
 import type { InvoiceStatus } from "@/models/Invoice";
+import { INVOICE_ATTENTION_LABELS, isInvoiceAttention } from "@/lib/admin/attention-filters";
+import { AttentionFilterBanner } from "@/components/admin/attention-filter-banner";
 
 interface InvoiceRow {
   _id: string;
@@ -146,6 +148,7 @@ async function fetchInvoices(params: {
   search: string;
   sortBy: string;
   sortDir: string;
+  attention?: string;
   all?: boolean;
 }): Promise<{ invoices: InvoiceRow[]; pagination: Pagination; typeCounts: TypeCounts }> {
   const searchParams = new URLSearchParams({
@@ -157,6 +160,7 @@ async function fetchInvoices(params: {
   if (params.status !== "all") searchParams.set("status", params.status);
   if (params.type !== "all") searchParams.set("type", params.type);
   if (params.search) searchParams.set("search", params.search);
+  if (params.attention) searchParams.set("attention", params.attention);
   if (params.all) searchParams.set("all", "true");
 
   const res = await fetch(`/api/admin/invoices?${searchParams.toString()}`);
@@ -185,6 +189,12 @@ export function InvoicesClient({
   const [type, setType] = useState("all");
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  // Set when opened from the dashboard "Overdue Invoices" card (?attention=overdue).
+  const urlParams = useSearchParams();
+  const [attention, setAttention] = useState(() => {
+    const value = urlParams.get("attention");
+    return isInvoiceAttention(value) ? value : "";
+  });
   const [confirmState, setConfirmState] = useState<{
     type: "cancel" | "delete";
     id: string;
@@ -217,11 +227,12 @@ export function InvoicesClient({
     view === "active" &&
     search === "" &&
     sortBy === "createdAt" &&
-    sortDir === "desc";
+    sortDir === "desc" &&
+    attention === "";
 
   const { data } = useQuery({
-    queryKey: ["admin", "invoices", { page, status, type, view, search, sortBy, sortDir }],
-    queryFn: () => fetchInvoices({ page, status, type, view, search, sortBy, sortDir }),
+    queryKey: ["admin", "invoices", { page, status, type, view, search, sortBy, sortDir, attention }],
+    queryFn: () => fetchInvoices({ page, status, type, view, search, sortBy, sortDir, attention }),
     initialData: isDefaultQuery
       ? { invoices: initialInvoices, pagination: initialPagination, typeCounts: initialTypeCounts }
       : undefined,
@@ -382,7 +393,7 @@ export function InvoicesClient({
     rows: (string | number)[][];
     totals: (string | number)[];
   }> {
-    const full = await fetchInvoices({ page: 1, status, type, view, search, sortBy, sortDir, all: true });
+    const full = await fetchInvoices({ page: 1, status, type, view, search, sortBy, sortDir, attention, all: true });
     const headers = [
       "Sr No",
       "Invoice #",
@@ -552,6 +563,15 @@ export function InvoicesClient({
 
   return (
     <div className="space-y-6">
+      {isInvoiceAttention(attention) && (
+        <AttentionFilterBanner
+          label={INVOICE_ATTENTION_LABELS[attention]}
+          onClear={() => {
+            setAttention("");
+            setPage(1);
+          }}
+        />
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-heading text-2xl">Invoices</h1>

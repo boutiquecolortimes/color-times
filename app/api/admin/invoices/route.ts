@@ -16,6 +16,7 @@ import { requireApiRole } from "@/lib/api/require-role";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
+import { invoiceAttentionFilter, isInvoiceAttention } from "@/lib/admin/attention-filters";
 
 const SORTABLE_FIELDS = new Set(["invoiceNumber", "total", "amountDue", "amountPaid", "dueDate", "createdAt", "status", "deletedAt"]);
 
@@ -41,6 +42,11 @@ export async function GET(request: NextRequest): Promise<Response> {
 
   if (status && status !== "all") {
     filter.status = status;
+  }
+  // Dashboard "Overdue Invoices" card (?attention=overdue).
+  const attention = searchParams.get("attention");
+  if (isInvoiceAttention(attention)) {
+    filter.$and = [invoiceAttentionFilter(attention)];
   }
   // Counts for the type tabs ignore the type tab itself.
   const baseFilter: Record<string, unknown> = { ...filter };

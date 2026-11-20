@@ -113,7 +113,7 @@ export default async function AdminDashboardPage() {
             label="Returns Overdue"
             value={stats.returnsDue.toLocaleString("en-IN")}
             icon={RotateCcw}
-            href="/admin/bookings"
+            href="/admin/bookings?attention=returns_overdue"
             active={stats.returnsDue > 0}
             hint="Past their return date"
           />
@@ -121,21 +121,21 @@ export default async function AdminDashboardPage() {
             label="Pickups Today"
             value={stats.todaysPickups.toLocaleString("en-IN")}
             icon={PackageCheck}
-            href="/admin/bookings"
+            href="/admin/bookings?attention=pickups_today"
             active={stats.todaysPickups > 0}
           />
           <AttentionCard
             label="Returns Due Today"
             value={stats.todaysReturns.toLocaleString("en-IN")}
             icon={Undo2}
-            href="/admin/bookings"
+            href="/admin/bookings?attention=returns_due_today"
             active={stats.todaysReturns > 0}
           />
           <AttentionCard
             label="Overdue Invoices"
             value={stats.overdueInvoicesCount.toLocaleString("en-IN")}
             icon={FileWarning}
-            href="/admin/invoices"
+            href="/admin/invoices?attention=overdue"
             active={stats.overdueInvoicesCount > 0}
             hint={
               stats.overdueInvoicesCount > 0
@@ -147,7 +147,7 @@ export default async function AdminDashboardPage() {
             label="Low Stock Items"
             value={stats.lowStockCount.toLocaleString("en-IN")}
             icon={AlertTriangle}
-            href="/admin/products"
+            href="/admin/products?attention=low_stock"
             active={stats.lowStockCount > 0}
             hint="At or below reorder threshold"
           />

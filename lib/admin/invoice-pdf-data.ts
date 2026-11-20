@@ -20,6 +20,7 @@ async function buildData(invoice: NonNullable<Awaited<ReturnType<typeof findInvo
   // so the PDF never crashes on undefined numbers or dates.
   return {
     invoiceNumber: invoice.invoiceNumber,
+    bookingNumber: (invoice.booking as unknown as { bookingNumber?: string } | null)?.bookingNumber,
     status: invoice.status,
     createdAt: invoice.createdAt ?? new Date(),
     dueDate: invoice.dueDate ?? invoice.createdAt ?? new Date(),
@@ -45,7 +46,7 @@ async function buildData(invoice: NonNullable<Awaited<ReturnType<typeof findInvo
 function findInvoice(id: string) {
   return Invoice.findById(id)
     .populate("customer", "name email phone")
-    .populate("booking", "pickupPaid status depositRefundAmount")
+    .populate("booking", "bookingNumber pickupPaid status depositRefundAmount")
     .lean();
 }
 

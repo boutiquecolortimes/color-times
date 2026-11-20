@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { buildInvoicePdf, type InvoicePdfData } from "@/lib/admin/invoice-pdf";
+import { invoicePdfFilename } from "@/lib/admin/invoice-filename";
 
 type State = { kind: "building" } | { kind: "ready"; url: string; file: File } | { kind: "error"; message: string };
 
@@ -15,7 +16,7 @@ export function HindiBill({ invoice }: { invoice: InvoicePdfData }) {
     buildInvoicePdf(invoice, "hi")
       .then((doc) => {
         const blob = doc.output("blob");
-        const name = `${invoice.invoiceNumber}-hi.pdf`;
+        const name = invoicePdfFilename(invoice, "hi");
         setState({ kind: "ready", url: URL.createObjectURL(blob), file: new File([blob], name, { type: "application/pdf" }) });
       })
       .catch((error: unknown) =>

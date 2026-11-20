@@ -119,7 +119,10 @@ const bookingSchema = new Schema<IBooking>(
     // suggestNextBillNumber()) and duplicates are rejected. Sparse so the
     // unique index doesn't choke on any legacy bookings saved before this
     // field became mandatory.
-    billNumber: { type: String, required: true, trim: true, unique: true, sparse: true },
+    // Unique among bookings NOT in Trash only (see the partial index below),
+    // so staff can re-create a booking with the same bill number after
+    // moving the old one to Trash, without deleting it permanently.
+    billNumber: { type: String, required: true, trim: true },
     bookingDate: { type: Date, required: true, default: Date.now, index: true },
     customer: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     items: {
@@ -173,6 +176,18 @@ const bookingSchema = new Schema<IBooking>(
 bookingSchema.index({ createdAt: -1 });
 bookingSchema.index({ statusUpdatedAt: -1, createdAt: -1 });
 bookingSchema.index({ status: 1, rentalEndDate: 1 });
+// Bill numbers are unique among live bookings only. A trashed booking keeps
+// its bill number but no longer blocks a new booking from using it. The old
+// global unique index (billNumber_1) must be dropped once in each database:
+// `npm run fix:booking-bill-index -- --apply`.
+bookingSchema.index(
+  { billNumber: 1 },
+  {
+    name: "billNumber_active_unique",
+    unique: true,
+    partialFilterExpression: { deletedAt: { $type: "null" }, billNumber: { $type: "string" } },
+  }
+);
 
 export const Booking: Model<IBooking> =
   models.Booking ?? model<IBooking>("Booking", bookingSchema);

@@ -62,7 +62,7 @@ export const siteConfig = {
   proprietor: {
     name: "Neelam Soni",
     nameHi: "नीलम सोनी",
-    printTagline: "You Choose, We Design",
+    printTagline: "Your Choice, Our Priority",
     phones: ["7891919789", "9509786777"],
     instagramHandle: "Color_times_boutique",
   },

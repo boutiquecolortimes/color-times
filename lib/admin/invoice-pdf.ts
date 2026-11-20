@@ -23,6 +23,7 @@ import {
 import { EN_LABELS, loadHindiLabels, type HindiLabelMap, type LabelKey, type PdfLang } from "@/lib/admin/pdf-labels";
 import { formatDate, isWalkinEmail } from "@/lib/utils";
 import type { InvoiceLineItem, InvoiceStatus, PaymentMethod } from "@/models/Invoice";
+import { invoicePdfFilename } from "@/lib/admin/invoice-filename";
 
 interface InvoicePdfPayment {
   amount: number;
@@ -33,6 +34,8 @@ interface InvoicePdfPayment {
 
 export interface InvoicePdfData {
   invoiceNumber: string;
+  /** Set for booking invoices; names the PDF file (see invoicePdfFilename). */
+  bookingNumber?: string;
   status: InvoiceStatus;
   createdAt: string;
   dueDate: string;
@@ -126,7 +129,7 @@ const LABEL_HEIGHT_MM: Record<LabelKey, number> = {
 
 export async function downloadInvoicePdf(invoice: InvoicePdfData, lang: PdfLang = "en"): Promise<void> {
   const doc = await buildInvoicePdf(invoice, lang);
-  doc.save(`${invoice.invoiceNumber}${lang === "hi" ? "-hi" : ""}.pdf`);
+  doc.save(invoicePdfFilename(invoice, lang));
 }
 
 /**

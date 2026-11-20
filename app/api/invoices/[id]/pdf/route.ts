@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { generateInvoicePdfBuffer } from "@/lib/admin/invoice-pdf-server";
 import { loadInvoicePdfData } from "@/lib/admin/invoice-pdf-data";
+import { invoicePdfFilename } from "@/lib/admin/invoice-filename";
 
 export async function GET(
   request: NextRequest,
@@ -14,7 +15,7 @@ export async function GET(
     return new Response(new Uint8Array(buffer), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${result.data.invoiceNumber}.pdf"`,
+        "Content-Disposition": `inline; filename="${invoicePdfFilename(result.data)}"`,
         "Cache-Control": "private, max-age=0, no-store",
       },
     });

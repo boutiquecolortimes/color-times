@@ -1,3 +1,4 @@
+import { invoicePdfFilename } from "@/lib/admin/invoice-filename";
 import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Invoice } from "@/models/Invoice";
@@ -85,7 +86,7 @@ async function sendBookingConfirmationOnce(
       relatedEntityType: "Booking",
       relatedEntityId: String(booking._id),
       documentUrl: `${siteConfig.url}/api/invoices/${String(invoice._id)}/pdf`,
-      documentFilename: `${invoice.invoiceNumber}.pdf`,
+      documentFilename: invoicePdfFilename({ invoiceNumber: invoice.invoiceNumber, bookingNumber: booking.bookingNumber }),
       variables: {
         bookingNumber: booking.bookingNumber,
         productName: productNames,
@@ -117,7 +118,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     await connectToDatabase();
 
     const booking = await Booking.findById(bookingId)
-      .populate("items.product", "name")
+      .populate("items.product", "name sku")
       .populate("customer", "name phone addresses")
       .lean();
     if (!booking) {
@@ -155,12 +156,15 @@ export async function POST(request: NextRequest): Promise<Response> {
     const dateRange = `${formatDate(rentalStartDate)} to ${formatDate(rentalEndDate)}`;
     const securityDeposit = booking.securityDeposit ?? 0;
     const lineItems = booking.items.map((item) => {
-      const productName = (item.product as unknown as { name: string } | null)?.name ?? "Rental";
+      const product = item.product as unknown as { name: string; sku?: string } | null;
+      const productName = product?.name ?? "Rental";
+      // Product code first, e.g. "Rental — PDP012 - PDP Pink Crop Top (36), …".
+      const productLabel = product?.sku ? `${product.sku} - ${productName}` : productName;
       const quantity = item.quantity && item.quantity > 0 ? item.quantity : 1;
       const rentalFee = item.rentalFee ?? 0;
       const unitPrice = rentalFee / quantity;
       return {
-        description: `Rental — ${productName} (${item.size ?? "—"}), ${dateRange}`,
+        description: `Rental — ${productLabel} (${item.size ?? "—"}), ${dateRange}`,
         quantity,
         unitPrice,
         amount: rentalFee,

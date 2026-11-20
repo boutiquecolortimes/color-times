@@ -15,6 +15,8 @@
     "migrate:users-from-old-db": "tsx --env-file=.env.local scripts/migrate-users-from-old-db.ts",
     "reset:transactional-data": "tsx --env-file=.env.local scripts/reset-transactional-data.ts",
     "seed:team-member": "tsx --env-file=.env.local scripts/seed-team-member.ts",
+    "fix:booking-bill-index": "node --env-file=.env.local scripts/fix-booking-bill-index.mjs",
+    "backfill:invoice-product-codes": "node --env-file=.env.local scripts/backfill-invoice-product-codes.mjs",
     "backfill:order-invoices": "tsx --conditions=react-server --env-file=.env.local scripts/backfill-order-invoices.ts"
   },
   "dependencies": {

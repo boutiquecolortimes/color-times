@@ -229,6 +229,7 @@ export function InvoiceDetailClient({ initialInvoice }: { initialInvoice: Invoic
     void downloadInvoicePdf(
       {
         invoiceNumber: invoice.invoiceNumber,
+        bookingNumber: invoice.booking?.bookingNumber,
         status: invoice.status,
         createdAt: invoice.createdAt,
         dueDate: invoice.dueDate,

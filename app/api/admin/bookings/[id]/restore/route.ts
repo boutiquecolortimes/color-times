@@ -5,6 +5,7 @@ import { requireApiRole } from "@/lib/api/require-role";
 import { MANAGER_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
+import { findRestoreBillClashes, restoreClashMessage } from "@/lib/admin/booking-restore";
 
 export async function POST(
   request: NextRequest,
@@ -16,6 +17,11 @@ export async function POST(
   try {
     const { id } = await params;
     await connectToDatabase();
+
+    const clashes = await findRestoreBillClashes([id]);
+    if (clashes.length > 0) {
+      return apiError(restoreClashMessage(clashes), 409);
+    }
 
     // Deliberately doesn't touch the dress's Product.status — the dress may
     // have been rebooked to someone else while this booking sat in Trash.

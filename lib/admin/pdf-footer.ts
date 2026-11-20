@@ -88,7 +88,7 @@ export function ownerDetailLines(): string[] {
 export function ownerDetailLinesHi(): string[] {
   const { proprietor } = siteConfig;
   return [
-    "आप चुनें, हम डिज़ाइन करें",
+    "आपकी पसंद, हमारी प्राथमिकता",
     `द्वारा: ${proprietor.nameHi ?? proprietor.name}   मोबाइल: ${proprietor.phones.join(", ")}`,
     `इंस्टाग्राम: ${proprietor.instagramHandle}`,
   ];

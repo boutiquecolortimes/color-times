@@ -1,3 +1,4 @@
+import { invoicePdfFilename } from "@/lib/admin/invoice-filename";
 import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Invoice } from "@/models/Invoice";
@@ -34,7 +35,8 @@ export async function POST(
       id,
       { status: "sent", issuedAt: new Date() },
       { returnDocument: "after" }
-    ).populate("customer", "name phone");
+    ).populate("customer", "name phone")
+      .populate("booking", "bookingNumber");
 
     await recordAuditLog({
       entityType: "Invoice",
@@ -56,7 +58,10 @@ export async function POST(
         // to Meta when the active invoice_sent template has
         // metaHeaderType "document" (see lib/notifications/whatsapp-events.ts).
         documentUrl: `${siteConfig.url}/api/invoices/${id}/pdf`,
-        documentFilename: `${invoice.invoiceNumber}.pdf`,
+        documentFilename: invoicePdfFilename({
+          invoiceNumber: invoice.invoiceNumber,
+          bookingNumber: (invoice.booking as unknown as { bookingNumber?: string } | null)?.bookingNumber,
+        }),
         variables: {
           invoiceNumber: invoice.invoiceNumber,
           totalAmount: String(invoice.total),

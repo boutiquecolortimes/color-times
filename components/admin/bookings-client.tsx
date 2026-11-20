@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -66,6 +67,8 @@ import {
   type DepositState,
 } from "@/lib/admin/booking-status";
 import type { BookingStatus } from "@/models/Booking";
+import { BOOKING_ATTENTION_LABELS, isBookingAttention } from "@/lib/admin/attention-filters";
+import { AttentionFilterBanner } from "@/components/admin/attention-filter-banner";
 
 interface BookingRow {
   _id: string;
@@ -254,6 +257,7 @@ async function fetchBookings(params: {
   sortBy?: string;
   sortDir?: "asc" | "desc";
   view?: "active" | "trash";
+  attention?: string;
   all?: boolean;
 }): Promise<{
   bookings: BookingRow[];
@@ -269,6 +273,7 @@ async function fetchBookings(params: {
   if (params.sortDir) searchParams.set("sortDir", params.sortDir);
   if (params.search) searchParams.set("search", params.search);
   if (params.view) searchParams.set("view", params.view);
+  if (params.attention) searchParams.set("attention", params.attention);
   if (params.all) searchParams.set("all", "true");
 
   const res = await fetch(`/api/admin/bookings?${searchParams.toString()}`);
@@ -303,6 +308,12 @@ export function BookingsClient({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [view, setView] = useState<"table" | "card" | "calendar">("table");
   const [trashView, setTrashView] = useState<"active" | "trash">("active");
+  // Set when opened from a dashboard "Needs Attention" card (?attention=…).
+  const urlParams = useSearchParams();
+  const [attention, setAttention] = useState(() => {
+    const value = urlParams.get("attention");
+    return isBookingAttention(value) ? value : "";
+  });
   const [returnDialogBookingId, setReturnDialogBookingId] = useState<string | null>(null);
   const [confirmDialogBooking, setConfirmDialogBooking] = useState<BookingRow | null>(null);
   const [cancelDialogBooking, setCancelDialogBooking] = useState<BookingRow | null>(null);
@@ -319,7 +330,8 @@ export function BookingsClient({
     search === "" &&
     sortBy === "latestActivity" &&
     sortDir === "desc" &&
-    trashView === "active";
+    trashView === "active" &&
+    attention === "";
 
   function toggleSort(field: string) {
     if (sortBy === field) {
@@ -332,8 +344,8 @@ export function BookingsClient({
   }
 
   const { data } = useQuery({
-    queryKey: ["admin", "bookings", { page, status, from, to, search, sortBy, sortDir, trashView }],
-    queryFn: () => fetchBookings({ page, status, from, to, search, sortBy, sortDir, view: trashView }),
+    queryKey: ["admin", "bookings", { page, status, from, to, search, sortBy, sortDir, trashView, attention }],
+    queryFn: () => fetchBookings({ page, status, from, to, search, sortBy, sortDir, view: trashView, attention }),
     initialData: isDefaultQuery
       ? {
           bookings: initialBookings,
@@ -492,6 +504,7 @@ export function BookingsClient({
       sortBy,
       sortDir,
       view: trashView,
+      attention,
       all: true,
     });
     return result.bookings;
@@ -696,6 +709,15 @@ export function BookingsClient({
 
   return (
     <div className="space-y-6">
+      {isBookingAttention(attention) && (
+        <AttentionFilterBanner
+          label={BOOKING_ATTENTION_LABELS[attention]}
+          onClear={() => {
+            setAttention("");
+            setPage(1);
+          }}
+        />
+      )}
       <Tabs
         value={status}
         onValueChange={(value) => {

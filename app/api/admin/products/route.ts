@@ -8,6 +8,8 @@ import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { recordAuditLog } from "@/lib/audit/log";
 import { apiSuccess, apiError, apiErrorFromUnknown } from "@/lib/api/response";
 import { buildWordSearchClauses } from "@/lib/utils";
+import { isProductAttention } from "@/lib/admin/attention-filters";
+import { lowStockProductIds } from "@/lib/admin/low-stock";
 import { PRODUCT_STATUSES, type ProductStatus } from "@/models/Product";
 
 const SORTABLE_FIELDS = new Set([
@@ -94,6 +96,11 @@ export async function GET(request: NextRequest): Promise<Response> {
     // "booked" is a legacy value shown as Reserved — keep them together.
     filter.status =
       productState === "reserved" ? { $in: ["reserved", "booked"] } : productState;
+  }
+
+  // Dashboard "Low Stock Items" card (?attention=low_stock).
+  if (isProductAttention(searchParams.get("attention"))) {
+    filter._id = { $in: await lowStockProductIds() };
   }
 
   const sort: Record<string, 1 | -1> = {
