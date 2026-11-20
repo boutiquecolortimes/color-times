@@ -1,5 +1,6 @@
 import { invoicePdfFilename } from "@/lib/admin/invoice-filename";
 import { NextRequest } from "next/server";
+import type { Types } from "mongoose";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Invoice } from "@/models/Invoice";
 import { Booking } from "@/models/Booking";
@@ -65,7 +66,7 @@ async function sendBookingConfirmationOnce(
     if (Date.now() - changedAt > CONFIRMATION_WINDOW_MS) return;
 
     const claimed = await Booking.findOneAndUpdate(
-      { _id: booking._id, confirmationNotifiedAt: null },
+      { _id: booking._id as Types.ObjectId, confirmationNotifiedAt: null },
       { $set: { confirmationNotifiedAt: new Date() } }
     ).lean();
     if (!claimed) return;
