@@ -69,6 +69,9 @@ export function ReturnBookingDialog({
   const [rentRefund, setRentRefund] = useState(0);
   const [depositRefunded, setDepositRefunded] = useState(true);
   const [showInvoicePrompt, setShowInvoicePrompt] = useState(false);
+  // Money taken from the customer right now. Defaults to the full amount
+  // they owe; clear it (or lower it) if they're paying later.
+  const [collectedOverride, setCollectedOverride] = useState<number | null>(null);
 
   const { data: financials, isLoading: isLoadingFinancials } = useQuery<BookingFinancials | null>({
     queryKey: ["admin", "booking", bookingId, "financials"],
@@ -110,6 +113,9 @@ export function ReturnBookingDialog({
   const netPosition = amountOwed - securityDeposit;
   const depositRefundAmount = netPosition < 0 ? -netPosition : 0;
   const finalSettlementAmount = netPosition;
+  const amountToCollect = Math.max(0, finalSettlementAmount);
+  const collectedNow = Math.min(collectedOverride ?? amountToCollect, amountToCollect);
+  const stillDueAfterReturn = amountToCollect - collectedNow;
 
   function resetForm() {
     setCondition("good");
@@ -122,6 +128,7 @@ export function ReturnBookingDialog({
     setRentRefund(0);
     setDepositRefunded(true);
     setShowInvoicePrompt(false);
+    setCollectedOverride(null);
   }
 
   const mutation = useMutation({
@@ -140,6 +147,7 @@ export function ReturnBookingDialog({
           pendingRentAmount,
           rentRefund: effectiveRentRefund,
           depositRefunded,
+          returnPaymentAmount: collectedNow,
         }),
       });
       const json = await res.json();
@@ -242,10 +250,16 @@ export function ReturnBookingDialog({
           </DialogHeader>
 
           <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm">
+            {collectedNow > 0 && (
+              <div className="mb-2 flex justify-between">
+                <span className="text-muted-foreground">Collected at return</span>
+                <span className="font-medium text-emerald-600">{formatCurrency(collectedNow)}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">
                 {finalSettlementAmount > 0
-                  ? "Pending amount"
+                  ? "Still due"
                   : // depositRefunded was just submitted along with this
                     // return, so if it's checked, the refund already
                     // happened — showing "due" here would flatly contradict
@@ -257,11 +271,13 @@ export function ReturnBookingDialog({
               <span
                 className={cn(
                   "font-medium",
-                  finalSettlementAmount > 0 ? "text-destructive" : "text-emerald-600"
+                  finalSettlementAmount > 0 && stillDueAfterReturn > 0
+                    ? "text-destructive"
+                    : "text-emerald-600"
                 )}
               >
                 {formatCurrency(
-                  finalSettlementAmount > 0 ? finalSettlementAmount : depositRefundAmount
+                  finalSettlementAmount > 0 ? stillDueAfterReturn : depositRefundAmount
                 )}
               </span>
             </div>
@@ -459,6 +475,33 @@ export function ReturnBookingDialog({
                       )}
                     </span>
                   </div>
+                  {amountToCollect > 0 && (
+                    <>
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <label htmlFor="return-collected" className="text-muted-foreground">
+                          Collected now (&#8377;)
+                        </label>
+                        <Input
+                          id="return-collected"
+                          className="h-8 w-28 text-right"
+                          type="number"
+                          min={0}
+                          max={amountToCollect}
+                          placeholder="0"
+                          value={collectedNow === 0 ? "" : collectedNow}
+                          onChange={(event) =>
+                            setCollectedOverride(Math.max(0, Number(event.target.value) || 0))
+                          }
+                        />
+                      </div>
+                      <div className="mt-1 flex justify-between text-xs">
+                        <span className="text-muted-foreground">Still due after return</span>
+                        <span className={cn(stillDueAfterReturn > 0 ? "text-destructive" : "text-emerald-600")}>
+                          {formatCurrency(stillDueAfterReturn)}
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </div>

@@ -683,6 +683,8 @@ function ReturnFlow({ booking, visible, onClose, onDone }: FlowProps) {
   const pendingDefault = Math.max(0, rentAfterRefund - advancePaid);
   const [pending, setPending] = useState(String(pendingDefault));
   const [refunded, setRefunded] = useState(true);
+  // Money taken at return; empty = the full amount owed (same as web).
+  const [collected, setCollected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // Same rule the server applies: never settle against less than was paid beyond rent.
   const depositEffective = Math.max(0, num(deposit) ?? 0, collectedBeyondRent);
@@ -694,6 +696,8 @@ function ReturnFlow({ booking, visible, onClose, onDone }: FlowProps) {
     const net = owed - depositEffective;
     return { refund: net < 0 ? -net : 0, collect: net > 0 ? net : 0 };
   }, [damage, pending, depositEffective]);
+  const collectedNow = Math.min(collected === null ? calc.collect : num(collected) ?? 0, calc.collect);
+  const stillDue = calc.collect - collectedNow;
 
   const submit = async () => {
     setBusy(true);
@@ -709,6 +713,7 @@ function ReturnFlow({ booking, visible, onClose, onDone }: FlowProps) {
         pendingRentAmount: num(pending) ?? 0,
         rentRefund: effectiveRentRefund,
         depositRefunded: refunded,
+        returnPaymentAmount: collectedNow,
       });
       const invoiceId = await syncInvoice(booking._id);
       toast.success('Booking marked as returned');
@@ -722,7 +727,7 @@ function ReturnFlow({ booking, visible, onClose, onDone }: FlowProps) {
           title: 'Return confirmed',
           message: `${
             settle
-              ? `Pending amount ${inr(calc.collect)}`
+              ? `${collectedNow > 0 ? `Collected ${inr(collectedNow)} · ` : ''}Still due ${inr(stillDue)}`
               : refunded
               ? `Refunded ${inr(calc.refund)}`
               : `Refund due ${inr(calc.refund)}`
@@ -793,6 +798,14 @@ function ReturnFlow({ booking, visible, onClose, onDone }: FlowProps) {
         ) : null}
         {calc.refund === 0 && calc.collect === 0 ? <KV label="Settlement" value="All square" strong /> : null}
       </Card>
+      {calc.collect > 0 ? (
+        <MoneyInput
+          label="Collected now"
+          value={collected === null ? String(calc.collect) : collected}
+          onChangeText={setCollected}
+          hint={stillDue > 0 ? `Still due after return: ${inr(stillDue)}` : 'Fully paid at return'}
+        />
+      ) : null}
       {calc.refund > 0 ? (
         <ToggleRow label="Deposit handed back now" value={refunded} onChange={setRefunded} />
       ) : null}

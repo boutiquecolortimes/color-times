@@ -29,6 +29,10 @@ export const bookingStatusSchema = z.object({
   // reports, invoice and refund all agree on what was actually earned.
   rentRefund: z.number().min(0).optional(),
   depositRefunded: z.boolean().optional(),
+  // Money the customer pays at Return toward what's still owed (unpaid rent
+  // + damage beyond the deposit). Added to the booking's payments as "Due
+  // Paid", like a pickup payment, so Remaining Due drops to match.
+  returnPaymentAmount: z.number().min(0).optional(),
   // Amount collected from the customer at pickup — added on top of whatever
   // advance is already paid, not a replacement for it. Pickup now collects
   // the full outstanding due (not just a security top-up), so an invoice is

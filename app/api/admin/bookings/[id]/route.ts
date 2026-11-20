@@ -219,6 +219,16 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       update.depositRefundAmount = depositRefundAmount;
       update.finalSettlementAmount = finalSettlementAmount;
       update.settledAt = new Date();
+
+      // Payment taken at Return, capped at what the customer still owes.
+      const returnPayment = Math.min(
+        Math.max(0, input.returnPaymentAmount ?? 0),
+        Math.max(0, finalSettlementAmount)
+      );
+      if (returnPayment > 0) {
+        update.advancePaid = (before.advancePaid ?? 0) + returnPayment;
+        update.pickupPaid = (before.pickupPaid ?? 0) + returnPayment;
+      }
     } else if (input.status === "in_use") {
       update.pickedUpAt = new Date();
       // Payment collected when handing over the dress — treated as
